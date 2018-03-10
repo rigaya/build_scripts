@@ -6,7 +6,6 @@ set OUTPUT_DIR_ONEDRIVE=C:\Users\rigaya\OneDrive\L-SMASH
 set OUTPUT_DIR_GDRIVE=C:\Users\rigaya\GoogleDrive\L-SMASH
 set OUTPUT_DIR_DROPBOX=C:\Users\rigaya\DropBox\L-SMASH
 set BUILD_PROP_PATH=C:\ProgramEx\Build_lsmash.props
-set ONDRIVEVIEW_PATH=C:\ProgramEx\OneDriveView\bin\OneDriveView.exe
 md "%TMP_PATH%"
 cd /d "%TMP_PATH%"
 
@@ -46,12 +45,6 @@ copy /B /Y "..\%ARCHIEVE_NAME%" "%OUTPUT_DIR_DROPBOX%\L-SMASH_old"
 echo %REV% > "%OUTPUT_DIR_ONEDRIVE%\latest_build.txt"
 echo %REV% > "%OUTPUT_DIR_GDRIVE%\latest_build.txt"
 echo %REV% > "%OUTPUT_DIR_DROPBOX%\latest_build.txt"
-
-
-REM "%ONDRIVEVIEW_PATH%" uploadraw "%OUTPUT_DIR_ONEDRIVE%\latest_build.txt" /L-SMASH/
-REM "%ONDRIVEVIEW_PATH%" uploadraw "%OUTPUT_DIR_ONEDRIVE%\L-SMASH latest.zip" /L-SMASH/
-REM "%ONDRIVEVIEW_PATH%" uploadraw "..\%ARCHIEVE_NAME%" /L-SMASH/
-REM "%ONDRIVEVIEW_PATH%" uploadraw "..\%ARCHIEVE_NAME%" /L-SMASH/L-SMASH_old/
 
 for /f "usebackq delims=" %%a in (`dir /b "%OUTPUT_DIR_ONEDRIVE%" ^| find "latest build"`) do set REMOVE_TXT=%%a
 del /q "%OUTPUT_DIR_ONEDRIVE%\%REMOVE_TXT%"

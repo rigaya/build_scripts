@@ -1,5 +1,7 @@
 #!/bin/sh
 # msys2用x264afsビルドスクリプト
+#pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain
+#pacman -S p7zip git nasm
 BUILD_DIR=$HOME/build_x264
 Y4M_PATH="$HOME/husky.y4m"
 Y4M_XZ_PATH="$HOME/husky.tar.xz"
@@ -9,7 +11,6 @@ BUILD_CCFLAGS="-m32 -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fom
 BUILD_CCFLAGS_FFMPEG="-Os -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -fno-ident -I${INSTALL_DIR}/include"
 BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -L${INSTALL_DIR}/lib"
 MAKE_PROCESS=$NUMBER_OF_PROCESSORS
-SEVEN_ZIP_PATH="/C/Program Files/7-Zip/7z.exe"
 GOOGLE_DIR="/C/Users/rigaya/GoogleDrive/x264afs"
 ONEDRIVE_DIR="/C/Users/rigaya/OneDrive/x264afs"
 DROPBOX_DIR="/C/Users/rigaya/DropBox/x264afs"
@@ -160,9 +161,9 @@ rm -rf $BUILD_DIR/temp/src/x264/.git
 rm -rf $BUILD_DIR/temp/src/ffmpeg/.git
 rm -rf $BUILD_DIR/temp/src/l-smash/.git
 
-"${SEVEN_ZIP_PATH}" a -t7z -mx=9 -mmt=off  "$BUILD_DIR/temp/afsexe_r${X264_REV}+${LSMASH_REV}_src.7z" $BUILD_DIR/temp/src/
+7z a -t7z -mx=9 -mmt=off  "$BUILD_DIR/temp/afsexe_r${X264_REV}+${LSMASH_REV}_src.7z" $BUILD_DIR/temp/src/
 
-"${SEVEN_ZIP_PATH}" a -t7z -mx=9 -mmt=off "$BUILD_DIR/temp/afsexe_r${X264_REV}+${LSMASH_REV}.7z" $BUILD_DIR/$TARGET_ARCH/x264afs/x264afs_r${X264_REV}+${LSMASH_REV}.exe ${GPL_LICENSE_PATH}
+7z a -t7z -mx=9 -mmt=off "$BUILD_DIR/temp/afsexe_r${X264_REV}+${LSMASH_REV}.7z" $BUILD_DIR/$TARGET_ARCH/x264afs/x264afs_r${X264_REV}+${LSMASH_REV}.exe ${GPL_LICENSE_PATH}
 
 cp -f "$BUILD_DIR/temp/afsexe_r${X264_REV}+${LSMASH_REV}_src.7z" "${GOOGLE_DIR}/src"
 cp -f "$BUILD_DIR/temp/afsexe_r${X264_REV}+${LSMASH_REV}_src.7z" "${ONEDRIVE_DIR}/src"

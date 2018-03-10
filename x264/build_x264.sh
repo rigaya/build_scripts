@@ -1,5 +1,7 @@
 #!/bin/sh
 # msys2用x264ビルドスクリプト
+#pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain
+#pacman -S p7zip git nasm
 BUILD_DIR=$HOME/build_x264
 BUILD_CCFLAGS="-m32 -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -fno-ident -I${INSTALL_DIR}/include" 
 BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -L${INSTALL_DIR}/lib"
@@ -7,7 +9,6 @@ MAKE_PROCESS=$NUMBER_OF_PROCESSORS
 Y4M_PATH="$HOME/husky.y4m"
 Y4M_XZ_PATH="$HOME/husky.tar.xz"
 X264_MAKEFILE_PATCH="$HOME/patch/x264_makefile.diff"
-SEVEN_ZIP_PATH="/C/Program Files/7-Zip/7z.exe"
 GOOGLE_DIR="/C/Users/rigaya/GoogleDrive/x264"
 ONEDRIVE_DIR="/C/Users/rigaya/OneDrive/x264"
 DROPBOX_DIR="/C/Users/rigaya/DropBox/x264"
@@ -95,9 +96,9 @@ cp -r $BUILD_DIR/src/l-smash $BUILD_DIR/temp/src
 rm -rf $BUILD_DIR/temp/src/x264/.git
 rm -rf $BUILD_DIR/temp/src/l-smash/.git
 
-"${SEVEN_ZIP_PATH}" a -t7z -mx=9 -mmt=off  "$BUILD_DIR/temp/x264_${X264_REV}_src.7z" $BUILD_DIR/temp/src/
+7z a -t7z -mx=9 -mmt=off  "$BUILD_DIR/temp/x264_${X264_REV}_src.7z" $BUILD_DIR/temp/src/
 
-"${SEVEN_ZIP_PATH}" a -tzip -mx=9 -mfb=256 -mpass=15 -mmt=off "$BUILD_DIR/temp/x264_latest_${TARGET_ARCH}.zip" $BUILD_DIR/$TARGET_ARCH/x264/x264_${X264_REV}_${TARGET_ARCH}.exe ${GPL_LICENSE_PATH}
+7z a -tzip -mx=9 -mfb=256 -mpass=15 -mmt=off "$BUILD_DIR/temp/x264_latest_${TARGET_ARCH}.zip" $BUILD_DIR/$TARGET_ARCH/x264/x264_${X264_REV}_${TARGET_ARCH}.exe ${GPL_LICENSE_PATH}
 
 read -p "Hit enter: "
 

@@ -1,0 +1,26 @@
+diff -ur bzip2-1.0.5.orig/Makefile bzip2-1.0.5/Makefile
+--- bzip2-1.0.5.orig/Makefile	Thu Feb 14 21:39:18 2008
++++ bzip2-1.0.5/Makefile	Sun Mar  1 09:40:01 2009
+@@ -75,14 +75,14 @@
+ 	if ( test ! -d $(PREFIX)/man ) ; then mkdir -p $(PREFIX)/man ; fi
+ 	if ( test ! -d $(PREFIX)/man/man1 ) ; then mkdir -p $(PREFIX)/man/man1 ; fi
+ 	if ( test ! -d $(PREFIX)/include ) ; then mkdir -p $(PREFIX)/include ; fi
+-	cp -f bzip2 $(PREFIX)/bin/bzip2
+-	cp -f bzip2 $(PREFIX)/bin/bunzip2
+-	cp -f bzip2 $(PREFIX)/bin/bzcat
+-	cp -f bzip2recover $(PREFIX)/bin/bzip2recover
+-	chmod a+x $(PREFIX)/bin/bzip2
+-	chmod a+x $(PREFIX)/bin/bunzip2
+-	chmod a+x $(PREFIX)/bin/bzcat
+-	chmod a+x $(PREFIX)/bin/bzip2recover
++	cp -f bzip2.exe $(PREFIX)/bin/bzip2.exe
++	cp -f bzip2.exe $(PREFIX)/bin/bunzip2.exe
++	cp -f bzip2.exe $(PREFIX)/bin/bzcat.exe
++	cp -f bzip2recover.exe $(PREFIX)/bin/bzip2recover.exe
++	chmod a+x $(PREFIX)/bin/bzip2.exe
++	chmod a+x $(PREFIX)/bin/bunzip2.exe
++	chmod a+x $(PREFIX)/bin/bzcat.exe
++	chmod a+x $(PREFIX)/bin/bzip2recover.exe
+ 	cp -f bzip2.1 $(PREFIX)/man/man1
+ 	chmod a+r $(PREFIX)/man/man1/bzip2.1
+ 	cp -f bzlib.h $(PREFIX)/include

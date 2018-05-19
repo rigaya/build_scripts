@@ -56,11 +56,11 @@ INSTALL_DIR=$BUILD_DIR/$TARGET_ARCH/build
 if [ $TARGET_ARCH = "x64" ]; then
     BUILD_CCFLAGS="-O3 -mtune=sandybridge -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -I${INSTALL_DIR}/include"
     BUILD_CCFLAGS_SSE=$BUILD_CCFLAGS
-    BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -L${INSTALL_DIR}/lib"
+    BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
 elif [ $TARGET_ARCH = "x86" ]; then
     BUILD_CCFLAGS="-m32 -mtune=sandybridge -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -mstackrealign -I${INSTALL_DIR}/include" 
     BUILD_CCFLAGS_SSE="-m32 -mtune=sandybridge -msse -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -mstackrealign -I${INSTALL_DIR}/include"
-    BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -L${INSTALL_DIR}/lib"
+    BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
 else
     echo "invalid TARGET_ARCH: ${TARGET_ARCH}"
     exit
@@ -307,7 +307,8 @@ if [ ! -d "expat" ]; then
     ./configure \
     --prefix=$INSTALL_DIR \
     --enable-static \
-    --disable-shared
+    --disable-shared \
+    --without-docbook
     make -j$NJOBS && make install
 fi
 
@@ -403,6 +404,7 @@ if [ ! -d "libass" ]; then
     fi
     cp -r ./libass ./libass_dll
     cd ./libass
+    autoreconf -fvi
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
     CFLAGS="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include" \
     CPPFLAGS="${BUILD_CCFLAGS} -L${INSTALL_DIR}/lib -liconv" \
@@ -413,9 +415,12 @@ if [ ! -d "libass" ]; then
     make -j$NJOBS && make install
 
     cd $BUILD_DIR/$TARGET_ARCH/libass_dll
+    autoreconf -fvi
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+    CC="gcc -static-libgcc -static-libstdc++" \
     CFLAGS="${BUILD_CCFLAGS}" \
     CPPFLAGS="${BUILD_CCFLAGS}" \
+    LDFLAGS="-L${INSTALL_DIR}/lib -static-libgcc -static-libstdc++ -Wl,-Bstatic -Wl,-lm,-liconv,-lfreetype,-lfribidi,-lfontconfig,-lexpat,-lfreetype,-lpng,-lbz2,-lz" \
     ./configure \
     --prefix=$INSTALL_DIR \
     --enable-static=no \
@@ -424,25 +429,29 @@ if [ ! -d "libass" ]; then
     sed -i -e 's/AM_DEFAULT_VERBOSITY = 0/AM_DEFAULT_VERBOSITY = 1/g' libass/Makefile
     make -j$NJOBS
     cd libass
-    ../libtool --tag=CC   --mode=link gcc -std=gnu99 \
-    -D_GNU_SOURCE \
-    ${BUILD_CCFLAGS} \
-    -I${INSTALL_DIR}/include/freetype2 \
-    -I${INSTALL_DIR}/include/fribidi \
-    -I${INSTALL_DIR}/include \
-    -I${INSTALL_DIR}/include/freetype2 \
-    -no-undefined -version-info 8:0:3 -export-symbols ./libass.sym  -o libass.la -rpath ${INSTALL_DIR}/lib \
-    `find ./ -name "*.lo" | tr '\n' ' '` \
-    -L${INSTALL_DIR}/lib \
-    -Wl,-lm,-liconv,-lfreetype,-lfribidi,-lfontconfig,-lexpat,-lfreetype,-lpng,-lbz2,-lz \
-    -Wl,--output-def,libass.def -Wl,-s -Wl,-gc-sections
-    sed -i -e "s/ @[^ ]*//" libass.def
+    # ../libtool --tag=CC   --mode=link gcc -std=gnu99 \
+    # -D_GNU_SOURCE \
+    # ${BUILD_CCFLAGS} \
+    # -I${INSTALL_DIR}/include/freetype2 \
+    # -I${INSTALL_DIR}/include/fribidi \
+    # -I${INSTALL_DIR}/include \
+    # -I${INSTALL_DIR}/include/freetype2 \
+    # -no-undefined -version-info 8:0:3 -export-symbols ./libass.sym  -o libass.la -rpath ${INSTALL_DIR}/lib \
+    # `find ./ -name "*.lo" | tr '\n' ' '` \
+    # -L${INSTALL_DIR}/lib \
+    # -static -static-libgcc -static-libstdc++ \
+    # -Wl,-lm,-liconv,-lfreetype,-lfribidi,-lfontconfig,-lexpat,-lfreetype,-lpng,-lbz2,-lz \
+    # -Wl,--output-def,libass.def -Wl,-s -Wl,-gc-sections
+    # sed -i -e "s/ @[^ ]*//" libass.def
 
     LIBASS_DEF_FILENAME=`find ./.libs/libass-*.dll`.def
-    cp -f libass.def $LIBASS_DEF_FILENAME
-    LIBASS_LIB_FILENAME=$(basename $LIBASS_DEF_FILENAME .dll.def).lib
-    lib.exe -machine:$TARGET_ARCH -def:libass.def -out:$LIBASS_LIB_FILENAME
-    cp $LIBASS_DEF_FILENAME .
+    LIBASS_DEF_FILENAME=${LIBASS_DEF_FILENAME/.dll.def/.def}
+    cp -f `find ./.libs/libass-*.dll`.def ${LIBASS_DEF_FILENAME}
+    cp -f ${LIBASS_DEF_FILENAME} .
+    LIBASS_DEF_FILENAME=`basename $LIBASS_DEF_FILENAME`
+    sed -i -e "s/ @[^ ]*//" ${LIBASS_DEF_FILENAME}
+    LIBASS_LIB_FILENAME=$(basename $LIBASS_DEF_FILENAME .def).lib
+    lib.exe -machine:$TARGET_ARCH -def:$LIBASS_DEF_FILENAME -out:$LIBASS_LIB_FILENAME
     cp `find ./.libs/libass-*.dll` .
 fi
 
@@ -757,9 +766,9 @@ if [ $FOR_BITRATE != "TRUE" ]; then
     cp -f -r $BUILD_DIR/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH/lib/*     $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
     rm -rf   $BUILD_DIR/$FFMPEG_DIR_NAME/tmp
     
-    cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.dll     $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
-    cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.dll.def $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
-    cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.lib     $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
+    cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.dll $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
+    cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.def $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
+    cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.lib $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
     cp -f -r $INSTALL_DIR/include/ass $BUILD_DIR/$FFMPEG_DIR_NAME/include
 fi
 

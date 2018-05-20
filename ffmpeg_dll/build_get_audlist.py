@@ -28,7 +28,7 @@ if __name__ == '__main__':
     result = ""
     for configure_arg in lines_configure:
         for exeout_arg in lines_exeout:
-            if configure_arg.strip().lower() in exeout_arg.strip().lower():
+            if configure_arg.strip().replace('_', '').lower() in exeout_arg.strip().replace('_', '').lower():
                 if len(result) > 0:
                     result += ","
                 result += configure_arg.strip()

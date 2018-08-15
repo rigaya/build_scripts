@@ -2,19 +2,15 @@
 # msys2用x264afsビルドスクリプト
 #pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain
 #pacman -S p7zip git nasm
-BUILD_DIR=$HOME/build_x264
-Y4M_PATH="$HOME/husky.y4m"
-Y4M_XZ_PATH="$HOME/husky.tar.xz"
-X264_MAKEFILE_PATCH="$HOME/patch/x264_makefile.diff"
-X264_AFS_PATCH_DIR="$HOME/patch/afs"
+BUILD_DIR=`pwd`/build_x264
+Y4M_PATH="`pwd`/husky.y4m"
+Y4M_XZ_PATH="`pwd`/husky.tar.xz"
+X264_MAKEFILE_PATCH="`pwd`/patch/x264_makefile.diff"
+X264_AFS_PATCH_DIR="`pwd`/patch/afs"
 BUILD_CCFLAGS="-m32 -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -fno-ident -I${INSTALL_DIR}/include" 
 BUILD_CCFLAGS_FFMPEG="-Os -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -fno-ident -I${INSTALL_DIR}/include"
 BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -L${INSTALL_DIR}/lib"
 MAKE_PROCESS=$NUMBER_OF_PROCESSORS
-GOOGLE_DIR="/C/Users/rigaya/GoogleDrive/x264afs"
-ONEDRIVE_DIR="/C/Users/rigaya/OneDrive/x264afs"
-DROPBOX_DIR="/C/Users/rigaya/DropBox/x264afs"
-GPL_LICENSE_PATH="/C/Users/rigaya/GoogleDrive/txt/gplv2.txt"
 BUILD_ALL=1
 
 #download
@@ -59,7 +55,7 @@ else
 fi
 
 if [ ! -e $Y4M_PATH ]; then
-	tar xf $Y4M_XZ_PATH
+	tar xf $Y4M_XZ_PATH -C `dirname $Y4M_PATH`
 fi
 
 
@@ -122,6 +118,7 @@ cp -r ../src/ffmpeg ffmpeg
 #build L-SMASH
 cd $BUILD_DIR/$TARGET_ARCH/L-SMASH
 LSMASH_REV=`git rev-list HEAD | wc -l`
+export LSMASH_REV=$LSMASH_REV
 ./configure \
 --prefix=$INSTALL_DIR \
 --extra-cflags="${BUILD_CCFLAGS}" \
@@ -131,6 +128,7 @@ make clean && make -j$MAKE_PROCESS install-lib
 #build x264afs
 cd $BUILD_DIR/$TARGET_ARCH/x264afs
 X264_REV=`git rev-list HEAD | wc -l`
+export X264_REV=$X264_REV
 
 patch -uNp1 < "${X264_AFS_PATCH_DIR}/afs.diff"
 cp "${X264_AFS_PATCH_DIR}/afs_client.h" .
@@ -148,29 +146,3 @@ PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
 # make -j$MAKE_PROCESS
 make fprofiled VIDS="${Y4M_PATH}" -j$MAKE_PROCESS
 cp -f x264.exe x264afs_r${X264_REV}+${LSMASH_REV}.exe
-
-read -p "Hit enter: "
-
-cd $HOME
-mkdir -p $BUILD_DIR/temp
-mkdir -p $BUILD_DIR/temp/src
-cp -r $BUILD_DIR/src/x264 $BUILD_DIR/temp/src
-cp -r $BUILD_DIR/src/ffmpeg $BUILD_DIR/temp/src
-cp -r $BUILD_DIR/src/l-smash $BUILD_DIR/temp/src
-rm -rf $BUILD_DIR/temp/src/x264/.git
-rm -rf $BUILD_DIR/temp/src/ffmpeg/.git
-rm -rf $BUILD_DIR/temp/src/l-smash/.git
-
-7z a -t7z -mx=9 -mmt=off  "$BUILD_DIR/temp/afsexe_r${X264_REV}+${LSMASH_REV}_src.7z" $BUILD_DIR/temp/src/
-
-7z a -t7z -mx=9 -mmt=off "$BUILD_DIR/temp/afsexe_r${X264_REV}+${LSMASH_REV}.7z" $BUILD_DIR/$TARGET_ARCH/x264afs/x264afs_r${X264_REV}+${LSMASH_REV}.exe ${GPL_LICENSE_PATH}
-
-cp -f "$BUILD_DIR/temp/afsexe_r${X264_REV}+${LSMASH_REV}_src.7z" "${GOOGLE_DIR}/src"
-cp -f "$BUILD_DIR/temp/afsexe_r${X264_REV}+${LSMASH_REV}_src.7z" "${ONEDRIVE_DIR}/src"
-cp -f "$BUILD_DIR/temp/afsexe_r${X264_REV}+${LSMASH_REV}_src.7z" "${DROPBOX_DIR}/src"
-
-cp -f "$BUILD_DIR/temp/afsexe_r${X264_REV}+${LSMASH_REV}.7z" "${GOOGLE_DIR}"
-cp -f "$BUILD_DIR/temp/afsexe_r${X264_REV}+${LSMASH_REV}.7z" "${ONEDRIVE_DIR}"
-cp -f "$BUILD_DIR/temp/afsexe_r${X264_REV}+${LSMASH_REV}.7z" "${DROPBOX_DIR}"
-
-rm -rf $BUILD_DIR/temp

@@ -34,9 +34,9 @@ rm -rf $BUILD_DIR/temp/src/.hg
 cp -f $BUILD_DIR/$TARGET_ARCH/x265/build/msys/8bit/x265.exe $BUILD_DIR/$TARGET_ARCH/x265/build/msys/8bit/x265_${X265_VER}_${TARGET_ARCH}.exe
 7z a -tzip -mx=9 -mfb=256 -mpass=15 -mmt=off "$BUILD_DIR/temp/x265_latest_${TARGET_ARCH}.zip" $BUILD_DIR/$TARGET_ARCH/x265/build/msys/8bit/x265_${X265_VER}_${TARGET_ARCH}.exe ${GPL_LICENSE_PATH}
 
-rm -f "${GOOGLE_DIR}/current*.txt"
-rm -f "${ONEDRIVE_DIR}/current*.txt"
-rm -f "${DROPBOX_DIR}/current*.txt"
+rm -f "${GOOGLE_DIR}"/current*.txt
+rm -f "${ONEDRIVE_DIR}"/current*.txt
+rm -f "${DROPBOX_DIR}"/current*.txt
 
 echo -n > "${GOOGLE_DIR}/current version is ${X265_VER}.txt"
 echo -n > "${ONEDRIVE_DIR}/current version is ${X265_VER}.txt"

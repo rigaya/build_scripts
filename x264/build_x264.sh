@@ -4,7 +4,7 @@
 #pacman -S p7zip git nasm
 BUILD_DIR=`pwd`/build_x264
 BUILD_CCFLAGS="-msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -fno-ident -I${INSTALL_DIR}/include" 
-BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -L${INSTALL_DIR}/lib"
+BUILD_LDFLAGS="-static -static-libgcc -Wl,--gc-sections -Wl,--strip-all -L${INSTALL_DIR}/lib"
 MAKE_PROCESS=$NUMBER_OF_PROCESSORS
 Y4M_PATH="`pwd`/husky.y4m"
 Y4M_XZ_PATH="`pwd`/husky.tar.xz"

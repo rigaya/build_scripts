@@ -55,13 +55,15 @@ fi
 if [ -d "x265" ]; then
     if [ $UPDATE_X265 != "FALSE" ]; then
         cd x265
-        make uninstall && make distclean &> /dev/null
-        hg pull
+        hg pull && hg update stable
         cd ..
     fi
 else
     UPDATE_X265=TRUE
     hg clone https://bitbucket.org/multicoreware/x265
+    cd x265
+    hg pull && hg update stable
+    cd ..
 fi
 
 # --- 出力先を準備 --------------------------------------

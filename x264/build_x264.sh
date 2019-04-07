@@ -29,7 +29,7 @@ if [ -d "x264" ]; then
     git pull
     cd ..
 else
-	git clone git://git.videolan.org/x264.git x264
+	git clone git@code.videolan.org:videolan/x264.git x264
 fi
 
 if [ -d "l-smash" ]; then
@@ -79,6 +79,7 @@ PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
  --enable-strip \
  --disable-ffms \
  --disable-gpac \
+ --disable-lavf \
  --bit-depth=all \
  --extra-cflags="-O3 ${BUILD_CCFLAGS}" \
  --extra-ldflags="${BUILD_LDFLAGS}"

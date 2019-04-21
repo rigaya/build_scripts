@@ -1,7 +1,7 @@
 @echo off
 set CUR_DIR=%~dp0
 set ENCODER_NAME=x264guiEx
-set ENCODER_SRC_DIR=F:\Visual Studio 2015\Projects\%ENCODER_NAME%
+set ENCODER_SRC_DIR=F:\VisualStudio2019\Projects\%ENCODER_NAME%
 set SEVENZIP_PATH=C:\Program Files\7-Zip\7z.exe
 
 set /P ENCODER_VERSION=çÏê¨Ç∑ÇÈ%ENCODER_NAME%ÇÃÉoÅ[ÉWÉáÉì=
@@ -16,7 +16,7 @@ if not exist "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%" (
 timeout 2
 
 cd /d "%ENCODER_SRC_DIR%"
-call "%VS140COMNTOOLS%VsMSBuildCmd.bat"
+call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat" x86
 msbuild x264guiEx.sln /t:build /p:Configuration=Release;Platform="Win32"
 cd /d "%CUR_DIR%"
 

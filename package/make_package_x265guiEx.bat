@@ -16,7 +16,7 @@ if not exist "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%" (
 timeout 2
 
 cd /d "%ENCODER_SRC_DIR%"
-call "%VS140COMNTOOLS%VsMSBuildCmd.bat"
+call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars32.bat" x86
 msbuild x265guiEx.sln /t:build /p:Configuration=Release;Platform="Win32"
 cd /d "%CUR_DIR%"
 

@@ -4,6 +4,7 @@
 #そのほかにcmake, mercurial(windows版)のインストールが必要
 NJOBS=$(($NUMBER_OF_PROCESSORS>16?16:$NUMBER_OF_PROCESSORS))
 BUILD_DIR=$HOME/build_x265
+BUILD_DIR_WIN=`cygpath -m ${HOME}`/build_x265
 #cmake.exeのある場所
 CMAKE_DIR="/C/Program Files/CMake/bin"
 #hg.exeのある場所
@@ -11,6 +12,10 @@ HG_DIR="/C/Program Files/Mercurial"
 #プロファイル用のソース
 Y4M_PATH=$HOME/sakura_op_cut.y4m
 
+ENABLE_SVT_HEVC=OFF
+SVT_HEVC_REV=6a6003e127554b3139bbe560769d1df196b2127f
+SVT_HEVC_A_DIR=
+SVT_HEVC_LINK_LIBS=
 UPDATE_X265="TRUE"
 BUILD_12BIT="ON"
 BUILD_10BIT="ON"
@@ -33,7 +38,7 @@ else
 fi
 
 if [ $TARGET_ARCH = "x64" ]; then
-    BUILD_CCFLAGS="-O3 -msse2 -I${INSTALL_DIR}/include"
+    BUILD_CCFLAGS="-O3 -msse2 -fpermissive -I${INSTALL_DIR}/include"
     BUILD_LDFLAGS="-static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
 elif [ $TARGET_ARCH = "x86" ]; then
     BUILD_CCFLAGS="-m32 -msse2 -I${INSTALL_DIR}/include" 
@@ -55,15 +60,29 @@ fi
 if [ -d "x265" ]; then
     if [ $UPDATE_X265 != "FALSE" ]; then
         cd x265
-        hg pull && hg update stable
+        #hg pull && hg update stable
+        hg pull && hg update default
         cd ..
     fi
 else
     UPDATE_X265=TRUE
     hg clone https://bitbucket.org/multicoreware/x265
     cd x265
-    hg pull && hg update stable
+    #hg pull && hg update stable
+    hg pull && hg update default
     cd ..
+fi
+
+if [ -d "SVT-HEVC" ]; then
+    if [ $UPDATE_X265 != "FALSE" ]; then
+        cd SVT-HEVC
+        git pull
+        git checkout $SVT_HEVC_REV
+        cd ..
+    fi
+else
+    git clone https://github.com/OpenVisualCloud/SVT-HEVC.git
+    git checkout $SVT_HEVC_REV
 fi
 
 # --- 出力先を準備 --------------------------------------
@@ -75,12 +94,38 @@ if [ -d x265 ]; then
     rm -rf x265
 fi
 cp -r ../src/x265 .
+cp -r ../src/SVT-HEVC .
+
+if [ $TARGET_ARCH = "x64" ]; then
+    ENABLE_SVT_HEVC=ON
+    cd $BUILD_DIR/$TARGET_ARCH/SVT-HEVC
+    #static linkを強制
+    sed -i -e 's/SHARED/STATIC/g' Source/Lib/Codec/CMakeLists.txt
+    find ./ -type f -name *.txt | xargs sed -i -e 's/-flto//g'
+    find ./ -type f -name *.txt | xargs sed -i -e 's/-fPIC//g'
+    find ./ -type f -name *.txt | xargs sed -i -e 's/-fPIE//g'
+    find ./ -type f -name *.txt | xargs sed -i -e 's/-O2/-O3/g'
+    find ./ -type f -name *.txt | xargs sed -i -e 's/-fstack-protector-strong//g'
+    cd Build/linux
+    mkdir -p release
+    mkdir -p ../../Bin/Release
+    cd release
+    cmake -G "MSYS Makefiles" ../../.. -DCMAKE_BUILD_TYPE=Release
+    make -j${NJOBS}
+    export SVT_HEVC_INCLUDE_DIR=$BUILD_DIR/$TARGET_ARCH/SVT-HEVC/Source/API/
+    export SVT_HEVC_LIBRARY_DIR=$BUILD_DIR/$TARGET_ARCH/SVT-HEVC/Bin/Release/
+    #そのままだと見つけてくれないので小細工
+    sed -i -e 's/CMAKE_FIND_LIBRARY_SUFFIXES ".lib"/CMAKE_FIND_LIBRARY_SUFFIXES ".a"/g' $BUILD_DIR/$TARGET_ARCH/x265/source/cmake/Findsvthevc.cmake
+    SVT_HEVC_A_DIR=$BUILD_DIR_WIN/$TARGET_ARCH/SVT-HEVC/Build/linux/release/Release/lib
+    SVT_HEVC_LINK_LIBS=" ${SVT_HEVC_A_DIR}/libC_DEFAULT.a ${SVT_HEVC_A_DIR}/libASM_SSE2.a ${SVT_HEVC_A_DIR}/libASM_SSSE3.a ${SVT_HEVC_A_DIR}/libASM_SSE4_1.a ${SVT_HEVC_A_DIR}/libASM_AVX2.a"
+fi
 
 # --- バージョン情報 ----------------------------------------------
 cd $BUILD_DIR/$TARGET_ARCH/x265
 X265_VER=`hg log -r. --template "{latesttag}"`
 X265_VER=${X265_VER}+`hg log -r. --template "{latesttagdistance}"`
 echo "build x265 ${X265_VER}"
+
 
 # --- ビルド ----------------------------------------------
 cd $BUILD_DIR/$TARGET_ARCH/x265/build/msys
@@ -103,6 +148,7 @@ if [ "${PROFILE_GEN_CC}" != "" ]; then
             -DEXPORT_C_API=OFF \
             -DENABLE_SHARED=OFF \
             -DENABLE_CLI=OFF \
+            -DENABLE_SVT_HEVC=OFF \
             -DMAIN12=ON \
             ${CMAKE_PROFILE_ARG} \
             -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
@@ -123,6 +169,7 @@ if [ "${PROFILE_GEN_CC}" != "" ]; then
             -DHIGH_BIT_DEPTH=ON \
             -DEXPORT_C_API=OFF \
             -DENABLE_SHARED=OFF \
+            -DENABLE_SVT_HEVC=OFF \
             -DENABLE_CLI=OFF \
             ${CMAKE_PROFILE_ARG} \
             -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
@@ -139,6 +186,7 @@ if [ "${PROFILE_GEN_CC}" != "" ]; then
         -DEXTRA_LINK_FLAGS=-L. \
         -DLINKED_10BIT=${BUILD_10BIT} \
         -DLINKED_12BIT=${BUILD_12BIT} \
+        -DENABLE_SVT_HEVC=$ENABLE_SVT_HEVC \
         -DENABLE_SHARED=OFF \
         ${CMAKE_PROFILE_ARG} \
         -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
@@ -147,6 +195,7 @@ if [ "${PROFILE_GEN_CC}" != "" ]; then
 
     #強制的に完全な静的リンクにする
     sed -i -e 's/Bdynamic/Bstatic/g' CMakeFiles/cli.dir/linklibs.rsp
+    echo ${SVT_HEVC_LINK_LIBS} >> CMakeFiles/cli.dir/linklibs.rsp
     make -j${NJOBS}
 
     #profileのための実行はシングルスレッドで行う
@@ -185,6 +234,7 @@ if [ $BUILD_12BIT = "ON" ]; then
         -DHIGH_BIT_DEPTH=ON \
         -DEXPORT_C_API=OFF \
         -DENABLE_SHARED=OFF \
+        -DENABLE_SVT_HEVC=OFF \
         -DENABLE_CLI=OFF \
         -DMAIN12=ON \
         ${CMAKE_PROFILE_ARG} \
@@ -204,6 +254,7 @@ if [ $BUILD_10BIT = "ON" ]; then
         -DHIGH_BIT_DEPTH=ON \
         -DEXPORT_C_API=OFF \
         -DENABLE_SHARED=OFF \
+        -DENABLE_SVT_HEVC=OFF \
         -DENABLE_CLI=OFF \
         ${CMAKE_PROFILE_ARG} \
         -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
@@ -221,6 +272,7 @@ cmake -G "MSYS Makefiles" ../../../source \
     -DLINKED_10BIT=${BUILD_10BIT} \
     -DLINKED_12BIT=${BUILD_12BIT} \
     -DENABLE_SHARED=OFF \
+    -DENABLE_SVT_HEVC=$ENABLE_SVT_HEVC \
     ${CMAKE_PROFILE_ARG} \
     -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
     -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
@@ -228,6 +280,7 @@ cmake -G "MSYS Makefiles" ../../../source \
 
 #強制的に完全な静的リンクにする
 sed -i -e 's/Bdynamic/Bstatic/g' CMakeFiles/cli.dir/linklibs.rsp
+echo ${SVT_HEVC_LINK_LIBS} >> CMakeFiles/cli.dir/linklibs.rsp
 make -j${NJOBS}
 
 strip -s $BUILD_DIR/$TARGET_ARCH/x265/build/msys/8bit/x265

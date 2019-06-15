@@ -13,7 +13,7 @@ HG_DIR="/C/Program Files/Mercurial"
 Y4M_PATH=$HOME/sakura_op_cut.y4m
 
 ENABLE_SVT_HEVC=OFF
-SVT_HEVC_REV=6a6003e127554b3139bbe560769d1df196b2127f
+SVT_HEVC_REV=
 SVT_HEVC_A_DIR=
 SVT_HEVC_LINK_LIBS=
 UPDATE_X265="TRUE"
@@ -77,12 +77,22 @@ if [ -d "SVT-HEVC" ]; then
     if [ $UPDATE_X265 != "FALSE" ]; then
         cd SVT-HEVC
         git pull
-        git checkout $SVT_HEVC_REV
+        if [ "${SVT_HEVC_REV}" != "" ]; then
+            git checkout $SVT_HEVC_REV
+        else
+            git checkout HEAD
+        fi
         cd ..
     fi
 else
     git clone https://github.com/OpenVisualCloud/SVT-HEVC.git
-    git checkout $SVT_HEVC_REV
+    cd SVT-HEVC
+    if [ "${SVT_HEVC_REV}" != "" ]; then
+        git checkout $SVT_HEVC_REV
+    else
+        git checkout HEAD
+    fi
+    cd ..
 fi
 
 # --- 出力先を準備 --------------------------------------
@@ -147,6 +157,7 @@ if [ "${PROFILE_GEN_CC}" != "" ]; then
             -DHIGH_BIT_DEPTH=ON \
             -DEXPORT_C_API=OFF \
             -DENABLE_SHARED=OFF \
+            -DENABLE_HDR10_PLUS=OFF \
             -DENABLE_CLI=OFF \
             -DENABLE_SVT_HEVC=OFF \
             -DMAIN12=ON \
@@ -169,6 +180,7 @@ if [ "${PROFILE_GEN_CC}" != "" ]; then
             -DHIGH_BIT_DEPTH=ON \
             -DEXPORT_C_API=OFF \
             -DENABLE_SHARED=OFF \
+            -DENABLE_HDR10_PLUS=ON \
             -DENABLE_SVT_HEVC=OFF \
             -DENABLE_CLI=OFF \
             ${CMAKE_PROFILE_ARG} \
@@ -188,6 +200,7 @@ if [ "${PROFILE_GEN_CC}" != "" ]; then
         -DLINKED_12BIT=${BUILD_12BIT} \
         -DENABLE_SVT_HEVC=$ENABLE_SVT_HEVC \
         -DENABLE_SHARED=OFF \
+        -DENABLE_HDR10_PLUS=OFF \
         ${CMAKE_PROFILE_ARG} \
         -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
         -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
@@ -234,6 +247,7 @@ if [ $BUILD_12BIT = "ON" ]; then
         -DHIGH_BIT_DEPTH=ON \
         -DEXPORT_C_API=OFF \
         -DENABLE_SHARED=OFF \
+        -DENABLE_HDR10_PLUS=OFF \
         -DENABLE_SVT_HEVC=OFF \
         -DENABLE_CLI=OFF \
         -DMAIN12=ON \
@@ -254,6 +268,7 @@ if [ $BUILD_10BIT = "ON" ]; then
         -DHIGH_BIT_DEPTH=ON \
         -DEXPORT_C_API=OFF \
         -DENABLE_SHARED=OFF \
+        -DENABLE_HDR10_PLUS=ON \
         -DENABLE_SVT_HEVC=OFF \
         -DENABLE_CLI=OFF \
         ${CMAKE_PROFILE_ARG} \
@@ -272,6 +287,7 @@ cmake -G "MSYS Makefiles" ../../../source \
     -DLINKED_10BIT=${BUILD_10BIT} \
     -DLINKED_12BIT=${BUILD_12BIT} \
     -DENABLE_SHARED=OFF \
+    -DENABLE_HDR10_PLUS=OFF \
     -DENABLE_SVT_HEVC=$ENABLE_SVT_HEVC \
     ${CMAKE_PROFILE_ARG} \
     -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \

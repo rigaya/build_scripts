@@ -2,7 +2,7 @@
 #MSYS2用ffmpeg dllビルドスクリプト
 #Visual Studioへの環境変数を通しておくこと
 #pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain
-#pacman -S p7zip git nasm python
+#pacman -S p7zip git nasm python unzip
 #そのほかにcmake(windows版)のインストールが必要
 NJOBS=$(($NUMBER_OF_PROCESSORS>16?16:$NUMBER_OF_PROCESSORS))
 BUILD_DIR=$HOME/build_ffmpeg_dll
@@ -107,9 +107,9 @@ else
     git clone git://source.ffmpeg.org/ffmpeg.git ffmpeg
 fi
 
-if [ ! -d "libpng-1.6.34" ]; then
-    wget ftp://ftp-osl.osuosl.org/pub/libpng/src/libpng16/libpng-1.6.34.tar.xz
-    tar xf libpng-1.6.34.tar.xz
+if [ ! -d "libpng-1.6.37" ]; then
+    wget https://download.sourceforge.net/libpng/libpng-1.6.37.tar.xz
+    tar xf libpng-1.6.37.tar.xz
 fi
 
 if [ ! -d "bzip2-1.0.6" ]; then
@@ -153,14 +153,14 @@ if [ ! -d "libogg-1.3.3" ]; then
     tar xf libogg-1.3.3.tar.gz
 fi
 
-if [ ! -d "libvorbis-1.3.5" ]; then
-    wget http://downloads.xiph.org/releases/vorbis/libvorbis-1.3.5.tar.gz
-    tar xf libvorbis-1.3.5.tar.gz
+if [ ! -d "libvorbis-1.3.6" ]; then
+    wget http://downloads.xiph.org/releases/vorbis/libvorbis-1.3.6.tar.gz
+    tar xf libvorbis-1.3.6.tar.gz
 fi
 
-if [ ! -d "opus-1.2.1" ]; then
-    wget https://archive.mozilla.org/pub/opus/opus-1.2.1.tar.gz
-    tar xf opus-1.2.1.tar.gz
+if [ ! -d "opus-1.3.1" ]; then
+    wget https://archive.mozilla.org/pub/opus/opus-1.3.1.tar.gz
+    tar xf opus-1.3.1.tar.gz
 fi
 
 if [ ! -d "speex-1.2.0" ]; then
@@ -183,14 +183,35 @@ if [ ! -d "libsndfile-1.0.28" ]; then
     tar xf libsndfile-1.0.28.tar.gz
 fi
 
-if [ ! -d "soxr-0.1.2-Source" ]; then
-    wget http://nchc.dl.sourceforge.net/project/soxr/soxr-0.1.2-Source.tar.xz
-    tar xf soxr-0.1.2-Source.tar.xz
+if [ ! -d "soxr-0.1.3-Source" ]; then
+    wget http://nchc.dl.sourceforge.net/project/soxr/soxr-0.1.3-Source.tar.xz
+    tar xf soxr-0.1.3-Source.tar.xz
 fi
 
 if [ ! -d "wavpack-5.1.0" ]; then
     wget http://www.wavpack.com/wavpack-5.1.0.tar.bz2
     tar xf wavpack-5.1.0.tar.bz2
+fi
+
+if [ ! -d "libxml2-2.9.9" ]; then
+    wget ftp://xmlsoft.org/libxml2/libxml2-2.9.9.tar.gz
+    tar xf libxml2-2.9.9.tar.gz
+fi
+
+#if [ ! -d "apache-ant-1.10.6-src.tar.xz" ]; then
+#    wget https://archive.apache.org/dist/ant/source/apache-ant-1.10.6-src.tar.xz
+#    tar xf apache-ant-1.10.6-src.tar.xz
+#fi
+
+if [ ! -d "libbluray-1.1.2" ]; then
+    wget https://download.videolan.org/pub/videolan/libbluray/1.1.2/libbluray-1.1.2.tar.bz2
+    tar xf libbluray-1.1.2.tar.bz2
+fi
+
+if [ ! -d "aribb24-master" ]; then
+    wget https://github.com/nkoriyama/aribb24/archive/master.zip
+    mv master.zip aribb24-master.zip
+    unzip aribb24-master.zip
 fi
 
 # if [ ! -d "gperf-3.0.4" ]; then
@@ -594,6 +615,57 @@ if [ ! -d "wavpack" ]; then
     make install -j$NJOBS
 fi
 
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "libxml2" ]; then
+    find ../src/ -type d -name "libxml2-*" | xargs -i cp -r {} ./libxml2
+    cd ./libxml2
+    CFLAGS="${BUILD_CCFLAGS}" \
+    CPPFLAGS="${BUILD_CCFLAGS}" \
+    LDFLAGS="${BUILD_LDFLAGS}" \
+     ./configure \
+     --prefix=$INSTALL_DIR \
+     --disable-shared \
+     --enable-static
+    make install -j$NJOBS
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "libbluray" ]; then
+    find ../src/ -type d -name "libbluray-*" | xargs -i cp -r {} ./libbluray
+    cd ./libbluray
+    autoreconf -fvi
+    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+    CFLAGS="${BUILD_CCFLAGS}" \
+    CPPFLAGS="${BUILD_CCFLAGS}" \
+    LDFLAGS="${BUILD_LDFLAGS}" \
+     ./configure \
+     --prefix=$INSTALL_DIR \
+     --disable-shared \
+     --enable-static \
+     --disable-bdjava-jar \
+     --disable-doxygen-doc \
+     --disable-examples
+    make install -j$NJOBS
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "aribb24" ]; then
+    find ../src/ -type d -name "aribb24-*" | xargs -i cp -r {} ./aribb24
+    cd ./aribb24
+    autoreconf -fvi
+    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+    CFLAGS="${BUILD_CCFLAGS}" \
+    CPPFLAGS="${BUILD_CCFLAGS}" \
+    LDFLAGS="${BUILD_LDFLAGS}" \
+     ./configure \
+     --prefix=$INSTALL_DIR \
+     --disable-shared \
+     --enable-static
+    make install -j$NJOBS
+    sed -i -e 's/Version: 1.0.3/Version: 1.0.4/g' ${INSTALL_DIR}/lib/pkgconfig/aribb24.pc
+fi
+
+
 # cd $BUILD_DIR/$TARGET_ARCH
 # if [ ! -d "gmp" ]; then
     # find ../src/ -type d -name "gmp-*" | xargs -i cp -r {} ./gmp
@@ -719,6 +791,7 @@ PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
 --prefix=${BUILD_DIR}/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH \
 --arch="${FFMPEG_ARCH}" \
 --target-os="mingw32" \
+--enable-version3 \
 --disable-programs \
 --disable-doc \
 $SWSCALE_ARG \
@@ -739,11 +812,7 @@ $SWSCALE_ARG \
 --enable-bsfs \
 --enable-swresample \
 --enable-shared \
---disable-encoders \
---enable-encoder=$CONFIGURE_AUDENC_LIST,libmp3lame,libopus,libtwolame,libvorbis,libwavpack,libspeex \
 --disable-decoder=vorbis \
---disable-filters \
---enable-filter=$CONFIGURE_AUDFILTER_LIST \
 --enable-libvorbis \
 --enable-libspeex \
 --enable-libmp3lame \
@@ -753,10 +822,16 @@ $SWSCALE_ARG \
 --enable-libsoxr \
 --enable-libwavpack \
 --enable-libopus \
+--enable-libbluray \
+--enable-libass \
+--disable-filters \
+--enable-filter=$CONFIGURE_AUDFILTER_LIST \
+--pkg-config-flags="--static" \
+--enable-libaribb24 \
 --extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
 --extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib"
 fi
-make -j$NJOBS && make install
+make clean && make -j$NJOBS && make install
 
 if [ $FOR_BITRATE != "TRUE" ]; then
     mkdir -p $BUILD_DIR/$FFMPEG_DIR_NAME/include
@@ -780,7 +855,8 @@ if [ $UPDATE_FFMPEG != "FALSE" ]; then
      $BUILD_DIR/src/ffmpeg* $BUILD_DIR/src/opus* $BUILD_DIR/src/libogg* $BUILD_DIR/src/libvorbis* \
      $BUILD_DIR/src/lame* $BUILD_DIR/src/libsndfile* $BUILD_DIR/src/twolame* $BUILD_DIR/src/soxr* $BUILD_DIR/src/speex* \
      $BUILD_DIR/src/expat* $BUILD_DIR/src/freetype* $BUILD_DIR/src/libiconv* $BUILD_DIR/src/fontconfig* \
-     $BUILD_DIR/src/libpng* $BUILD_DIR/src/libass* $BUILD_DIR/src/bzip2* $BUILD_DIR/src/wavpack* \
+     $BUILD_DIR/src/libpng* $BUILD_DIR/src/libass* $BUILD_DIR/src/bzip2* $BUILD_DIR/src/wavpack* $BUILD_DIR/src/libbluray* \
+     $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libxml2* \
       > /dev/null
 fi
 

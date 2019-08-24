@@ -46,4 +46,7 @@ if exist "%ENCODER_NAME%_%ENCODER_VERSION%_7zip.7z" del "%ENCODER_NAME%_%ENCODER
 start "7-zipà≥èk" /b "%SEVENZIP_PATH%" a -t7z -mx=9 -mmt=off "%ENCODER_NAME%_%ENCODER_VERSION%_7zip.7z" "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%"
 "%SEVENZIP_PATH%" a -tzip -mx=9 -mfb=256 -mpass=15 -mmt=off "%ENCODER_NAME%_%ENCODER_VERSION%.zip" "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%"
 
+certutil -hashfile "%ENCODER_NAME%_%ENCODER_VERSION%_7zip.7z" SHA256
+certutil -hashfile "%ENCODER_NAME%_%ENCODER_VERSION%.zip" SHA256
+
 pause

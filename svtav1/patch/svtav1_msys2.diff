@@ -1,0 +1,51 @@
+diff --git a/Source/Lib/Common/ASM_AVX2/EbIntraPrediction_Intrinsic_AVX2.c b/Source/Lib/Common/ASM_AVX2/EbIntraPrediction_Intrinsic_AVX2.c
+index 6b5b5e22..a9ebff59 100644
+--- a/Source/Lib/Common/ASM_AVX2/EbIntraPrediction_Intrinsic_AVX2.c
++++ b/Source/Lib/Common/ASM_AVX2/EbIntraPrediction_Intrinsic_AVX2.c
+@@ -876,7 +876,7 @@ void eb_aom_dc_predictor_32x32_avx2(uint8_t *dst, ptrdiff_t stride,
+ }
+ 
+ // only define these intrinsics if immintrin.h doesn't have them
+-#ifdef _WIN32
++#if defined(_WIN32) && defined(_MSC_VER)
+ #if _MSC_VER < 1910
+ static inline int32_t _mm256_extract_epi32(__m256i a, const int32_t i)
+ {
+diff --git a/Source/Lib/Common/ASM_AVX512/pickrst_avx512.c b/Source/Lib/Common/ASM_AVX512/pickrst_avx512.c
+index f4db984e..517fc144 100644
+--- a/Source/Lib/Common/ASM_AVX512/pickrst_avx512.c
++++ b/Source/Lib/Common/ASM_AVX512/pickrst_avx512.c
+@@ -11,6 +11,7 @@
+ #include "pickrst_avx2.h"
+ #include "transpose_sse2.h"
+ #include "transpose_avx2.h"
++#include "synonyms.h"
+ 
+ #ifndef NON_AVX512_SUPPORT
+ 
+diff --git a/Source/Lib/Common/ASM_SSE2/synonyms.h b/Source/Lib/Common/ASM_SSE2/synonyms.h
+index e8d1b522..08c44e38 100644
+--- a/Source/Lib/Common/ASM_SSE2/synonyms.h
++++ b/Source/Lib/Common/ASM_SSE2/synonyms.h
+@@ -149,7 +149,7 @@ static INLINE __m128i xx_roundn_epi16(__m128i v_val_d, int32_t bits) {
+ // d: int16_t,
+ // indx: imm8 (0 - 15)
+ //#if _MSC_VER <= 1900
+-#ifdef _WIN32
++#if defined(_WIN32) && defined(_MSC_VER)
+ #if _MSC_VER < 1910
+ #define _mm256_insert_epi16(a, d, indx)                                      \
+   _mm256_insertf128_si256(                                                   \
+diff --git a/Source/Lib/Common/Codec/EbDefinitions.h b/Source/Lib/Common/Codec/EbDefinitions.h
+index 5a811a5b..e080b401 100644
+--- a/Source/Lib/Common/Codec/EbDefinitions.h
++++ b/Source/Lib/Common/Codec/EbDefinitions.h
+@@ -44,7 +44,7 @@ extern "C" {
+ #define PRED_CHANGE_5L               1 // Change the MRP in 5L Pictures 3, 5 , 7 and 9 use 1 as the reference, 11, 13, 15 and 17 use 9 as the reference
+ 
+ 
+-#define NON_AVX512_SUPPORT
++//#define NON_AVX512_SUPPORT
+ 
+ #define MR_MODE                           0
+ #define EIGTH_PEL_MV                      0

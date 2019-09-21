@@ -3,6 +3,8 @@
 #Visual Studioへの環境変数を通しておくこと
 #pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain
 #pacman -S p7zip git nasm python unzip
+#普通にpacman -S mesonとやるとうまくdav1dがビルドできないので注意
+#pacman -S mingw32/mingw-w64-i686-meson mingw64/mingw-w64-x86_64-meson
 #そのほかにcmake(windows版)のインストールが必要
 NJOBS=$(($NUMBER_OF_PROCESSORS>16?16:$NUMBER_OF_PROCESSORS))
 BUILD_DIR=$HOME/build_ffmpeg_dll
@@ -233,6 +235,15 @@ fi
     # wget ftp://ftp.gnutls.org/gcrypt/gnutls/v3.4/gnutls-3.3.19.tar.xz
     # tar xf gnutls-3.3.19.tar.xz
 # fi
+
+if [ ! -d "dav1d" ]; then
+    git clone https://code.videolan.org/videolan/dav1d.git
+elif [ $UPDATE_FFMPEG != "FALSE" ]; then
+    cd dav1d
+    git pull
+    cd ..
+    rm -rf $BUILD_DIR/$TARGET_ARCH/dav1d
+fi
 
 # --- 出力先の古いデータを削除 ----------------------
 if [ -d $FFMPEG_DIR_NAME ]; then
@@ -611,7 +622,7 @@ if [ ! -d "wavpack" ]; then
      ./configure \
      --prefix=$INSTALL_DIR \
      --disable-shared \
-     --enable-static
+     --enable-staticcd dav  
     make install -j$NJOBS
 fi
 
@@ -663,6 +674,15 @@ if [ ! -d "aribb24" ]; then
      --enable-static
     make install -j$NJOBS
     sed -i -e 's/Version: 1.0.3/Version: 1.0.4/g' ${INSTALL_DIR}/lib/pkgconfig/aribb24.pc
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "dav1d" ]; then
+    cp -r ../src/dav1d .
+    cd ./dav1d
+    meson build --buildtype release
+    meson configure build/ --prefix=$INSTALL_DIR -Dbuildtype=release -Ddefault_library=static -Denable_examples=false -Denable_tests=false -Dc_args="${BUILD_CCFLAGS}"
+    DESTDIR=$INSTALL_DIR ninja -C build install
 fi
 
 
@@ -824,6 +844,7 @@ $SWSCALE_ARG \
 --enable-libopus \
 --enable-libbluray \
 --enable-libass \
+--enable-libdav1d \
 --disable-filters \
 --enable-filter=$CONFIGURE_AUDFILTER_LIST \
 --pkg-config-flags="--static" \
@@ -856,7 +877,7 @@ if [ $UPDATE_FFMPEG != "FALSE" ]; then
      $BUILD_DIR/src/lame* $BUILD_DIR/src/libsndfile* $BUILD_DIR/src/twolame* $BUILD_DIR/src/soxr* $BUILD_DIR/src/speex* \
      $BUILD_DIR/src/expat* $BUILD_DIR/src/freetype* $BUILD_DIR/src/libiconv* $BUILD_DIR/src/fontconfig* \
      $BUILD_DIR/src/libpng* $BUILD_DIR/src/libass* $BUILD_DIR/src/bzip2* $BUILD_DIR/src/wavpack* $BUILD_DIR/src/libbluray* \
-     $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libxml2* \
+     $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* \
       > /dev/null
 fi
 

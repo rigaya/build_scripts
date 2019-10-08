@@ -5,14 +5,16 @@ set OUTPUT_DIR_GDRIVE=C:\Users\rigaya\GoogleDrive\L-SMASH
 set OUTPUT_DIR_DROPBOX=C:\Users\rigaya\DropBox\L-SMASH
 set OUTPUT_DIR_ZOHO=C:\Users\rigaya\Zoho Docs\L-SMASH
 set ONDRIVEVIEW_PATH=C:\ProgramEx\OneDriveView\bin\OneDriveView.exe
+set TMP_PATH=F:\temp\build_lsmash
+if exist "%TMP_PATH%" rmdir "%TMP_PATH%"
 md "%TMP_PATH%"
 cd /d "%TMP_PATH%"
 
-call Build_lsmash_vc2019.bat
+call %~dp0Build_lsmash_vc2019.bat
 
 for /f usebackq %%a in (`git rev-list HEAD ^| find /c /v ""`) do set REV=%%a
 
-"%SEVENZIP_PATH%" a -xr!.git\* -t7z -mx=9 -mmt=off ..\L-SMASH-src.7z .\
+"%SEVENZIP_PATH%" a -xr!.git\* -xr!CLIRelease\* -t7z -mx=9 -mmt=off ..\L-SMASH-src.7z .\
 
 set ARCHIEVE_NAME=L-SMASH rev%REV%.zip
 "%SEVENZIP_PATH%" a -tzip -mx=9 -mfb=256 -mpass=15 -mmt=off "..\%ARCHIEVE_NAME%" .\CLIRelease\*.exe LICENSE ..\L-SMASH-src.7z

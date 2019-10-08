@@ -17,5 +17,3 @@ MSBuild L-SMASH.sln /t:muxer /property:WindowsTargetPlatformVersion=10.0;Platfor
 MSBuild L-SMASH.sln /t:remuxer /property:WindowsTargetPlatformVersion=10.0;PlatformToolset=v142;Configuration="CLIRelease";Platform=Win32;WholeProgramOptimization=true;ForceImportBeforeCppTargets="%BUILD_PROP_PATH%" /p:BuildProjectReferences=false
 MSBuild L-SMASH.sln /t:boxdumper /property:WindowsTargetPlatformVersion=10.0;PlatformToolset=v142;Configuration="CLIRelease";Platform=Win32;WholeProgramOptimization=true;ForceImportBeforeCppTargets="%BUILD_PROP_PATH%" /p:BuildProjectReferences=false
 MSBuild L-SMASH.sln /t:timelineeditor /property:WindowsTargetPlatformVersion=10.0;PlatformToolset=v142;Configuration="CLIRelease";Platform=Win32;WholeProgramOptimization=true;ForceImportBeforeCppTargets="%BUILD_PROP_PATH%" /p:BuildProjectReferences=false
-
-pause

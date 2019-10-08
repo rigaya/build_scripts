@@ -13,7 +13,7 @@ HG_DIR="/C/Program Files/Mercurial"
 Y4M_PATH=$HOME/sakura_op_cut.y4m
 
 ENABLE_SVT_HEVC=OFF
-SVT_HEVC_REV=
+SVT_HEVC_REV=e69c96544c2142ba03cea80de097a91caecd7b67
 SVT_HEVC_A_DIR=
 SVT_HEVC_LINK_LIBS=
 UPDATE_X265="TRUE"
@@ -110,7 +110,6 @@ if [ $TARGET_ARCH = "x64" ]; then
     ENABLE_SVT_HEVC=ON
     cd $BUILD_DIR/$TARGET_ARCH/SVT-HEVC
     #static linkを強制
-    sed -i -e 's/SHARED/STATIC/g' Source/Lib/Codec/CMakeLists.txt
     find ./ -type f -name *.txt | xargs sed -i -e 's/-flto//g'
     find ./ -type f -name *.txt | xargs sed -i -e 's/-fPIC//g'
     find ./ -type f -name *.txt | xargs sed -i -e 's/-fPIE//g'
@@ -120,14 +119,14 @@ if [ $TARGET_ARCH = "x64" ]; then
     mkdir -p release
     mkdir -p ../../Bin/Release
     cd release
-    cmake -G "MSYS Makefiles" ../../.. -DCMAKE_BUILD_TYPE=Release
+    cmake -G "MSYS Makefiles" ../../.. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
     make -j${NJOBS}
     export SVT_HEVC_INCLUDE_DIR=$BUILD_DIR/$TARGET_ARCH/SVT-HEVC/Source/API/
     export SVT_HEVC_LIBRARY_DIR=$BUILD_DIR/$TARGET_ARCH/SVT-HEVC/Bin/Release/
     #そのままだと見つけてくれないので小細工
     sed -i -e 's/CMAKE_FIND_LIBRARY_SUFFIXES ".lib"/CMAKE_FIND_LIBRARY_SUFFIXES ".a"/g' $BUILD_DIR/$TARGET_ARCH/x265/source/cmake/Findsvthevc.cmake
-    SVT_HEVC_A_DIR=$BUILD_DIR_WIN/$TARGET_ARCH/SVT-HEVC/Build/linux/release/Release/lib
-    SVT_HEVC_LINK_LIBS=" ${SVT_HEVC_A_DIR}/libC_DEFAULT.a ${SVT_HEVC_A_DIR}/libASM_SSE2.a ${SVT_HEVC_A_DIR}/libASM_SSSE3.a ${SVT_HEVC_A_DIR}/libASM_SSE4_1.a ${SVT_HEVC_A_DIR}/libASM_AVX2.a"
+    SVT_HEVC_A_DIR=$BUILD_DIR_WIN/$TARGET_ARCH/SVT-HEVC/Bin/Release
+    SVT_HEVC_LINK_LIBS=" ${SVT_HEVC_A_DIR}/libSvtHevcEnc.a"
 fi
 
 # --- バージョン情報 ----------------------------------------------
@@ -208,7 +207,6 @@ if [ "${PROFILE_GEN_CC}" != "" ]; then
 
     #強制的に完全な静的リンクにする
     sed -i -e 's/Bdynamic/Bstatic/g' CMakeFiles/cli.dir/linklibs.rsp
-    echo ${SVT_HEVC_LINK_LIBS} >> CMakeFiles/cli.dir/linklibs.rsp
     make -j${NJOBS}
 
     #profileのための実行はシングルスレッドで行う
@@ -296,7 +294,7 @@ cmake -G "MSYS Makefiles" ../../../source \
 
 #強制的に完全な静的リンクにする
 sed -i -e 's/Bdynamic/Bstatic/g' CMakeFiles/cli.dir/linklibs.rsp
-echo ${SVT_HEVC_LINK_LIBS} >> CMakeFiles/cli.dir/linklibs.rsp
+#echo ${SVT_HEVC_LINK_LIBS} >> CMakeFiles/cli.dir/linklibs.rsp
 make -j${NJOBS}
 
 strip -s $BUILD_DIR/$TARGET_ARCH/x265/build/msys/8bit/x265

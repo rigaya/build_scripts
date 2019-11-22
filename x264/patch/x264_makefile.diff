@@ -18,7 +18,7 @@
 @@ -361,7 +369,7 @@
  fprofiled:
  	$(MAKE) clean
- 	$(MAKE) x264$(EXE) CFLAGS="$(CFLAGS) $(PROF_GEN_CC)" LDFLAGS="$(LDFLAGS) $(PROF_GEN_LD)"
+ 	$(MAKE) x264$(EXE) CFLAGSPROF="$(PROF_GEN_CC)" LDFLAGSPROF="$(PROF_GEN_LD)"
 -	$(foreach V, $(VIDS), $(foreach I, 0 1 2 3 4 5 6 7, ./x264$(EXE) $(OPT$I) --threads 1 $(V) -o $(DEVNULL) ;))
 +	$(foreach V, $(VIDS), $(foreach I, 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15, ./x264$(EXE) $(OPT$I) --threads 1 $(V) -o $(DEVNULL) ;))
  ifeq ($(COMPILER),CL)

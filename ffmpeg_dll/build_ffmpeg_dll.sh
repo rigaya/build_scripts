@@ -56,12 +56,12 @@ fi
 INSTALL_DIR=$BUILD_DIR/$TARGET_ARCH/build
 
 if [ $TARGET_ARCH = "x64" ]; then
-    BUILD_CCFLAGS="-O3 -mtune=sandybridge -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -I${INSTALL_DIR}/include"
+    BUILD_CCFLAGS="-O3 -mtune=sandybridge -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
     BUILD_CCFLAGS_SSE=$BUILD_CCFLAGS
     BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
 elif [ $TARGET_ARCH = "x86" ]; then
-    BUILD_CCFLAGS="-m32 -mtune=sandybridge -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -mstackrealign -I${INSTALL_DIR}/include" 
-    BUILD_CCFLAGS_SSE="-m32 -mtune=sandybridge -msse -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -mstackrealign -I${INSTALL_DIR}/include"
+    BUILD_CCFLAGS="-m32 -mtune=sandybridge -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -mstackrealign -I${INSTALL_DIR}/include" 
+    BUILD_CCFLAGS_SSE="-m32 -mtune=sandybridge -msse -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -mstackrealign -I${INSTALL_DIR}/include"
     BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
 else
     echo "invalid TARGET_ARCH: ${TARGET_ARCH}"

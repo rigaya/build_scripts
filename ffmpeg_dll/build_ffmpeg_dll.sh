@@ -115,7 +115,7 @@ if [ ! -d "libpng-1.6.37" ]; then
 fi
 
 if [ ! -d "bzip2-1.0.6" ]; then
-    wget http://www.bzip.org/1.0.6/bzip2-1.0.6.tar.gz
+    wget https://jaist.dl.sourceforge.net/project/bzip2/bzip2-1.0.6.tar.gz
     tar xf bzip2-1.0.6.tar.gz
 fi
 

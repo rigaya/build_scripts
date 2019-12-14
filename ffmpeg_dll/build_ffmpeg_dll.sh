@@ -680,6 +680,11 @@ cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "dav1d" ]; then
     cp -r ../src/dav1d .
     cd ./dav1d
+    CC=gcc \
+    CXX=g++ \
+    CFLAGS="${BUILD_CCFLAGS}" \
+    CPPFLAGS="${BUILD_CCFLAGS}" \
+    LDFLAGS="${BUILD_LDFLAGS}" \
     meson build --buildtype release
     meson configure build/ --prefix=$INSTALL_DIR -Dbuildtype=release -Ddefault_library=static -Denable_examples=false -Denable_tests=false -Dc_args="${BUILD_CCFLAGS}"
     DESTDIR=$INSTALL_DIR ninja -C build install

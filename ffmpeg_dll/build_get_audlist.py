@@ -26,12 +26,12 @@ if __name__ == '__main__':
         f.close()
         
     result = ""
-    for configure_arg in lines_configure:
+    for configure_item in sorted([item for line in lines_configure for item in line.strip().lower().split()]):
         for exeout_arg in lines_exeout:
-            if configure_arg.strip().replace('_', '').lower() in exeout_arg.strip().replace('_', '').lower():
+            if configure_item.strip().replace('_', '').lower() in exeout_arg.strip().replace('_', '').lower():
                 if len(result) > 0:
                     result += ","
-                result += configure_arg.strip()
+                result += configure_item.strip()
                 break
     print(result)
     sys.exit(0)

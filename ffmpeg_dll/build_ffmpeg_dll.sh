@@ -622,7 +622,7 @@ if [ ! -d "wavpack" ]; then
      ./configure \
      --prefix=$INSTALL_DIR \
      --disable-shared \
-     --enable-staticcd dav  
+     --enable-static
     make install -j$NJOBS
 fi
 

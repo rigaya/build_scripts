@@ -1,0 +1,11 @@
+--- twolame-0.4.0-org/libtwolame/twolame.h	2019-10-12 01:26:25.000000000 +0900
++++ twolame/libtwolame/twolame.h	2019-12-28 13:23:49.968511400 +0900
+@@ -41,7 +41,7 @@
+ # undef TL_API
+ #endif
+ 
+-#ifdef _WIN32
++#if defined(_WIN32) && !defined(__MINGW32__)
+ # ifdef LIBTWOLAME_BUILD
+ #  ifdef DLL_EXPORT
+ #   define TL_API __declspec(dllexport)

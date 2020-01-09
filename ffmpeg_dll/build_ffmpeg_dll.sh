@@ -5,6 +5,7 @@
 #pacman -S p7zip git nasm python unzip
 #普通にpacman -S mesonとやるとうまくdav1dがビルドできないので注意
 #pacman -S mingw32/mingw-w64-i686-meson mingw64/mingw-w64-x86_64-meson
+#pacman -S mingw32/mingw-w64-i686-python-lxml mingw64/mingw-w64-x86_64-python-lxml
 #そのほかにcmake(windows版)のインストールが必要
 NJOBS=$(($NUMBER_OF_PROCESSORS>16?16:$NUMBER_OF_PROCESSORS))
 BUILD_DIR=$HOME/build_ffmpeg_dll
@@ -150,9 +151,9 @@ if [ ! -d "libass-0.14.0" ]; then
     tar xf libass-0.14.0.tar.gz
 fi
 
-if [ ! -d "libogg-1.3.3" ]; then
-    wget http://downloads.xiph.org/releases/ogg/libogg-1.3.3.tar.gz
-    tar xf libogg-1.3.3.tar.gz
+if [ ! -d "libogg-1.3.4" ]; then
+    wget http://downloads.xiph.org/releases/ogg/libogg-1.3.4.tar.gz
+    tar xf libogg-1.3.4.tar.gz
 fi
 
 if [ ! -d "libvorbis-1.3.6" ]; then
@@ -175,9 +176,9 @@ if [ ! -d "lame-3.100" ]; then
     tar xf lame-3.100.tar.gz
 fi
 
-if [ ! -d "twolame-0.3.13" ]; then
-    wget http://downloads.sourceforge.net/twolame/twolame-0.3.13.tar.gz
-    tar xf twolame-0.3.13.tar.gz
+if [ ! -d "twolame-0.4.0" ]; then
+    wget https://jaist.dl.sourceforge.net/project/twolame/twolame/0.4.0/twolame-0.4.0.tar.gz
+    tar xf twolame-0.4.0.tar.gz
 fi
 
 if [ ! -d "libsndfile-1.0.28" ]; then
@@ -190,14 +191,14 @@ if [ ! -d "soxr-0.1.3-Source" ]; then
     tar xf soxr-0.1.3-Source.tar.xz
 fi
 
-if [ ! -d "wavpack-5.1.0" ]; then
-    wget http://www.wavpack.com/wavpack-5.1.0.tar.bz2
-    tar xf wavpack-5.1.0.tar.bz2
+if [ ! -d "wavpack-5.2.0" ]; then
+    wget http://www.wavpack.com/wavpack-5.2.0.tar.bz2
+    tar xf wavpack-5.2.0.tar.bz2
 fi
 
-if [ ! -d "libxml2-2.9.9" ]; then
-    wget ftp://xmlsoft.org/libxml2/libxml2-2.9.9.tar.gz
-    tar xf libxml2-2.9.9.tar.gz
+if [ ! -d "libxml2-2.9.10" ]; then
+    wget ftp://xmlsoft.org/libxml2/libxml2-2.9.10.tar.gz
+    tar xf libxml2-2.9.10.tar.gz
 fi
 
 #if [ ! -d "apache-ant-1.10.6-src.tar.xz" ]; then
@@ -236,13 +237,9 @@ fi
     # tar xf gnutls-3.3.19.tar.xz
 # fi
 
-if [ ! -d "dav1d" ]; then
-    git clone https://code.videolan.org/videolan/dav1d.git
-elif [ $UPDATE_FFMPEG != "FALSE" ]; then
-    cd dav1d
-    git pull
-    cd ..
-    rm -rf $BUILD_DIR/$TARGET_ARCH/dav1d
+if [ ! -d "dav1d-0.5.2" ]; then
+    wget https://code.videolan.org/videolan/dav1d/-/archive/0.5.2/dav1d-0.5.2.tar.bz2
+    tar xf dav1d-0.5.2.tar.bz2
 fi
 
 # --- 出力先の古いデータを削除 ----------------------
@@ -388,6 +385,7 @@ cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "fontconfig" ]; then
     find ../src/ -type d -name "fontconfig-*" | xargs -i cp -r {} ./fontconfig
     cd ./fontconfig
+    pip install lxml
     #/c/ProgramAnother/python27/x86/Scripts/pip install lxml
     #autoreconf -fvi
     #pythonは2.7系を使用する
@@ -584,7 +582,7 @@ cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "twolame" ]; then
     find ../src/ -type d -name "twolame-*" | xargs -i cp -r {} ./twolame
     cd ./twolame
-    patch -p1 < $PATCHES_DIR/twolame-0.3.13-mingw.diff
+    patch -p1 < $PATCHES_DIR/twolame-0.4.0-mingw.diff
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
     CFLAGS="${BUILD_CCFLAGS}" \
     CPPFLAGS="${BUILD_CCFLAGS}" \
@@ -678,7 +676,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "dav1d" ]; then
-    cp -r ../src/dav1d .
+    find ../src/ -type d -name "dav1d-*" | xargs -i cp -r {} ./dav1d
     cd ./dav1d
     CC=gcc \
     CXX=g++ \

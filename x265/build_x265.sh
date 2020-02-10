@@ -13,9 +13,10 @@ HG_DIR="/C/Program Files/Mercurial"
 Y4M_PATH=$HOME/sakura_op_cut.y4m
 
 ENABLE_SVT_HEVC=OFF
-SVT_HEVC_REV=e69c96544c2142ba03cea80de097a91caecd7b67
+SVT_HEVC_REV=02fd1261966acfae6b363d8213710ef7505f0f31
 SVT_HEVC_A_DIR=
 SVT_HEVC_LINK_LIBS=
+X265_REV=b11042b384af7f5cd45af60f87488eaa4d4908a8
 UPDATE_X265="TRUE"
 BUILD_12BIT="ON"
 BUILD_10BIT="ON"
@@ -60,16 +61,14 @@ fi
 if [ -d "x265" ]; then
     if [ $UPDATE_X265 != "FALSE" ]; then
         cd x265
-        #hg pull && hg update stable
-        hg pull && hg update default
+        hg pull && hg update -r ${X265_REV}
         cd ..
     fi
 else
     UPDATE_X265=TRUE
     hg clone https://bitbucket.org/multicoreware/x265
     cd x265
-    #hg pull && hg update stable
-    hg pull && hg update default
+    hg pull && hg update -r ${X265_REV}
     cd ..
 fi
 

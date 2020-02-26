@@ -21,6 +21,7 @@ SSE4_2="FALSE"
 UPDATE_FFMPEG="FALSE"
 FOR_BITRATE="FALSE"
 ENABLE_SWSCALE="FALSE"
+FOR_AUDENC="FALSE"
 
 # [ bitrate, swscale ]
 TARGET_BUILD=""
@@ -32,7 +33,7 @@ do
     "a" ) BUILD_ALL="TRUE" ;;
     "s" ) SSE4_2="TRUE" ;;
     "t" ) TARGET_BUILD=$OPTARG ;;
-    "u" ) UPDATE_FFMPEG="TRUE" ;;
+    "u" ) UPDATE_FFMPEG="TRUE" ;
   esac
 done
 
@@ -41,6 +42,8 @@ if [ "$TARGET_BUILD" = "swscale" ]; then
     ENABLE_SWSCALE="TRUE"
 elif [ "$TARGET_BUILD" = "bitrate" ]; then
     FOR_BITRATE="TRUE"
+elif [ "$TARGET_BUILD" = "audenc" ]; then
+    FOR_AUDENC="TRUE"
 fi
 
 # [ "x86", "x64" ]
@@ -86,6 +89,9 @@ fi
 if [ $ENABLE_SWSCALE = "TRUE" ]; then
     FFMPEG_DIR_NAME="ffmpeg_dll_swscale"
 fi
+if [ $FOR_AUDENC = "TRUE" ]; then
+    FFMPEG_DIR_NAME="ffmpeg_audenc"
+fi
 if [ $BUILD_ALL != "FALSE" ]; then
     UPDATE_FFMPEG="TRUE"
 fi
@@ -95,7 +101,9 @@ echo BUILD_ALL=$BUILD_ALL
 echo SSE4_2=$SSE4_2
 echo UPDATE_FFMPEG=$UPDATE_FFMPEG
 echo FOR_BITRATE=$FOR_BITRATE
+echo FOR_AUDENC=$FOR_AUDENC
 echo ENABLE_SWSCALE=$ENABLE_SWSCALE
+echo FFMPEG_DIR_NAME=$FFMPEG_DIR_NAME
 
 #--- ソースのダウンロード ---------------------------------------
 if [ -d "ffmpeg" ]; then
@@ -738,7 +746,7 @@ if [ $FOR_BITRATE = "FALSE" ]; then
     if [ ! -e ./ffmpeg.exe ]; then
         PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
         ./configure \
-        --prefix==${INSTALL_DIR}/$FFMPEG_DIR_NAME \
+        --prefix=${INSTALL_DIR}/$FFMPEG_DIR_NAME \
         --arch="${TARGET_ARCH}" \
         --target-os="mingw32" \
         --disable-doc \
@@ -753,6 +761,13 @@ if [ $FOR_BITRATE = "FALSE" ]; then
         --disable-fma4 \
         --disable-bsfs \
         --disable-aesni \
+        --enable-libvorbis \
+        --enable-libspeex \
+        --enable-libmp3lame \
+        --enable-libtwolame \
+        --enable-libsoxr \
+        --enable-libwavpack \
+        --enable-libopus \
         --extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
         --extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib"
         make -j$NJOBS
@@ -781,7 +796,6 @@ PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
 --prefix=${BUILD_DIR}/$FFMPEG_DIR_NAME/$TARGET_ARCH \
 --arch="${FFMPEG_ARCH}" \
 --target-os="mingw32" \
---disable-programs \
 --disable-doc \
 $SWSCALE_ARG \
 --disable-postproc \
@@ -808,6 +822,50 @@ $SWSCALE_ARG \
 --enable-small \
 --extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
 --extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib"
+elif [ $FOR_AUDENC = "TRUE" ]; then
+pwd
+PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+./configure \
+--prefix=${BUILD_DIR}/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH \
+--arch="${FFMPEG_ARCH}" \
+--enable-version3 \
+--disable-doc \
+$SWSCALE_ARG \
+--disable-postproc \
+--disable-avdevice \
+--disable-hwaccels \
+--disable-devices \
+--disable-debug \
+--disable-shared \
+--disable-amd3dnow \
+--disable-amd3dnowext \
+--disable-dxva2 \
+--disable-d3d11va \
+--disable-xop \
+--disable-fma4 \
+--disable-network \
+--disable-bsfs \
+--enable-swresample \
+--disable-protocols \
+--enable-protocol="file,pipe" \
+--disable-decoders \
+--enable-decoder="pcm*,adpcm*" \
+--disable-demuxers \
+--enable-demuxer="wav" \
+--disable-encoders \
+--enable-encoder="aac,ac3*,alac,adpcm*,eac3,flac,libmp3lame,libopus,libspeex,libtwolame,libmp3lame,libvorbis,mp2*,opus,pcm*,truehd,vorbis,wavpack,wma*" \
+--enable-libvorbis \
+--enable-libspeex \
+--enable-libmp3lame \
+--enable-libtwolame \
+--enable-libsoxr \
+--enable-libopus \
+--disable-filters \
+--enable-filter=$CONFIGURE_AUDFILTER_LIST \
+--enable-small \
+--pkg-config-flags="--static" \
+--extra-cflags="${BUILD_CCFLAGS} -Os -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
+--extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib"
 else
 PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
 ./configure \
@@ -815,7 +873,6 @@ PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
 --arch="${FFMPEG_ARCH}" \
 --target-os="mingw32" \
 --enable-version3 \
---disable-programs \
 --disable-doc \
 $SWSCALE_ARG \
 --disable-postproc \

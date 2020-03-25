@@ -498,14 +498,13 @@ if [ ! -d "opus" ]; then
     find ../src/ -type d -name "opus-*" | xargs -i cp -r {} ./opus
     cd ./opus
     autoreconf -fvi
-    CFLAGS="${BUILD_CCFLAGS}" \
-    CPPFLAGS="${BUILD_CCFLAGS}" \
-    CXXFLAGS="${BUILD_CCFLAGS}" \
+    CFLAGS="${BUILD_CCFLAGS} -fno-tree-vectorize -fno-fast-math" \
+    CPPFLAGS="${BUILD_CCFLAGS} -fno-tree-vectorize -fno-fast-math" \
+    CXXFLAGS="${BUILD_CCFLAGS} -fno-tree-vectorize -fno-fast-math" \
     ./configure \
     --prefix=$INSTALL_DIR \
     --enable-static=yes \
     --enable-shared=no \
-    --enable-fixed-point \
     --disable-doc \
     --disable-extra-programs
     make -j$NJOBS && make install

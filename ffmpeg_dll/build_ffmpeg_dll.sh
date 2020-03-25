@@ -123,9 +123,9 @@ if [ ! -d "libpng-1.6.37" ]; then
     tar xf libpng-1.6.37.tar.xz
 fi
 
-if [ ! -d "bzip2-1.0.6" ]; then
-    wget https://jaist.dl.sourceforge.net/project/bzip2/bzip2-1.0.6.tar.gz
-    tar xf bzip2-1.0.6.tar.gz
+if [ ! -d "bzip2-1.0.8" ]; then
+    wget https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
+    tar xf bzip2-1.0.8.tar.gz
 fi
 
 if [ ! -d "expat-2.2.5" ]; then
@@ -245,9 +245,9 @@ fi
     # tar xf gnutls-3.3.19.tar.xz
 # fi
 
-if [ ! -d "dav1d-0.5.2" ]; then
-    wget https://code.videolan.org/videolan/dav1d/-/archive/0.5.2/dav1d-0.5.2.tar.bz2
-    tar xf dav1d-0.5.2.tar.bz2
+if [ ! -d "dav1d-0.6.0" ]; then
+    wget https://downloads.videolan.org/pub/videolan/dav1d/0.6.0/dav1d-0.6.0.tar.xz
+    tar xf dav1d-0.6.0.tar.xz
 fi
 
 # --- 出力先の古いデータを削除 ----------------------

@@ -16,7 +16,8 @@ ENABLE_SVT_HEVC=OFF
 SVT_HEVC_REV=02fd1261966acfae6b363d8213710ef7505f0f31
 SVT_HEVC_A_DIR=
 SVT_HEVC_LINK_LIBS=
-X265_REV=b11042b384af7f5cd45af60f87488eaa4d4908a8
+X265_REV=
+X265_BRANCH="default"
 UPDATE_X265="TRUE"
 BUILD_12BIT="ON"
 BUILD_10BIT="ON"
@@ -61,14 +62,22 @@ fi
 if [ -d "x265" ]; then
     if [ $UPDATE_X265 != "FALSE" ]; then
         cd x265
-        hg pull && hg update -r ${X265_REV}
+        if [ "${X265_REV}" != "" ]; then
+            hg pull && hg update -C ${X265_REV}
+        else
+            hg pull && hg update -C ${X265_BRANCH}
+        fi
         cd ..
     fi
 else
     UPDATE_X265=TRUE
     hg clone https://bitbucket.org/multicoreware/x265
     cd x265
-    hg pull && hg update -r ${X265_REV}
+    if [ "${X265_REV}" != "" ]; then
+        hg pull && hg update -C ${X265_REV}
+    else
+        hg pull && hg update -C ${X265_BRANCH}
+    fi
     cd ..
 fi
 

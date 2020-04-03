@@ -114,8 +114,10 @@ fi
 cp -r ../src/x265 .
 cp -r ../src/SVT-HEVC .
 
-if [ $TARGET_ARCH = "x64" ]; then
-    ENABLE_SVT_HEVC=ON
+if [ $TARGET_ARCH = "x86" ]; then
+    ENABLE_SVT_HEVC=OFF
+fi
+if [ "$ENABLE_SVT_HEVC" = "ON" ]; then
     cd $BUILD_DIR/$TARGET_ARCH/SVT-HEVC
     #static linkを強制
     find ./ -type f -name *.txt | xargs sed -i -e 's/-flto//g'

@@ -28,21 +28,21 @@ rm -rf $BUILD_DIR/temp/src/l-smash/.git
 
 7z a -t7z -mx=9 -mmt=off  "$BUILD_DIR/temp/x264_${X264_REV}_src.7z" $BUILD_DIR/temp/src/
 
-7z a -tzip -mx=9 -mfb=256 -mpass=15 -mmt=off "$BUILD_DIR/temp/x264_latest_${TARGET_ARCH}.zip" $BUILD_DIR/$TARGET_ARCH/x264/x264_${X264_REV}_${TARGET_ARCH}.exe ${GPL_LICENSE_PATH}
+7z a -tzip -mx=9 -mfb=256 -mpass=15 -mmt=off "$BUILD_DIR/temp/x264_${X264_REV}_${TARGET_ARCH}.zip" $BUILD_DIR/$TARGET_ARCH/x264/x264_${X264_REV}_${TARGET_ARCH}.exe ${GPL_LICENSE_PATH}
 
 cp -f "$BUILD_DIR/temp/x264_${X264_REV}_src.7z" "${GOOGLE_DIR}/src"
 cp -f "$BUILD_DIR/temp/x264_${X264_REV}_src.7z" "${ONEDRIVE_DIR}/src"
 cp -f "$BUILD_DIR/temp/x264_${X264_REV}_src.7z" "${DROPBOX_DIR}/src"
 
-cp -f "$BUILD_DIR/temp/x264_latest_${TARGET_ARCH}.zip" "${GOOGLE_DIR}"
-cp -f "$BUILD_DIR/temp/x264_latest_${TARGET_ARCH}.zip" "${ONEDRIVE_DIR}"
-cp -f "$BUILD_DIR/temp/x264_latest_${TARGET_ARCH}.zip" "${DROPBOX_DIR}"
+rm ${GOOGLE_DIR}/x264_*_${TARGET_ARCH}.zip
+rm ${ONEDRIVE_DIR}/x264_*_${TARGET_ARCH}.zip
+rm ${DROPBOX_DIR}/x264_*_${TARGET_ARCH}.zip
 
-cp -f "$BUILD_DIR/temp/x264_latest_${TARGET_ARCH}.zip" "${GOOGLE_DIR}/old/x264_${X264_REV}_${TARGET_ARCH}.zip"
-cp -f "$BUILD_DIR/temp/x264_latest_${TARGET_ARCH}.zip" "${ONEDRIVE_DIR}/old/x264_${X264_REV}_${TARGET_ARCH}.zip"
-cp -f "$BUILD_DIR/temp/x264_latest_${TARGET_ARCH}.zip" "${DROPBOX_DIR}/old/x264_${X264_REV}_${TARGET_ARCH}.zip"
+cp -f "$BUILD_DIR/temp/x264_${X264_REV}_${TARGET_ARCH}.zip" "${GOOGLE_DIR}"
+cp -f "$BUILD_DIR/temp/x264_${X264_REV}_${TARGET_ARCH}.zip" "${ONEDRIVE_DIR}"
+cp -f "$BUILD_DIR/temp/x264_${X264_REV}_${TARGET_ARCH}.zip" "${DROPBOX_DIR}"
 
-echo ${X264_REV} > "${GOOGLE_DIR}/latest_build.txt"
-echo ${X264_REV} > "${ONEDRIVE_DIR}/latest_build.txt"
-echo ${X264_REV} > "${DROPBOX_DIR}/latest_build.txt"
+cp -f "$BUILD_DIR/temp/x264_${X264_REV}_${TARGET_ARCH}.zip" "${GOOGLE_DIR}/old/x264_${X264_REV}_${TARGET_ARCH}.zip"
+cp -f "$BUILD_DIR/temp/x264_${X264_REV}_${TARGET_ARCH}.zip" "${ONEDRIVE_DIR}/old/x264_${X264_REV}_${TARGET_ARCH}.zip"
+cp -f "$BUILD_DIR/temp/x264_${X264_REV}_${TARGET_ARCH}.zip" "${DROPBOX_DIR}/old/x264_${X264_REV}_${TARGET_ARCH}.zip"
 

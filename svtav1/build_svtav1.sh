@@ -1,5 +1,5 @@
 BUILD_DIR=`pwd`/build_svtav1
-BUILD_CCFLAGS="-ffast-math -fomit-frame-pointer -fno-ident"
+BUILD_CCFLAGS="-Ofast -ffast-math -fomit-frame-pointer -fno-ident"
 BUILD_LDFLAGS="-static -static-libgcc -Wl,--gc-sections -Wl,--strip-all"
 MAKE_PROCESS=$NUMBER_OF_PROCESSORS
 #cmake.exeÇÃÇ†ÇÈèÍèä
@@ -41,10 +41,8 @@ if [ -d "SVT-AV1" ]; then
 fi
 cp -r ../src/SVT-AV1 SVT-AV1
 
-# ./build.sh -p$INSTALL_DIR -x -j$MAKE_PROCESS -sWindows
 cd $BUILD_DIR/$TARGET_ARCH/SVT-AV1
-patch -p1 < $PATCH_DIR/svtav1_msys2.diff
 mkdir build/msys2
 cd build/msys2
-cmake -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DCMAKE_ASM_NASM_COMPILER=yasm -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_C_FLAGS="${BUILD_CCFLAGS}" -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS}" -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS}" ../..
+cmake -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DENABLE_NASM=ON -DCMAKE_ASM_NASM_COMPILER=yasm -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_C_FLAGS="${BUILD_CCFLAGS}" -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS}" -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS}" ../..
 make SvtAv1EncApp -j8

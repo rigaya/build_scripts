@@ -16,7 +16,7 @@ ENABLE_SVT_HEVC=ON
 SVT_HEVC_REV=02fd1261966acfae6b363d8213710ef7505f0f31
 SVT_HEVC_A_DIR=
 SVT_HEVC_LINK_LIBS=
-X265_REV=73ca1d7be3779ed6eb4cbbc4cdb3bec6371472b6
+X265_REV=
 X265_BRANCH="default"
 UPDATE_X265="TRUE"
 BUILD_12BIT="ON"
@@ -71,7 +71,7 @@ if [ -d "x265" ]; then
     fi
 else
     UPDATE_X265=TRUE
-    hg clone https://bitbucket.org/multicoreware/x265
+    hg clone http://hg.videolan.org/x265
     cd x265
     if [ "${X265_REV}" != "" ]; then
         hg pull && hg update -C ${X265_REV}

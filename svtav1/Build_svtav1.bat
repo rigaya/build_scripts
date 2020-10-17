@@ -5,8 +5,10 @@ set TMP_PATH=F:\temp\build_svtav1
 set INSTALL_DIR=%TMP_PATH%\build
 set SVTAV1_PATH=%TMP_PATH%\svt-av1
 set BUILD_PROP_PATH=Build_svtav1.props
-set YUVFILE=F:\temp\sakura_op_1280x720.yuv
-set YUVFILE_10=F:\temp\sakura_op_10bit.yuv
+REM set YUVFILE=F:\temp\ssim\sakura_op_1280x720.yuv
+REM set YUVFILE_10=F:\temp\ssim\sakura_op_10bit.yuv
+set YUVFILE=Y:\QSVTest\sakura_op_8bit_10sec.yuv
+set YUVFILE_10=Y:\QSVTest\sakura_op_10bit_10sec.yuv
 
 set PATH=%CMAKE_DIR%;%PATH%
 
@@ -25,8 +27,8 @@ cmake -A x64 ^
 MSBuild svt-av1.sln /t:SvtAv1Enc /property:WindowsTargetPlatformVersion=10.0;PlatformToolset=v142;Configuration="Release";Platform=x64;WholeProgramOptimization=PGInstrument;ConfigurationType=StaticLibrary;ForceImportBeforeCppTargets="%BUILD_PROP_PATH%" /p:BuildProjectReferences=true
 MSBuild svt-av1.sln /t:SvtAv1EncApp /property:WindowsTargetPlatformVersion=10.0;PlatformToolset=v142;Configuration="Release";Platform=x64;WholeProgramOptimization=PGInstrument;ForceImportBeforeCppTargets="%BUILD_PROP_PATH%" /p:BuildProjectReferences=false
 
-"%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" -i "%YUVFILE%" -w 1280 -h 720 -n 50 --rc 1 --fps 30 --preset 4
-"%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" -i "%YUVFILE_10%" -w 1280 -h 720 -n 50 --rc 1 --fps 30  --preset 4 --input-depth 10
+"%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" -i "%YUVFILE%" -w 1280 -h 720 -n 20 --rc 0 --fps 30 --preset 5 --asm max
+"%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" -i "%YUVFILE_10%" -w 1280 -h 720 -n 20 --rc 0 --fps 30 --preset 5 --input-depth 10 --asm max
 
 MSBuild svt-av1.sln /t:SvtAv1Enc /property:WindowsTargetPlatformVersion=10.0;PlatformToolset=v142;Configuration="Release";Platform=x64;WholeProgramOptimization=PGOptimize;ConfigurationType=StaticLibrary;ForceImportBeforeCppTargets="%BUILD_PROP_PATH%" /p:BuildProjectReferences=true
 MSBuild svt-av1.sln /t:SvtAv1EncApp /property:WindowsTargetPlatformVersion=10.0;PlatformToolset=v142;Configuration="Release";Platform=x64;WholeProgramOptimization=PGOptimize;ForceImportBeforeCppTargets="%BUILD_PROP_PATH%" /p:BuildProjectReferences=false

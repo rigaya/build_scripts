@@ -26,9 +26,9 @@ PROFILE_USE_LD="-fprofile-use"
 
 export PATH="${CMAKE_DIR}:$PATH"
 
-mkdir -p $BUILD_DIR
-mkdir -p $BUILD_DIR/src
-cd $BUILD_DIR/src
+mkdir -p ${BUILD_DIR}
+mkdir -p ${BUILD_DIR}/src
+cd ${BUILD_DIR}/src
 
 # [ "x86", "x64" ]
 if [ $MSYSTEM = "MINGW32" ]; then
@@ -36,11 +36,12 @@ if [ $MSYSTEM = "MINGW32" ]; then
 else
     TARGET_ARCH="x64"
 fi
+echo "TARGET_ARCH=${TARGET_ARCH}"
 
-if [ $TARGET_ARCH = "x64" ]; then
+if [ ${TARGET_ARCH} = "x64" ]; then
     BUILD_CCFLAGS="-O3 -msse2 -fpermissive -I${INSTALL_DIR}/include"
     BUILD_LDFLAGS="-static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
-elif [ $TARGET_ARCH = "x86" ]; then
+elif [ ${TARGET_ARCH} = "x86" ]; then
     BUILD_CCFLAGS="-m32 -msse2 -I${INSTALL_DIR}/include" 
     BUILD_LDFLAGS="-static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
     #x86向けには高ビット深度版はビルドしない
@@ -103,21 +104,21 @@ else
 fi
 
 # --- 出力先を準備 --------------------------------------
-if [ ! -d $BUILD_DIR/$TARGET_ARCH ]; then
-    mkdir $BUILD_DIR/$TARGET_ARCH
+if [ ! -d ${BUILD_DIR}/${TARGET_ARCH} ]; then
+    mkdir ${BUILD_DIR}/${TARGET_ARCH}
 fi
-cd $BUILD_DIR/$TARGET_ARCH
+cd ${BUILD_DIR}/${TARGET_ARCH}
 if [ -d x265 ]; then
     rm -rf x265
 fi
 cp -r ../src/x265 .
 cp -r ../src/SVT-HEVC .
 
-if [ $TARGET_ARCH = "x86" ]; then
+if [ ${TARGET_ARCH} = "x86" ]; then
     ENABLE_SVT_HEVC=OFF
 fi
-if [ "$ENABLE_SVT_HEVC" = "ON" ]; then
-    cd $BUILD_DIR/$TARGET_ARCH/SVT-HEVC
+if [ "${ENABLE_SVT_HEVC}" = "ON" ]; then
+    cd ${BUILD_DIR}/${TARGET_ARCH}/SVT-HEVC
     #static linkを強制
     find ./ -type f -name *.txt | xargs sed -i -e 's/-flto//g'
     find ./ -type f -name *.txt | xargs sed -i -e 's/-fPIC//g'
@@ -130,19 +131,19 @@ if [ "$ENABLE_SVT_HEVC" = "ON" ]; then
     cd release
     cmake -G "MSYS Makefiles" ../../.. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
     make -j${NJOBS}
-    export SVT_HEVC_INCLUDE_DIR=$BUILD_DIR/$TARGET_ARCH/SVT-HEVC/Source/API/
-    export SVT_HEVC_LIBRARY_DIR=$BUILD_DIR/$TARGET_ARCH/SVT-HEVC/Bin/Release/
+    export SVT_HEVC_INCLUDE_DIR=$BUILD_DIR/${TARGET_ARCH}/SVT-HEVC/Source/API/
+    export SVT_HEVC_LIBRARY_DIR=$BUILD_DIR/${TARGET_ARCH}/SVT-HEVC/Bin/Release/
     #そのままだと見つけてくれないので小細工
-    sed -i -e 's/CMAKE_FIND_LIBRARY_SUFFIXES ".lib"/CMAKE_FIND_LIBRARY_SUFFIXES ".a"/g' $BUILD_DIR/$TARGET_ARCH/x265/source/cmake/Findsvthevc.cmake
-    SVT_HEVC_A_DIR=$BUILD_DIR_WIN/$TARGET_ARCH/SVT-HEVC/Bin/Release
+    sed -i -e 's/CMAKE_FIND_LIBRARY_SUFFIXES ".lib"/CMAKE_FIND_LIBRARY_SUFFIXES ".a"/g' ${BUILD_DIR}/${TARGET_ARCH}/x265/source/cmake/Findsvthevc.cmake
+    SVT_HEVC_A_DIR=$BUILD_DIR_WIN/${TARGET_ARCH}/SVT-HEVC/Bin/Release
     SVT_HEVC_LINK_LIBS=" ${SVT_HEVC_A_DIR}/libSvtHevcEnc.a"
 fi
 
 # --- ビルド ----------------------------------------------
-cd $BUILD_DIR/$TARGET_ARCH/x265
+cd ${BUILD_DIR}/${TARGET_ARCH}/x265
 patch -p 1 < ~/patch/x265_version.diff
 
-cd $BUILD_DIR/$TARGET_ARCH/x265/build/msys
+cd ${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys
 
 X265_EXTRA_LIB=""
 
@@ -174,7 +175,7 @@ if [ "${PROFILE_GEN_CC}" != "" ]; then
         X265_EXTRA_LIB="x265_main12"
     fi
 
-    cd $BUILD_DIR/$TARGET_ARCH/x265/build/msys
+    cd ${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys
     if [ $BUILD_10BIT = "ON" ]; then
         mkdir -p 10bit
         cd 10bit
@@ -196,13 +197,13 @@ if [ "${PROFILE_GEN_CC}" != "" ]; then
         X265_EXTRA_LIB="x265_main10;${X265_EXTRA_LIB}"
     fi
 
-    cd $BUILD_DIR/$TARGET_ARCH/x265/build/msys/8bit
+    cd ${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys/8bit
     cmake -G "MSYS Makefiles" ../../../source \
         -DEXTRA_LIB="${X265_EXTRA_LIB}" \
         -DEXTRA_LINK_FLAGS=-L. \
         -DLINKED_10BIT=${BUILD_10BIT} \
         -DLINKED_12BIT=${BUILD_12BIT} \
-        -DENABLE_SVT_HEVC=$ENABLE_SVT_HEVC \
+        -DENABLE_SVT_HEVC=${ENABLE_SVT_HEVC} \
         -DENABLE_SHARED=OFF \
         -DENABLE_HDR10_PLUS=OFF \
         ${CMAKE_PROFILE_ARG} \
@@ -242,7 +243,7 @@ fi
 
 X265_EXTRA_LIB=""
 
-cd $BUILD_DIR/$TARGET_ARCH/x265/build/msys
+cd ${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys
 if [ $BUILD_12BIT = "ON" ]; then
     mkdir -p 12bit
     cd 12bit
@@ -263,7 +264,7 @@ if [ $BUILD_12BIT = "ON" ]; then
     X265_EXTRA_LIB="x265_main12"
 fi
 
-cd $BUILD_DIR/$TARGET_ARCH/x265/build/msys
+cd ${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys
 if [ $BUILD_10BIT = "ON" ]; then
     mkdir -p 10bit
     cd 10bit
@@ -283,7 +284,7 @@ if [ $BUILD_10BIT = "ON" ]; then
     X265_EXTRA_LIB="x265_main10;${X265_EXTRA_LIB}"
 fi
 
-cd $BUILD_DIR/$TARGET_ARCH/x265/build/msys/8bit
+cd ${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys/8bit
 cmake -G "MSYS Makefiles" ../../../source \
     -DEXTRA_LIB="${X265_EXTRA_LIB}" \
     -DEXTRA_LINK_FLAGS=-L. \
@@ -291,7 +292,7 @@ cmake -G "MSYS Makefiles" ../../../source \
     -DLINKED_12BIT=${BUILD_12BIT} \
     -DENABLE_SHARED=OFF \
     -DENABLE_HDR10_PLUS=OFF \
-    -DENABLE_SVT_HEVC=$ENABLE_SVT_HEVC \
+    -DENABLE_SVT_HEVC=${ENABLE_SVT_HEVC} \
     ${CMAKE_PROFILE_ARG} \
     -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
     -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
@@ -302,4 +303,4 @@ sed -i -e 's/Bdynamic/Bstatic/g' CMakeFiles/cli.dir/linklibs.rsp
 #echo ${SVT_HEVC_LINK_LIBS} >> CMakeFiles/cli.dir/linklibs.rsp
 make -j${NJOBS}
 
-strip -s $BUILD_DIR/$TARGET_ARCH/x265/build/msys/8bit/x265
+strip -s ${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys/8bit/x265.exe

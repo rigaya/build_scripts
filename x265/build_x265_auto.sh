@@ -20,32 +20,32 @@ export PATH="${CMAKE_DIR}:$PATH"
 
 X265_VER=`${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys/8bit/x265.exe --version 2>&1 | head -n 1 | sed 's/-/ /g' | awk '{print $6}'`
 
-cd $BUILD_DIR/src/x265
+cd ${BUILD_DIR}/src/x265
 echo "build x265 ${X265_VER}"
 
-mkdir $BUILD_DIR/temp
-cp -r $BUILD_DIR/src/x265 $BUILD_DIR/temp/src
-rm -rf $BUILD_DIR/temp/src/.git
+mkdir ${BUILD_DIR}/temp
+cp -r ${BUILD_DIR}/src/x265 ${BUILD_DIR}/temp/src
+rm -rf ${BUILD_DIR}/temp/src/.git
 
-7z a -t7z -mx=9 -mmt=off "$BUILD_DIR/temp/x265_${X265_VER}_src.7z" $BUILD_DIR/temp/src/
+7z a -t7z -mx=9 -mmt=off "${BUILD_DIR}/temp/x265_${X265_VER}_src.7z" ${BUILD_DIR}/temp/src/
 
-cp -f $BUILD_DIR/$TARGET_ARCH/x265/build/msys/8bit/x265.exe $BUILD_DIR/$TARGET_ARCH/x265/build/msys/8bit/x265_${X265_VER}_${TARGET_ARCH}.exe
-7z a -tzip -mx=9 -mfb=256 -mpass=15 -mmt=off "$BUILD_DIR/temp/x265_${X265_VER}_${TARGET_ARCH}.zip" $BUILD_DIR/$TARGET_ARCH/x265/build/msys/8bit/x265_${X265_VER}_${TARGET_ARCH}.exe ${GPL_LICENSE_PATH}
+cp -f ${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys/8bit/x265.exe ${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys/8bit/x265_${X265_VER}_${TARGET_ARCH}.exe
+7z a -tzip -mx=9 -mfb=256 -mpass=15 -mmt=off "${BUILD_DIR}/temp/x265_${X265_VER}_${TARGET_ARCH}.zip" ${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys/8bit/x265_${X265_VER}_${TARGET_ARCH}.exe ${GPL_LICENSE_PATH}
 
-cp -f "$BUILD_DIR/temp/x265_${X265_VER}_src.7z" "${GOOGLE_DIR}/src"
-cp -f "$BUILD_DIR/temp/x265_${X265_VER}_src.7z" "${ONEDRIVE_DIR}/src"
-cp -f "$BUILD_DIR/temp/x265_${X265_VER}_src.7z" "${DROPBOX_DIR}/src"
+cp -f "${BUILD_DIR}/temp/x265_${X265_VER}_src.7z" "${GOOGLE_DIR}/src"
+cp -f "${BUILD_DIR}/temp/x265_${X265_VER}_src.7z" "${ONEDRIVE_DIR}/src"
+cp -f "${BUILD_DIR}/temp/x265_${X265_VER}_src.7z" "${DROPBOX_DIR}/src"
 
 rm ${GOOGLE_DIR}/x265_*_${TARGET_ARCH}.zip
 rm ${ONEDRIVE_DIR}/x265_*_${TARGET_ARCH}.zip
 rm ${DROPBOX_DIR}/x265_*_${TARGET_ARCH}.zip
 
-cp -f "$BUILD_DIR/temp/x265_${X265_VER}_${TARGET_ARCH}.zip" "${GOOGLE_DIR}"
-cp -f "$BUILD_DIR/temp/x265_${X265_VER}_${TARGET_ARCH}.zip" "${ONEDRIVE_DIR}"
-cp -f "$BUILD_DIR/temp/x265_${X265_VER}_${TARGET_ARCH}.zip" "${DROPBOX_DIR}"
+cp -f "${BUILD_DIR}/temp/x265_${X265_VER}_${TARGET_ARCH}.zip" "${GOOGLE_DIR}"
+cp -f "${BUILD_DIR}/temp/x265_${X265_VER}_${TARGET_ARCH}.zip" "${ONEDRIVE_DIR}"
+cp -f "${BUILD_DIR}/temp/x265_${X265_VER}_${TARGET_ARCH}.zip" "${DROPBOX_DIR}"
 
-cp -f "$BUILD_DIR/temp/x265_${X265_VER}_${TARGET_ARCH}.zip" "${GOOGLE_DIR}/old/x265_${X265_VER}_${TARGET_ARCH}.zip"
-cp -f "$BUILD_DIR/temp/x265_${X265_VER}_${TARGET_ARCH}.zip" "${ONEDRIVE_DIR}/old/x265_${X265_VER}_${TARGET_ARCH}.zip"
-# cp -f "$BUILD_DIR/temp/x265_${X265_VER}_${TARGET_ARCH}.zip" "${DROPBOX_DIR}/old/x265_${X265_VER}_${TARGET_ARCH}.zip"
+cp -f "${BUILD_DIR}/temp/x265_${X265_VER}_${TARGET_ARCH}.zip" "${GOOGLE_DIR}/old/x265_${X265_VER}_${TARGET_ARCH}.zip"
+cp -f "${BUILD_DIR}/temp/x265_${X265_VER}_${TARGET_ARCH}.zip" "${ONEDRIVE_DIR}/old/x265_${X265_VER}_${TARGET_ARCH}.zip"
+# cp -f "${BUILD_DIR}/temp/x265_${X265_VER}_${TARGET_ARCH}.zip" "${DROPBOX_DIR}/old/x265_${X265_VER}_${TARGET_ARCH}.zip"
 
-# rm -rf $BUILD_DIR/temp
+# rm -rf ${BUILD_DIR}/temp

@@ -1,0 +1,12 @@
+diff --git a/source/cmake/Version.cmake b/source/cmake/Version.cmake
+index 37c759268..1f2fd3d26 100644
+--- a/source/cmake/Version.cmake
++++ b/source/cmake/Version.cmake
+@@ -26,6 +26,7 @@
+  #################################################################################################################
+  #Default Settings, for user to be vigilant about x265 version being reported during product build.
+ set(X265_VERSION "unknown")
++set(X265_REPO_ID "unknown")
+ set(X265_LATEST_TAG "0.0")
+ set(X265_TAG_DISTANCE "0")
+ set(HG_ARCHETYPE "0")

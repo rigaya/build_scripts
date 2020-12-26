@@ -1,14 +1,12 @@
 #!/bin/sh
 #msys2用x265ビルドスクリプト
 #pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain p7zip git nasm p7zip
-#そのほかにcmake, mercurial(windows版)のインストールが必要
+#そのほかにcmakeのインストールが必要
 NJOBS=$(($NUMBER_OF_PROCESSORS>16?16:$NUMBER_OF_PROCESSORS))
 BUILD_DIR=$HOME/build_x265
 BUILD_DIR_WIN=`cygpath -m ${HOME}`/build_x265
 #cmake.exeのある場所
 CMAKE_DIR="/C/Program Files/CMake/bin"
-#hg.exeのある場所
-HG_DIR="/C/Program Files/Mercurial"
 #プロファイル用のソース
 Y4M_PATH=$HOME/sakura_op_cut.y4m
 
@@ -17,7 +15,7 @@ SVT_HEVC_REV=02fd1261966acfae6b363d8213710ef7505f0f31
 SVT_HEVC_A_DIR=
 SVT_HEVC_LINK_LIBS=
 X265_REV=
-X265_BRANCH="default"
+X265_BRANCH="master"
 UPDATE_X265="TRUE"
 BUILD_12BIT="ON"
 BUILD_10BIT="ON"
@@ -26,7 +24,7 @@ PROFILE_GEN_LD="-fprofile-generate"
 PROFILE_USE_CC="-fprofile-use"
 PROFILE_USE_LD="-fprofile-use"
 
-export PATH="${CMAKE_DIR}:${HG_DIR}:$PATH"
+export PATH="${CMAKE_DIR}:$PATH"
 
 mkdir -p $BUILD_DIR
 mkdir -p $BUILD_DIR/src
@@ -63,20 +61,21 @@ if [ -d "x265" ]; then
     if [ $UPDATE_X265 != "FALSE" ]; then
         cd x265
         if [ "${X265_REV}" != "" ]; then
-            hg pull && hg update -C ${X265_REV}
+            git fetch && git checkout --force ${X265_REV}
         else
-            hg pull && hg update -C ${X265_BRANCH}
+            git fetch && git checkout --force ${X265_BRANCH}
         fi
         cd ..
     fi
 else
     UPDATE_X265=TRUE
-    hg clone http://hg.videolan.org/x265
+    git clone https://bitbucket.org/multicoreware/x265_git.git x265
     cd x265
+    git fetch
     if [ "${X265_REV}" != "" ]; then
-        hg pull && hg update -C ${X265_REV}
+        git checkout --force ${X265_REV}
     else
-        hg pull && hg update -C ${X265_BRANCH}
+        git checkout --force ${X265_BRANCH}
     fi
     cd ..
 fi
@@ -86,9 +85,9 @@ if [ -d "SVT-HEVC" ]; then
         cd SVT-HEVC
         git pull
         if [ "${SVT_HEVC_REV}" != "" ]; then
-            git checkout $SVT_HEVC_REV
+            git checkout --force $SVT_HEVC_REV
         else
-            git checkout HEAD
+            git checkout --force HEAD
         fi
         cd ..
     fi
@@ -96,9 +95,9 @@ else
     git clone https://github.com/OpenVisualCloud/SVT-HEVC.git
     cd SVT-HEVC
     if [ "${SVT_HEVC_REV}" != "" ]; then
-        git checkout $SVT_HEVC_REV
+        git checkout --force $SVT_HEVC_REV
     else
-        git checkout HEAD
+        git checkout --force HEAD
     fi
     cd ..
 fi
@@ -139,14 +138,10 @@ if [ "$ENABLE_SVT_HEVC" = "ON" ]; then
     SVT_HEVC_LINK_LIBS=" ${SVT_HEVC_A_DIR}/libSvtHevcEnc.a"
 fi
 
-# --- バージョン情報 ----------------------------------------------
-cd $BUILD_DIR/$TARGET_ARCH/x265
-X265_VER=`hg log -r. --template "{latesttag}"`
-X265_VER=${X265_VER}+`hg log -r. --template "{latesttagdistance}"`
-echo "build x265 ${X265_VER}"
-
-
 # --- ビルド ----------------------------------------------
+cd $BUILD_DIR/$TARGET_ARCH/x265
+patch -p 1 < ~/patch/x265_version.diff
+
 cd $BUILD_DIR/$TARGET_ARCH/x265/build/msys
 
 X265_EXTRA_LIB=""
@@ -185,7 +180,7 @@ if [ "${PROFILE_GEN_CC}" != "" ]; then
         cd 10bit
         #fprofile-generateするためには、-fprofile-generateを
         #CMAKE_C_FLAGS/CMAKE_CXX_FLAGSだけでなく、CMAKE_EXE_LINKER_FLAGSに渡す必要がある
-        cmake -G "MSYS Makefiles" ../../../source ../../../source \
+        cmake -G "MSYS Makefiles" ../../../source \
             -DHIGH_BIT_DEPTH=ON \
             -DEXPORT_C_API=OFF \
             -DENABLE_SHARED=OFF \

@@ -1,0 +1,14 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index ff23fa85..d77a1292 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -229,7 +229,8 @@ endif()
+ 
+ include(CheckSymbolExists)
+ 
+-check_symbol_exists("_mm512_extracti64x4_epi64" "immintrin.h" HAS_AVX512)
++set(HAS_AVX512 1)
++#check_symbol_exists("_mm512_extracti64x4_epi64" "immintrin.h" HAS_AVX512)
+ if(HAS_AVX512)
+     option(ENABLE_AVX512 "Enable building avx512 code" OFF)
+ else()

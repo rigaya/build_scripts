@@ -13,7 +13,7 @@ set STATSFILE=%TMP_PATH%\profile.stats
 set PATH=%CMAKE_DIR%;%PATH%
 
 rd /s /q "%SVTAV1_PATH%"
-git clone https://github.com/OpenVisualCloud/SVT-AV1.git "%SVTAV1_PATH%"
+git clone https://gitlab.com/AOMediaCodec/SVT-AV1.git "%SVTAV1_PATH%"
 
 cd /d "%SVTAV1_PATH%"
 git apply "%SVTAV1_DIFF%"

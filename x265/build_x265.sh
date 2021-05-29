@@ -64,7 +64,7 @@ if [ -d "x265" ]; then
         if [ "${X265_REV}" != "" ]; then
             git fetch && git checkout --force ${X265_REV}
         else
-            git fetch && git checkout --force ${X265_BRANCH}
+            git fetch && git checkout --force ${X265_BRANCH} && git reset --hard origin/${X265_BRANCH}
         fi
         cd ..
     fi
@@ -77,6 +77,7 @@ else
         git checkout --force ${X265_REV}
     else
         git checkout --force ${X265_BRANCH}
+        git reset --hard origin/${X265_BRANCH}
     fi
     cd ..
 fi

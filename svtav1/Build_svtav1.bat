@@ -29,21 +29,15 @@ cmake -A x64 ^
   ..
 
 
-MSBuild svt-av1.sln /t:SvtAv1Enc /property:WindowsTargetPlatformVersion=10.0;PlatformToolset=v142;Configuration="Release";Platform=x64;WholeProgramOptimization=PGInstrument;ConfigurationType=StaticLibrary;ForceImportBeforeCppTargets="%BUILD_PROP_PATH%" /p:BuildProjectReferences=true
-MSBuild svt-av1.sln /t:SvtAv1EncApp /property:WindowsTargetPlatformVersion=10.0;PlatformToolset=v142;Configuration="Release";Platform=x64;WholeProgramOptimization=PGInstrument;ForceImportBeforeCppTargets="%BUILD_PROP_PATH%" /p:BuildProjectReferences=false
+MSBuild svt-av1.sln /property:WindowsTargetPlatformVersion=10.0;PlatformToolset=v142;Configuration="Release";Platform=x64;WholeProgramOptimization=PGInstrument;ForceImportBeforeCppTargets="%BUILD_PROP_PATH%"
 
-"%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" -i "%YUVFILE%"    -w 1280 -h 720 -n 50 --rc 0 --qp 26 --fps 30 --preset 4 --irefresh-type 2 --pass 1 --stats "%STATSFILE%"
-"%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" -i "%YUVFILE%"    -w 1280 -h 720 -n 50 --rc 0 --qp 26 --fps 30 --preset 4 --irefresh-type 2 --pass 2 --stats "%STATSFILE%"
-"%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" -i "%YUVFILE_10%" -w 1280 -h 720 -n 50 --rc 0 --qp 26 --fps 30 --preset 4 --irefresh-type 2 --input-depth 10 --pass 1 --stats "%STATSFILE%"
-"%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" -i "%YUVFILE_10%" -w 1280 -h 720 -n 50 --rc 0 --qp 26 --fps 30 --preset 4 --irefresh-type 2 --input-depth 10 --pass 2 --stats "%STATSFILE%"
+"%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" -i "%YUVFILE%"    -w 1280 -h 720 -n 50 --rc 0 --qp 26 --fps 30 --preset 4 --irefresh-type 2
+"%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" -i "%YUVFILE_10%" -w 1280 -h 720 -n 50 --rc 0 --qp 26 --fps 30 --preset 4 --irefresh-type 2 --input-depth 10
 
-"%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" -i "%YUVFILE%"    -w 1280 -h 720 -n 50 --rc 0 --qp 26 --fps 30 --preset 4 --irefresh-type 2 --pass 1 --stats "%STATSFILE%" --asm avx2
-"%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" -i "%YUVFILE%"    -w 1280 -h 720 -n 50 --rc 0 --qp 26 --fps 30 --preset 4 --irefresh-type 2 --pass 2 --stats "%STATSFILE%" --asm avx2
-"%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" -i "%YUVFILE_10%" -w 1280 -h 720 -n 50 --rc 0 --qp 26 --fps 30 --preset 4 --irefresh-type 2 --input-depth 10 --pass 1 --stats "%STATSFILE%" --asm avx2
-"%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" -i "%YUVFILE_10%" -w 1280 -h 720 -n 50 --rc 0 --qp 26 --fps 30 --preset 4 --irefresh-type 2 --input-depth 10 --pass 2 --stats "%STATSFILE%" --asm avx2
+"%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" -i "%YUVFILE%"    -w 1280 -h 720 -n 50 --rc 0 --qp 26 --fps 30 --preset 4 --irefresh-type 2
+"%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" -i "%YUVFILE_10%" -w 1280 -h 720 -n 50 --rc 0 --qp 26 --fps 30 --preset 4 --irefresh-type 2 --input-depth 10
 
-MSBuild svt-av1.sln /t:SvtAv1Enc /property:WindowsTargetPlatformVersion=10.0;PlatformToolset=v142;Configuration="Release";Platform=x64;WholeProgramOptimization=PGOptimize;ConfigurationType=StaticLibrary;ForceImportBeforeCppTargets="%BUILD_PROP_PATH%" /p:BuildProjectReferences=true
-MSBuild svt-av1.sln /t:SvtAv1EncApp /property:WindowsTargetPlatformVersion=10.0;PlatformToolset=v142;Configuration="Release";Platform=x64;WholeProgramOptimization=PGOptimize;ForceImportBeforeCppTargets="%BUILD_PROP_PATH%" /p:BuildProjectReferences=false
+MSBuild svt-av1.sln /property:WindowsTargetPlatformVersion=10.0;PlatformToolset=v142;Configuration="Release";Platform=x64;WholeProgramOptimization=PGOptimize;ForceImportBeforeCppTargets="%BUILD_PROP_PATH%"
 
 copy "%SVTAV1_PATH%\Bin\Release\SvtAv1EncApp.exe" "%INSTALL_DIR%"
 

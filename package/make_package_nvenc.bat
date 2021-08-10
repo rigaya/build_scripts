@@ -16,10 +16,9 @@ if not exist "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%" (
 timeout 2
 
 cd /d "%ENCODER_SRC_DIR%\BuildParallel"
-start "" /wait buildReleaseVC2015.bat
-start "" /wait buildReleaseVC2019.bat
+start "" /wait buildReleaseVC2019Cuda11.bat
+start "" /wait buildReleaseVC2019Cuda10.bat
 cd /d "%CUR_DIR%"
-
 
 set EXE_32_SRC_PATH=%ENCODER_SRC_DIR%\_build\Win32\RelStatic\%ENCODER_NAME%C.exe
 set EXE_64_SRC_PATH=%ENCODER_SRC_DIR%\_build\x64\RelStatic\%ENCODER_NAME%C64.exe
@@ -27,10 +26,22 @@ set AUO_SRC_PATH=%ENCODER_SRC_DIR%\_build\Win32\Release\%ENCODER_NAME%.auo
 set INI_SRC_PATH=%ENCODER_SRC_DIR%\%ENCODER_NAME%\%ENCODER_NAME%.ini
 set COPY_PATH=F:\temp\
 
-copy /y "%EXE_32_SRC_PATH%" "Y:\QSVTest\x86"
-copy /y "%EXE_64_SRC_PATH%" "Y:\QSVTest\x64"
-copy /y "%AUO_SRC_PATH%" "Y:\QSVTest\Aviutl\plugins"
-copy /y "%INI_SRC_PATH%" "Y:\QSVTest\Aviutl\plugins"
+set EXE_VER_RESULT=
+for /f "usebackq tokens=3" %%i in (`"%EXE_64_SRC_PATH%" --version`) DO (
+    set EXE_VER_RESULT=%%i
+    goto GOT_EXE_VER
+)
+:GOT_EXE_VER
+if not "%EXE_VER_RESULT%" == "%ENCODER_VERSION%" (
+    echo exe version do not match! set %ENCODER_VERSION%, exe %EXE_VER_RESULT%
+    pause
+    exit 1
+)
+echo check exe version OK! set %ENCODER_VERSION%, exe %EXE_VER_RESULT%
+
+copy /y "%EXE_32_SRC_PATH%" "Y:\Encoders\x86"
+copy /y "%EXE_64_SRC_PATH%" "Y:\Encoders\x64"
+copy /y "%EXE_64_SRC_PATH%" "Y:\Encoders\x64\%ENCODER_NAME%C64_%ENCODER_VERSION%.exe"
 copy /y "%EXE_32_SRC_PATH%" "%COPY_PATH%"
 copy /y "%EXE_64_SRC_PATH%" "%COPY_PATH%"
 copy /y "%AUO_SRC_PATH%" "%COPY_PATH%"
@@ -43,10 +54,13 @@ copy /y "%EXE_64_SRC_PATH%" "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%\%ENCODER
 
 if exist "%ENCODER_NAME%_%ENCODER_VERSION%.zip" del "%ENCODER_NAME%_%ENCODER_VERSION%.zip"
 if exist "%ENCODER_NAME%_%ENCODER_VERSION%_7zip.7z" del "%ENCODER_NAME%_%ENCODER_VERSION%_7zip.7z"
-start "7-zipà≥èk" /b "%SEVENZIP_PATH%" a -t7z -mx=9 -mmt=off "%ENCODER_NAME%_%ENCODER_VERSION%_7zip.7z" "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%"
-"%SEVENZIP_PATH%" a -tzip -mx=9 -mfb=256 -mpass=15 -mmt=off "%ENCODER_NAME%_%ENCODER_VERSION%.zip" "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%"
+start "7-zipà≥èk" /b "%SEVENZIP_PATH%" a -t7z -mx=7 -mmt=off "%ENCODER_NAME%_%ENCODER_VERSION%_7zip.7z" "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%"
+"%SEVENZIP_PATH%" a -tzip -mx=5 "%ENCODER_NAME%_%ENCODER_VERSION%.zip" "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%"
 
-certutil -hashfile "%ENCODER_NAME%_%ENCODER_VERSION%_7zip.7z" SHA256
-certutil -hashfile "%ENCODER_NAME%_%ENCODER_VERSION%.zip" SHA256
+"%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%\%ENCODER_NAME%C\x86\%ENCODER_NAME%C.exe" --version
+"%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%\%ENCODER_NAME%C\x64\%ENCODER_NAME%C64.exe" --version
+
+REM certutil -hashfile "%ENCODER_NAME%_%ENCODER_VERSION%_7zip.7z" SHA256
+REM certutil -hashfile "%ENCODER_NAME%_%ENCODER_VERSION%.zip" SHA256
 
 pause

@@ -1,16 +1,16 @@
+#!/bin/bash
 BUILD_DIR=`pwd`/build_svtav1
 BUILD_CCFLAGS="-Ofast -ffast-math -fomit-frame-pointer -flto"
 BUILD_LDFLAGS="-static -static-libgcc -flto -Wl,--gc-sections -Wl,--strip-all"
 MAKE_PROCESS=$NUMBER_OF_PROCESSORS
 #cmake.exeÇÃÇ†ÇÈèÍèä
 CMAKE_DIR="/C/Program Files/CMake/bin"
-PATCH_DIR=$HOME/patch
 PROFILE_GEN_CC="-fprofile-generate -fprofile-update=atomic"
 PROFILE_GEN_LD="-fprofile-generate -fprofile-update=atomic"
 PROFILE_USE_CC="-fprofile-use"
 PROFILE_USE_LD="-fprofile-use"
-YUV_PATH="/Y/QSVTest/sakura_op_8bit_10sec.yuv"
-YUV_10_PATH="/Y/QSVTest/sakura_op_10bit_10sec.yuv"
+YUVFILE="/y/Encoders/sakura_op_1280x720.yuv"
+YUVFILE_10="/y/Encoders/sakura_10.yuv"
 
 export CC=gcc
 export CXX=g++
@@ -21,9 +21,9 @@ mkdir -p $BUILD_DIR/src
 cd $BUILD_DIR/src
 git config --global core.autocrlf false
 
-if [ $MSYSTEM = "MINGW32" ]; then
-    TARGET_ARCH="x86"
-    BUILD_CCFLAGS="-m32 ${BUILD_CCFLAGS}"
+if [ $MSYSTEM != "MINGW64" ]; then
+    echo "This script is for mingw64 only!"
+    exit 1
 else
     TARGET_ARCH="x64"
 fi
@@ -36,7 +36,7 @@ if [ -d "SVT-AV1" ]; then
     git pull
     cd ..
 else
-	git clone https://github.com/OpenVisualCloud/SVT-AV1.git
+    git clone https://gitlab.com/AOMediaCodec/SVT-AV1.git
 fi
 
 
@@ -55,34 +55,40 @@ cmake -G "MSYS Makefiles" \
   -DBUILD_SHARED_LIBS=OFF \
   -DBUILD_TESTING=OFF \
   -DENABLE_NASM=ON \
-  -DCMAKE_ASM_NASM_COMPILER=yasm \
+  -DENABLE_AVX512=ON \
+  -DCMAKE_ASM_NASM_COMPILER=nasm \
   -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
   -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
   -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
   -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_GEN_LD}" \
   ../..
 
-make SvtAv1EncApp -j$MAKE_PROCESS
+make SvtAv1EncApp -j${NUMBER_OF_PROCESSORS}
 
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/nul -i "${YUV_PATH}"    --preset 5 -n 30
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/nul -i "${YUV_PATH}"    --preset 7 -n 60
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/nul -i "${YUV_PATH}"    --preset 5 -n 30 --pass 1 --stats pass.stats --aq-mode 2 --irefresh-type 2
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/nul -i "${YUV_PATH}"    --preset 5 -n 30 --pass 2 --stats pass.stats --aq-mode 2 --irefresh-type 2
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/nul -i "${YUV_10_PATH}" --preset 5 -n 30 --input-depth 10
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/nul -i "${YUV_10_PATH}" --preset 7 -n 60 --input-depth 10
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/nul -i "${YUV_10_PATH}" --preset 5 -n 30 --pass 1 --stats pass.stats --aq-mode 2 --irefresh-type 2 --input-depth 10 --hbd-md 2
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/nul -i "${YUV_10_PATH}" --preset 5 -n 30 --pass 2 --stats pass.stats --aq-mode 2 --irefresh-type 2 --input-depth 10 --hbd-md 2
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx512
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 5 -n 30 --asm avx512
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 7 -n 60 --asm avx512
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx2
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 5 -n 30 --asm avx2
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 7 -n 60 --asm avx2
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx512
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 5 -n 30 --input-depth 10 --asm avx512
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 7 -n 60 --input-depth 10 --asm avx512
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx2
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 5 -n 30 --input-depth 10 --asm avx2
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 7 -n 60 --input-depth 10 --asm avx2
 
 cmake -G "MSYS Makefiles" \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=OFF \
   -DBUILD_TESTING=OFF \
   -DENABLE_NASM=ON \
-  -DCMAKE_ASM_NASM_COMPILER=yasm \
+  -DENABLE_AVX512=ON \
+  -DCMAKE_ASM_NASM_COMPILER=nasm \
   -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
   -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
   -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
   -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_USE_LD}" \
   ../..
 
-make SvtAv1EncApp -j$MAKE_PROCESS
+make SvtAv1EncApp -j${NUMBER_OF_PROCESSORS}

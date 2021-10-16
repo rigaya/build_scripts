@@ -127,15 +127,14 @@ if [ ! -d "expat-2.2.5" ]; then
     tar xf expat-2.2.5.tar.bz2
 fi
 
-if [ ! -d "freetype-2.7.1" ]; then
-    wget https://download.savannah.gnu.org/releases/freetype/freetype-2.7.1.tar.gz
-    tar xf freetype-2.7.1.tar.gz
+if [ ! -d "freetype-2.11.0" ]; then
+    wget https://download.savannah.gnu.org/releases/freetype/freetype-2.11.0.tar.xz
+    tar xf freetype-2.11.0.tar.xz
 fi
 
-# 1.14でないと現状ビルドできない
-if [ ! -d "libiconv-1.14" ]; then
-    wget http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.14.tar.gz
-    tar xf libiconv-1.14.tar.gz
+if [ ! -d "libiconv-1.16" ]; then
+    wget https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.16.tar.gz
+    tar xf libiconv-1.16.tar.gz
 fi
 
 #2.12.6でないといろいろ面倒 -> 2.12.1もだめ, 2.13.0もだめ
@@ -149,10 +148,9 @@ if [ ! -d "fribidi-1.0.11" ]; then
     tar xf fribidi-1.0.11.tar.xz
 fi
 
-# 0.14.0でないと現状ビルドできない
-if [ ! -d "libass-0.14.0" ]; then
-    wget https://github.com/libass/libass/releases/download/0.14.0/libass-0.14.0.tar.gz
-    tar xf libass-0.14.0.tar.gz
+if [ ! -d "libass-0.15.2" ]; then
+    wget https://github.com/libass/libass/releases/download/0.15.2/libass-0.15.2.tar.xz
+    tar xf libass-0.15.2.tar.xz
 fi
 
 if [ ! -d "libogg-1.3.5" ]; then
@@ -369,10 +367,10 @@ cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "libiconv" ]; then
     find ../src/ -type d -name "libiconv-*" | xargs -i cp -r {} ./libiconv
     cd ./libiconv
-    gzip -dc $PATCHES_DIR/libiconv-1.14-ja-1.patch.gz | patch -p1
+    gzip -dc $PATCHES_DIR/libiconv-1.16-ja-1.patch.gz | patch -p1
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-    CFLAGS="${BUILD_CCFLAGS_SMALL} -fgnu89-inline" \
-    CPPFLAGS="${BUILD_CCFLAGS_SMALL} -fgnu89-inline" \
+    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
     ./configure \
     --prefix=$INSTALL_DIR \
     --enable-static \

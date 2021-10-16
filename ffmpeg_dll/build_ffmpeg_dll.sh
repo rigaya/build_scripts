@@ -7,7 +7,7 @@
 #pacman -S mingw32/mingw-w64-i686-meson mingw64/mingw-w64-x86_64-meson
 #pacman -S mingw32/mingw-w64-i686-python-lxml mingw64/mingw-w64-x86_64-python-lxml
 #そのほかにcmake(windows版)のインストールが必要
-NJOBS=$(($NUMBER_OF_PROCESSORS>16?16:$NUMBER_OF_PROCESSORS))
+NJOBS=$NUMBER_OF_PROCESSORS
 BUILD_DIR=$HOME/build_ffmpeg_dll
 CMAKE_PATH="/C/Program Files/CMake/bin/cmake.exe"
 PATCHES_DIR=$HOME/patches
@@ -19,7 +19,6 @@ cd $BUILD_DIR/src
 BUILD_ALL="FALSE"
 SSE4_2="FALSE"
 UPDATE_FFMPEG="FALSE"
-FOR_BITRATE="FALSE"
 ENABLE_SWSCALE="FALSE"
 FOR_AUDENC="FALSE"
 
@@ -40,8 +39,6 @@ done
 
 if [ "$TARGET_BUILD" = "swscale" ]; then
     ENABLE_SWSCALE="TRUE"
-elif [ "$TARGET_BUILD" = "bitrate" ]; then
-    FOR_BITRATE="TRUE"
 elif [ "$TARGET_BUILD" = "audenc" ]; then
     FOR_AUDENC="TRUE"
 fi
@@ -60,12 +57,10 @@ fi
 INSTALL_DIR=$BUILD_DIR/$TARGET_ARCH/build
 
 if [ $TARGET_ARCH = "x64" ]; then
-    BUILD_CCFLAGS="-O3 -mtune=sandybridge -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
-    BUILD_CCFLAGS_SSE=$BUILD_CCFLAGS
+    BUILD_CCFLAGS="-mtune=sandybridge -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
     BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
 elif [ $TARGET_ARCH = "x86" ]; then
-    BUILD_CCFLAGS="-m32 -mtune=sandybridge -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -mstackrealign -I${INSTALL_DIR}/include" 
-    BUILD_CCFLAGS_SSE="-m32 -mtune=sandybridge -msse -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -mstackrealign -I${INSTALL_DIR}/include"
+    BUILD_CCFLAGS="-m32 -mtune=sandybridge -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -mstackrealign -I${INSTALL_DIR}/include"
     BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
 else
     echo "invalid TARGET_ARCH: ${TARGET_ARCH}"
@@ -78,14 +73,14 @@ if [ $SSE4_2 = "TRUE" ]; then
     FFMPEG_DIR_NAME="ffmpeg_dll_sse42"
     FFMPEG_SSE="-msse4.2 -mpopcnt"
 fi
-if [ $FOR_BITRATE = "TRUE" ]; then
-    FFMPEG_DIR_NAME="ffmpeg_dll_small"
-    BUILD_CCFLAGS="-Os ${BUILD_CCFLAGS}"
-    BUILD_CCFLAGS_SSE="-Os ${BUILD_CCFLAGS_SSE}"
-else
-    BUILD_CCFLAGS="-O3 ${BUILD_CCFLAGS}"
-    BUILD_CCFLAGS_SSE="-O3 ${BUILD_CCFLAGS_SSE}"
-fi
+
+# static link用のフラグ (これらがないとundefined referenceが出る)
+BUILD_CCFLAGS="${BUILD_CCFLAGS} -DLIBXML_STATIC -DFRIBIDI_LIB_STATIC"
+
+# small build用のフラグと通常用のフラグ
+BUILD_CCFLAGS_SMALL="-Os -fno-unroll-loops ${BUILD_CCFLAGS}"
+BUILD_CCFLAGS="-O3 ${BUILD_CCFLAGS}"
+
 if [ $ENABLE_SWSCALE = "TRUE" ]; then
     FFMPEG_DIR_NAME="ffmpeg_dll_swscale"
 fi
@@ -100,7 +95,6 @@ echo TARGET_ARCH=$TARGET_ARCH
 echo BUILD_ALL=$BUILD_ALL
 echo SSE4_2=$SSE4_2
 echo UPDATE_FFMPEG=$UPDATE_FFMPEG
-echo FOR_BITRATE=$FOR_BITRATE
 echo FOR_AUDENC=$FOR_AUDENC
 echo ENABLE_SWSCALE=$ENABLE_SWSCALE
 echo FFMPEG_DIR_NAME=$FFMPEG_DIR_NAME
@@ -138,6 +132,7 @@ if [ ! -d "freetype-2.7.1" ]; then
     tar xf freetype-2.7.1.tar.gz
 fi
 
+# 1.14でないと現状ビルドできない
 if [ ! -d "libiconv-1.14" ]; then
     wget http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.14.tar.gz
     tar xf libiconv-1.14.tar.gz
@@ -149,24 +144,25 @@ if [ ! -d "fontconfig-2.12.6" ]; then
     tar xf fontconfig-2.12.6.tar.gz
 fi
 
-if [ ! -d "fribidi-1.0.1" ]; then
-    wget https://github.com/fribidi/fribidi/releases/download/v1.0.1/fribidi-1.0.1.tar.bz2
-    tar xf fribidi-1.0.1.tar.bz2
+if [ ! -d "fribidi-1.0.11" ]; then
+    wget https://github.com/fribidi/fribidi/releases/download/v1.0.11/fribidi-1.0.11.tar.xz
+    tar xf fribidi-1.0.11.tar.xz
 fi
 
+# 0.14.0でないと現状ビルドできない
 if [ ! -d "libass-0.14.0" ]; then
     wget https://github.com/libass/libass/releases/download/0.14.0/libass-0.14.0.tar.gz
     tar xf libass-0.14.0.tar.gz
 fi
 
-if [ ! -d "libogg-1.3.4" ]; then
-    wget http://downloads.xiph.org/releases/ogg/libogg-1.3.4.tar.gz
-    tar xf libogg-1.3.4.tar.gz
+if [ ! -d "libogg-1.3.5" ]; then
+    wget https://downloads.xiph.org/releases/ogg/libogg-1.3.5.tar.xz
+    tar xf libogg-1.3.5.tar.xz
 fi
 
-if [ ! -d "libvorbis-1.3.6" ]; then
-    wget http://downloads.xiph.org/releases/vorbis/libvorbis-1.3.6.tar.gz
-    tar xf libvorbis-1.3.6.tar.gz
+if [ ! -d "libvorbis-1.3.7" ]; then
+    wget https://downloads.xiph.org/releases/vorbis/libvorbis-1.3.7.tar.xz
+    tar xf libvorbis-1.3.7.tar.xz
 fi
 
 if [ ! -d "opus-1.3.1" ]; then
@@ -189,9 +185,9 @@ if [ ! -d "twolame-0.4.0" ]; then
     tar xf twolame-0.4.0.tar.gz
 fi
 
-if [ ! -d "libsndfile-1.0.28" ]; then
-    wget http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.28.tar.gz
-    tar xf libsndfile-1.0.28.tar.gz
+if [ ! -d "libsndfile-1.0.31" ]; then
+    wget https://github.com/libsndfile/libsndfile/releases/download/1.0.31/libsndfile-1.0.31.tar.bz2
+    tar xf libsndfile-1.0.31.tar.bz2
 fi
 
 if [ ! -d "soxr-0.1.3-Source" ]; then
@@ -199,14 +195,9 @@ if [ ! -d "soxr-0.1.3-Source" ]; then
     tar xf soxr-0.1.3-Source.tar.xz
 fi
 
-if [ ! -d "wavpack-5.2.0" ]; then
-    wget http://www.wavpack.com/wavpack-5.2.0.tar.bz2
-    tar xf wavpack-5.2.0.tar.bz2
-fi
-
-if [ ! -d "libxml2-2.9.10" ]; then
-    wget ftp://xmlsoft.org/libxml2/libxml2-2.9.10.tar.gz
-    tar xf libxml2-2.9.10.tar.gz
+if [ ! -d "libxml2-2.9.12" ]; then
+    wget http://xmlsoft.org/sources/libxml2-2.9.12.tar.gz
+    tar xf libxml2-2.9.12.tar.gz
 fi
 
 #if [ ! -d "apache-ant-1.10.6-src.tar.xz" ]; then
@@ -214,9 +205,9 @@ fi
 #    tar xf apache-ant-1.10.6-src.tar.xz
 #fi
 
-if [ ! -d "libbluray-1.1.2" ]; then
-    wget https://download.videolan.org/pub/videolan/libbluray/1.1.2/libbluray-1.1.2.tar.bz2
-    tar xf libbluray-1.1.2.tar.bz2
+if [ ! -d "libbluray-1.3.0" ]; then
+    wget https://download.videolan.org/pub/videolan/libbluray/1.3.0/libbluray-1.3.0.tar.bz2
+    tar xf libbluray-1.3.0.tar.bz2
 fi
 
 if [ ! -d "aribb24-master" ]; then
@@ -245,9 +236,9 @@ fi
     # tar xf gnutls-3.3.19.tar.xz
 # fi
 
-if [ ! -d "dav1d-0.6.0" ]; then
-    wget https://downloads.videolan.org/pub/videolan/dav1d/0.6.0/dav1d-0.6.0.tar.xz
-    tar xf dav1d-0.6.0.tar.xz
+if [ ! -d "dav1d-0.9.2" ]; then
+    wget https://code.videolan.org/videolan/dav1d/-/archive/0.9.2/dav1d-0.9.2.tar.bz2
+    tar xf dav1d-0.9.2.tar.bz2
 fi
 
 # --- 出力先の古いデータを削除 ----------------------
@@ -281,9 +272,9 @@ cp -r ../src/ffmpeg $FFMPEG_DIR_NAME
     # cd $BUILD_DIR/$TARGET_ARCH
     # find ../src/ -type d -name "zlib-*" | xargs -i cp -r {} ./zlib
     # cd $BUILD_DIR/$TARGET_ARCH/zlib
-    # CFLAGS="${BUILD_CCFLAGS}" \
-    # CPPFLAGS="${BUILD_CCFLAGS}" \
-    # CXXFLAGS="${BUILD_CCFLAGS}" \
+    # CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    # CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    # CXXFLAGS="${BUILD_CCFLAGS_SMALL}" \
     # make -f win32/Makefile.gcc
     # rm -f $INSTALL_DIR/lib/libz.a
     # rm -f $INSTALL_DIR/include/zlib.h $INSTALL_DIR/include/zconf.h
@@ -296,9 +287,9 @@ if [ ! -d "bzip2" ]; then
     find ../src/ -type d -name "bzip2-*" | xargs -i cp -r {} ./bzip2
     cd ./bzip2
     patch -p1 < $PATCHES_DIR/bzip2-makefile.diff
-    CFLAGS="${BUILD_CCFLAGS}" \
-    CPPFLAGS="${BUILD_CCFLAGS}" \
-    CXXFLAGS="${BUILD_CCFLAGS}" \
+    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CXXFLAGS="${BUILD_CCFLAGS_SMALL}" \
     make -j$NJOBS && make PREFIX=$INSTALL_DIR install
 fi
 
@@ -306,9 +297,9 @@ cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "libpng" ]; then
     find ../src/ -type d -name "libpng-*" | xargs -i cp -r {} ./libpng
     cd ./libpng
-    CFLAGS="${BUILD_CCFLAGS}" \
-    CPPFLAGS="${BUILD_CCFLAGS}" \
-    CXXFLAGS="${BUILD_CCFLAGS}" \
+    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CXXFLAGS="${BUILD_CCFLAGS_SMALL}" \
     ./configure \
     --prefix=$INSTALL_DIR \
     --enable-static \
@@ -338,9 +329,9 @@ cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "expat" ]; then
     find ../src/ -type d -name "expat-*" | xargs -i cp -r {} ./expat
     cd ./expat
-    CFLAGS="${BUILD_CCFLAGS}" \
-    CPPFLAGS="${BUILD_CCFLAGS}" \
-    CXXFLAGS="${BUILD_CCFLAGS}" \
+    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CXXFLAGS="${BUILD_CCFLAGS_SMALL}" \
     ./configure \
     --prefix=$INSTALL_DIR \
     --enable-static \
@@ -360,9 +351,9 @@ if [ ! -d "freetype" ]; then
     BZIP2_LIBS="-L${INSTALL_DIR}/lib -lbz2" \
     LIBPNG_CFLAGS=" -I${INSTALL_DIR}/include" \
     LIBPNG_LIBS="-L${INSTALL_DIR}/lib -lpng -lz" \
-    CFLAGS="${BUILD_CCFLAGS}" \
-    CPPFLAGS="${BUILD_CCFLAGS}" \
-    CXXFLAGS="${BUILD_CCFLAGS}" \
+    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CXXFLAGS="${BUILD_CCFLAGS_SMALL}" \
     ./configure \
     --prefix=$INSTALL_DIR \
     --enable-static \
@@ -380,8 +371,8 @@ if [ ! -d "libiconv" ]; then
     cd ./libiconv
     gzip -dc $PATCHES_DIR/libiconv-1.14-ja-1.patch.gz | patch -p1
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-    CFLAGS="${BUILD_CCFLAGS} -fgnu89-inline" \
-    CPPFLAGS="${BUILD_CCFLAGS} -fgnu89-inline" \
+    CFLAGS="${BUILD_CCFLAGS_SMALL} -fgnu89-inline" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL} -fgnu89-inline" \
     ./configure \
     --prefix=$INSTALL_DIR \
     --enable-static \
@@ -397,14 +388,12 @@ if [ ! -d "fontconfig" ]; then
     #/c/ProgramAnother/python27/x86/Scripts/pip install lxml
     #autoreconf -fvi
     #pythonは2.7系を使用する
-    #fontconfigはSSE2を有効にしない
-    #SSE2を有効にすると、なぜかundefined reference to `_mm_mfence'が出る
     autoreconf -fvi
     FREETYPE_CFLAGS=-I$INSTALL_DIR/include/freetype2 \
     FREETYPE_LIBS="-L$INSTALL_DIR/lib -lfreetype" \
-    CFLAGS="${BUILD_CCFLAGS_SSE}" \
-    CPPFLAGS="${BUILD_CCFLAGS_SSE}" \
-    CXXFLAGS="${BUILD_CCFLAGS_SSE}" \
+    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CXXFLAGS="${BUILD_CCFLAGS_SMALL}" \
     ./configure \
     --prefix=$INSTALL_DIR \
     --disable-shared \
@@ -425,8 +414,8 @@ if [ ! -d "fribidi" ]; then
     cd ./fribidi
     autoreconf -fvi
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-    CFLAGS="${BUILD_CCFLAGS}" \
-    CPPFLAGS="${BUILD_CCFLAGS}" \
+    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
     ./configure \
     --prefix=$INSTALL_DIR \
     --enable-static \
@@ -444,8 +433,8 @@ if [ ! -d "libass" ]; then
     cd ./libass
     autoreconf -fvi
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-    CFLAGS="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include" \
-    CPPFLAGS="${BUILD_CCFLAGS} -L${INSTALL_DIR}/lib -liconv" \
+    CFLAGS="${BUILD_CCFLAGS_SMALL} -I${INSTALL_DIR}/include" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL} -L${INSTALL_DIR}/lib -liconv" \
     ./configure \
     --prefix=$INSTALL_DIR \
     --enable-static \
@@ -456,8 +445,8 @@ if [ ! -d "libass" ]; then
     autoreconf -fvi
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
     CC="gcc -static-libgcc -static-libstdc++" \
-    CFLAGS="${BUILD_CCFLAGS}" \
-    CPPFLAGS="${BUILD_CCFLAGS}" \
+    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
     LDFLAGS="-L${INSTALL_DIR}/lib -static-libgcc -static-libstdc++ -Wl,-Bstatic -Wl,-lm,-liconv,-lfreetype,-lfribidi,-lfontconfig,-lexpat,-lfreetype,-lpng,-lbz2,-lz" \
     ./configure \
     --prefix=$INSTALL_DIR \
@@ -469,7 +458,7 @@ if [ ! -d "libass" ]; then
     cd libass
     # ../libtool --tag=CC   --mode=link gcc -std=gnu99 \
     # -D_GNU_SOURCE \
-    # ${BUILD_CCFLAGS} \
+    # ${BUILD_CCFLAGS_SMALL} \
     # -I${INSTALL_DIR}/include/freetype2 \
     # -I${INSTALL_DIR}/include/fribidi \
     # -I${INSTALL_DIR}/include \
@@ -578,6 +567,7 @@ if [ ! -d "libsndfile" ]; then
     CFLAGS="${BUILD_CCFLAGS}" \
     CPPFLAGS="${BUILD_CCFLAGS}" \
     LDFLAGS="${BUILD_LDFLAGS}" \
+    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
      ./configure \
      --prefix=$INSTALL_DIR \
      --disable-shared \
@@ -617,31 +607,17 @@ if [ ! -d "soxr" ]; then
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
-if [ ! -d "wavpack" ]; then
-    find ../src/ -type d -name "wavpack-*" | xargs -i cp -r {} ./wavpack
-    cd ./wavpack
-    autoreconf -fvi
-    CFLAGS="${BUILD_CCFLAGS}" \
-    CPPFLAGS="${BUILD_CCFLAGS}" \
-    LDFLAGS="${BUILD_LDFLAGS}" \
-     ./configure \
-     --prefix=$INSTALL_DIR \
-     --disable-shared \
-     --enable-static
-    make install -j$NJOBS
-fi
-
-cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "libxml2" ]; then
     find ../src/ -type d -name "libxml2-*" | xargs -i cp -r {} ./libxml2
     cd ./libxml2
-    CFLAGS="${BUILD_CCFLAGS}" \
-    CPPFLAGS="${BUILD_CCFLAGS}" \
+    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
     LDFLAGS="${BUILD_LDFLAGS}" \
      ./configure \
      --prefix=$INSTALL_DIR \
      --disable-shared \
-     --enable-static
+     --enable-static \
+     --without-python
     make install -j$NJOBS
 fi
 
@@ -651,8 +627,8 @@ if [ ! -d "libbluray" ]; then
     cd ./libbluray
     autoreconf -fvi
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-    CFLAGS="${BUILD_CCFLAGS}" \
-    CPPFLAGS="${BUILD_CCFLAGS}" \
+    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
     LDFLAGS="${BUILD_LDFLAGS}" \
      ./configure \
      --prefix=$INSTALL_DIR \
@@ -670,8 +646,8 @@ if [ ! -d "aribb24" ]; then
     cd ./aribb24
     autoreconf -fvi
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-    CFLAGS="${BUILD_CCFLAGS}" \
-    CPPFLAGS="${BUILD_CCFLAGS}" \
+    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
     LDFLAGS="${BUILD_LDFLAGS}" \
      ./configure \
      --prefix=$INSTALL_DIR \
@@ -692,7 +668,7 @@ if [ ! -d "dav1d" ]; then
     LDFLAGS="${BUILD_LDFLAGS}" \
     meson build --buildtype release
     meson configure build/ --prefix=$INSTALL_DIR -Dbuildtype=release -Ddefault_library=static -Denable_examples=false -Denable_tests=false -Dc_args="${BUILD_CCFLAGS}"
-    DESTDIR=$INSTALL_DIR ninja -C build install
+    ninja -C build install
 fi
 
 
@@ -701,8 +677,8 @@ fi
     # find ../src/ -type d -name "gmp-*" | xargs -i cp -r {} ./gmp
     # cd ./gmp
     # PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-    # CFLAGS="${BUILD_CCFLAGS}" \
-    # CPPFLAGS="${BUILD_CCFLAGS}" \
+    # CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    # CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
     # LDFLAGS="${BUILD_LDFLAGS}" \
      # ./configure \
      # --prefix=$INSTALL_DIR \
@@ -716,8 +692,8 @@ fi
     # find ../src/ -type d -name "nettle-*" | xargs -i cp -r {} ./nettle
     # cd ./nettle
     # PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-    # CFLAGS="${BUILD_CCFLAGS}" \
-    # CPPFLAGS="${BUILD_CCFLAGS}" \
+    # CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    # CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
     # LDFLAGS="${BUILD_LDFLAGS}" \
      # ./configure \
      # --prefix=$INSTALL_DIR \
@@ -728,8 +704,8 @@ fi
 
 # cd $BUILD_DIR/$TARGET_ARCH/gnutls
 # PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-# CFLAGS="${BUILD_CCFLAGS}" \
-# CPPFLAGS="${BUILD_CCFLAGS}" \
+# CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+# CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
 # LDFLAGS="${BUILD_LDFLAGS}" \
 # ./configure \
 # --prefix=$INSTALL_DIR \
@@ -740,47 +716,44 @@ fi
 # sed -i.orig -e "/Libs.private:/s/$/ -lcrypt32/" lib/gnutls.pc
 # make install -j$NJOBS
 
-if [ $FOR_BITRATE = "FALSE" ]; then
-    cd $BUILD_DIR/$TARGET_ARCH/ffmpeg_test
-    if [ ! -e ./ffmpeg.exe ]; then
-        PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-        ./configure \
-        --prefix=${INSTALL_DIR}/$FFMPEG_DIR_NAME \
-        --arch="${TARGET_ARCH}" \
-        --target-os="mingw32" \
-        --disable-doc \
-        --disable-avdevice \
-        --disable-hwaccels \
-        --disable-devices \
-        --disable-debug \
-        --disable-network \
-        --disable-amd3dnow \
-        --disable-amd3dnowext \
-        --disable-xop \
-        --disable-fma4 \
-        --disable-bsfs \
-        --disable-aesni \
-        --enable-libvorbis \
-        --enable-libspeex \
-        --enable-libmp3lame \
-        --enable-libtwolame \
-        --enable-libsoxr \
-        --enable-libwavpack \
-        --enable-libopus \
-        --extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
-        --extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib"
-        make -j$NJOBS
-    fi
-
-    ./ffmpeg.exe -encoders | grep '^ A.\{5\} ' | cut -d' ' -f3 > ffmpeg_audenc_list.txt
-    ./ffmpeg.exe -encoders | grep '^ S.\{5\} ' | cut -d' ' -f3 >> ffmpeg_audenc_list.txt
-    ./configure --list-encoders | tr '\t' '\n' | grep -v '^\s*$' | sort > ./configure_enc_list.txt
-    CONFIGURE_AUDENC_LIST=`python $HOME/build_get_audlist.py ffmpeg_audenc_list.txt ./configure_enc_list.txt`
-
-    ./ffmpeg.exe -filters | grep -v 'V->V' | cut -d' ' -f3 > ffmpeg_audfilter_list.txt
-    ./configure --list-filters | tr '\t' '\n' | grep -v '^\s*$' | sort > ./configure_filter_list.txt
-    CONFIGURE_AUDFILTER_LIST=`python $HOME/build_get_audlist.py ffmpeg_audfilter_list.txt ./configure_filter_list.txt`
+cd $BUILD_DIR/$TARGET_ARCH/ffmpeg_test
+if [ ! -e ./ffmpeg.exe ]; then
+    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+    ./configure \
+    --prefix=${INSTALL_DIR}/$FFMPEG_DIR_NAME \
+    --arch="${FFMPEG_ARCH}" \
+    --target-os="mingw32" \
+    --disable-doc \
+    --disable-avdevice \
+    --disable-hwaccels \
+    --disable-devices \
+    --disable-debug \
+    --disable-network \
+    --disable-amd3dnow \
+    --disable-amd3dnowext \
+    --disable-xop \
+    --disable-fma4 \
+    --disable-bsfs \
+    --disable-aesni \
+    --enable-libvorbis \
+    --enable-libspeex \
+    --enable-libmp3lame \
+    --enable-libtwolame \
+    --enable-libsoxr \
+    --enable-libopus \
+    --extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
+    --extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib"
+    make -j$NJOBS
 fi
+
+./ffmpeg.exe -encoders | grep '^ A.\{5\} ' | cut -d' ' -f3 > ffmpeg_audenc_list.txt
+./ffmpeg.exe -encoders | grep '^ S.\{5\} ' | cut -d' ' -f3 >> ffmpeg_audenc_list.txt
+./configure --list-encoders | tr '\t' '\n' | grep -v '^\s*$' | sort > ./configure_enc_list.txt
+CONFIGURE_AUDENC_LIST=`python $HOME/build_get_audlist.py ffmpeg_audenc_list.txt ./configure_enc_list.txt`
+
+./ffmpeg.exe -filters | grep -v 'V->' | grep -v '\->V' | cut -d' ' -f3 > ffmpeg_audfilter_list.txt
+./configure --list-filters | tr '\t' '\n' | grep -v '^\s*$' | sort > ./configure_filter_list.txt
+CONFIGURE_AUDFILTER_LIST=`python $HOME/build_get_audlist.py ffmpeg_audfilter_list.txt ./configure_filter_list.txt`
 
 if [ $ENABLE_SWSCALE = "TRUE" ]; then
     SWSCALE_ARG="--enable-swscale"
@@ -789,44 +762,13 @@ else
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH/$FFMPEG_DIR_NAME
-if [ $FOR_BITRATE = "TRUE" ]; then
-PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-./configure \
---prefix=${BUILD_DIR}/$FFMPEG_DIR_NAME/$TARGET_ARCH \
---arch="${FFMPEG_ARCH}" \
---target-os="mingw32" \
---disable-doc \
-$SWSCALE_ARG \
---disable-postproc \
---disable-avdevice \
---disable-hwaccels \
---disable-devices \
---disable-swresample \
---disable-avfilter \
---disable-network \
---disable-debug \
---disable-static \
---disable-amd3dnow \
---disable-amd3dnowext \
---disable-encoders \
---disable-muxers \
---disable-xop \
---disable-fma4 \
---disable-w32threads \
---disable-pthreads \
---disable-dxva2 \
---disable-d3d11va \
---enable-shared \
---disable-xlib \
---enable-small \
---extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
---extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib"
-elif [ $FOR_AUDENC = "TRUE" ]; then
+if [ $FOR_AUDENC = "TRUE" ]; then
 pwd
 PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
 ./configure \
 --prefix=${BUILD_DIR}/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH \
 --arch="${FFMPEG_ARCH}" \
+--target-os="mingw32" \
 --enable-version3 \
 --disable-doc \
 $SWSCALE_ARG \
@@ -852,7 +794,7 @@ $SWSCALE_ARG \
 --disable-demuxers \
 --enable-demuxer="wav" \
 --disable-encoders \
---enable-encoder="aac,ac3*,alac,adpcm*,eac3,flac,libmp3lame,libopus,libspeex,libtwolame,libmp3lame,libvorbis,mp2*,opus,pcm*,truehd,vorbis,wavpack,wma*" \
+--enable-encoder="aac,ac3*,alac,adpcm*,eac3,flac,libmp3lame,libopus,libspeex,libtwolame,libmp3lame,libvorbis,mp2*,opus,pcm*,truehd,vorbis,wma*" \
 --enable-libvorbis \
 --enable-libspeex \
 --enable-libmp3lame \
@@ -897,9 +839,9 @@ $SWSCALE_ARG \
 --enable-libmp3lame \
 --enable-libtwolame \
 --enable-fontconfig \
+--enable-libfribidi \
 --enable-libfreetype \
 --enable-libsoxr \
---enable-libwavpack \
 --enable-libopus \
 --enable-libbluray \
 --enable-libass \
@@ -913,29 +855,27 @@ $SWSCALE_ARG \
 fi
 make clean && make -j$NJOBS && make install
 
-if [ $FOR_BITRATE != "TRUE" ]; then
-    mkdir -p $BUILD_DIR/$FFMPEG_DIR_NAME/include
-    mkdir -p $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
-    cp -f -r $BUILD_DIR/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH/include/* $BUILD_DIR/$FFMPEG_DIR_NAME/include
-    cp -f -r $BUILD_DIR/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH/bin/*     $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
-    cp -f -r $BUILD_DIR/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH/lib/*     $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
-    rm -rf   $BUILD_DIR/$FFMPEG_DIR_NAME/tmp
-    
-    cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.dll $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
-    cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.def $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
-    cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.lib $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
-    cp -f -r $INSTALL_DIR/include/ass $BUILD_DIR/$FFMPEG_DIR_NAME/include
-fi
+mkdir -p $BUILD_DIR/$FFMPEG_DIR_NAME/include
+mkdir -p $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
+cp -f -r $BUILD_DIR/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH/include/* $BUILD_DIR/$FFMPEG_DIR_NAME/include
+cp -f -r $BUILD_DIR/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH/bin/*     $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
+cp -f -r $BUILD_DIR/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH/lib/*     $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
+rm -rf   $BUILD_DIR/$FFMPEG_DIR_NAME/tmp
+
+cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.dll $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
+cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.def $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
+cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.lib $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
+cp -f -r $INSTALL_DIR/include/ass $BUILD_DIR/$FFMPEG_DIR_NAME/include
 
 cd $BUILD_DIR/src
-if [ $UPDATE_FFMPEG != "FALSE" ]; then
+if [ ${UPDATE_FFMPEG} != "FALSE" ]; then
     rm -f ffmpeg_lgpl_src.7z
     echo "compressing src file..."
-    7z a -y -t7z -mx=9 -mmt=off -x\!'*.tar.gz' -x\!'*.tar.bz2' -x\!'*.tar.xz' -xr\!'.git' ffmpeg_lgpl_src.7z \
+    7z a -y -t7z -mx=9 -mmt=off -x\!'*.tar.gz' -x\!'*.tar.bz2' -x\!'*.zip' -x\!'*.tar.xz' -xr\!'.git' ffmpeg_lgpl_src.7z \
      $BUILD_DIR/src/ffmpeg* $BUILD_DIR/src/opus* $BUILD_DIR/src/libogg* $BUILD_DIR/src/libvorbis* \
      $BUILD_DIR/src/lame* $BUILD_DIR/src/libsndfile* $BUILD_DIR/src/twolame* $BUILD_DIR/src/soxr* $BUILD_DIR/src/speex* \
      $BUILD_DIR/src/expat* $BUILD_DIR/src/freetype* $BUILD_DIR/src/libiconv* $BUILD_DIR/src/fontconfig* \
-     $BUILD_DIR/src/libpng* $BUILD_DIR/src/libass* $BUILD_DIR/src/bzip2* $BUILD_DIR/src/wavpack* $BUILD_DIR/src/libbluray* \
+     $BUILD_DIR/src/libpng* $BUILD_DIR/src/libass* $BUILD_DIR/src/bzip2* $BUILD_DIR/src/libbluray* \
      $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* \
       > /dev/null
 fi

@@ -9,8 +9,8 @@ PROFILE_GEN_CC="-fprofile-generate -fprofile-update=atomic"
 PROFILE_GEN_LD="-fprofile-generate -fprofile-update=atomic"
 PROFILE_USE_CC="-fprofile-use"
 PROFILE_USE_LD="-fprofile-use"
-YUVFILE="/y/Encoders/sakura_op_1280x720.yuv"
-YUVFILE_10="/y/Encoders/sakura_10.yuv"
+YUVFILE="/y/Encoders/sakura_op_short_720p.yuv"
+YUVFILE_10="/y/Encoders/sakura_op_short_720p_10.yuv"
 
 export CC=gcc
 export CXX=g++

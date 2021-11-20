@@ -65,18 +65,18 @@ cmake -G "MSYS Makefiles" \
 
 make SvtAv1EncApp -j${NUMBER_OF_PROCESSORS}
 
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx512
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 5 -n 30 --asm avx512
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 7 -n 60 --asm avx512
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx2
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 5 -n 30 --asm avx2
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 7 -n 60 --asm avx2
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx512
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 5 -n 30 --input-depth 10 --asm avx512
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 7 -n 60 --input-depth 10 --asm avx512
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx2
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 5 -n 30 --input-depth 10 --asm avx2
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --qp 30 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 7 -n 60 --input-depth 10 --asm avx2
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx512
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 5 -n 30 --asm avx512
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 7 -n 60 --asm avx512
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx2
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 5 -n 30 --asm avx2
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 7 -n 60 --asm avx2
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx512
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 5 -n 30 --input-depth 10 --asm avx512
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 7 -n 60 --input-depth 10 --asm avx512
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx2
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 5 -n 30 --input-depth 10 --asm avx2
+../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 7 -n 60 --input-depth 10 --asm avx2
 
 cmake -G "MSYS Makefiles" \
   -DCMAKE_BUILD_TYPE=Release \

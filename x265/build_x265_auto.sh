@@ -25,9 +25,9 @@ echo "build x265 ${X265_VER}"
 
 mkdir ${BUILD_DIR}/temp
 cp -r ${BUILD_DIR}/src/x265 ${BUILD_DIR}/temp/src
-rm -rf ${BUILD_DIR}/temp/src/.git
+rm -rf ${BUILD_DIR}/temp/src/x265/.git
 
-7z a -t7z -mx=9 -mmt=off "${BUILD_DIR}/temp/x265_${X265_VER}_src.7z" ${BUILD_DIR}/temp/src/
+7z a -t7z -mx=9 -mmt=off "${BUILD_DIR}/temp/x265_${X265_VER}_src.7z" ${BUILD_DIR}/temp/src/x265
 
 cp -f ${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys/8bit/x265.exe ${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys/8bit/x265_${X265_VER}_${TARGET_ARCH}.exe
 7z a -tzip -mx=9 -mfb=256 -mpass=15 -mmt=off "${BUILD_DIR}/temp/x265_${X265_VER}_${TARGET_ARCH}.zip" ${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys/8bit/x265_${X265_VER}_${TARGET_ARCH}.exe ${GPL_LICENSE_PATH}

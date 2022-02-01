@@ -122,9 +122,9 @@ if [ ! -d "bzip2-1.0.8" ]; then
     tar xf bzip2-1.0.8.tar.gz
 fi
 
-if [ ! -d "expat-2.2.5" ]; then
-    wget https://github.com/libexpat/libexpat/releases/download/R_2_2_5/expat-2.2.5.tar.bz2
-    tar xf expat-2.2.5.tar.bz2
+if [ ! -d "expat-2.4.4" ]; then
+    wget https://github.com/libexpat/libexpat/releases/download/R_2_4_4/expat-2.4.4.tar.xz
+    tar xf expat-2.4.4.tar.xz
 fi
 
 if [ ! -d "freetype-2.11.0" ]; then

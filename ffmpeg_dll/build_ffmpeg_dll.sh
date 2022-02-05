@@ -148,6 +148,11 @@ if [ ! -d "fribidi-1.0.11" ]; then
     tar xf fribidi-1.0.11.tar.xz
 fi
 
+if [ ! -d "harfbuzz-3.3.1" ]; then
+    wget https://github.com/harfbuzz/harfbuzz/releases/download/3.3.1/harfbuzz-3.3.1.tar.xz
+    tar xf harfbuzz-3.3.1.tar.xz
+fi
+
 if [ ! -d "libass-0.15.2" ]; then
     wget https://github.com/libass/libass/releases/download/0.15.2/libass-0.15.2.tar.xz
     tar xf libass-0.15.2.tar.xz
@@ -422,6 +427,22 @@ if [ ! -d "fribidi" ]; then
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "harfbuzz" ]; then
+    find ../src/ -type d -name "harfbuzz-*" | xargs -i cp -r {} ./harfbuzz
+    cd ./harfbuzz
+    autoreconf -fvi
+    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    ./configure \
+    --prefix=$INSTALL_DIR \
+    --enable-static \
+    --enable-shared=no \
+    --enable-gtk-doc-html=no
+    make -j$NJOBS && make install
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "libass" ]; then
     find ../src/ -type d -name "libass-*" | xargs -i cp -r {} ./libass
     if [ -d "libass_dll" ]; then
@@ -445,7 +466,7 @@ if [ ! -d "libass" ]; then
     CC="gcc -static-libgcc -static-libstdc++" \
     CFLAGS="${BUILD_CCFLAGS_SMALL}" \
     CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
-    LDFLAGS="-L${INSTALL_DIR}/lib -static-libgcc -static-libstdc++ -Wl,-Bstatic -Wl,-lm,-liconv,-lfreetype,-lfribidi,-lfontconfig,-lexpat,-lfreetype,-lpng,-lbz2,-lz" \
+    LDFLAGS="-L${INSTALL_DIR}/lib -static-libgcc -static-libstdc++ -Wl,-Bstatic -Wl,-lm,-liconv,-lharfbuzz,-lfreetype,-lfribidi,-lfontconfig,-lexpat,-lfreetype,-lpng,-lbz2,-lz" \
     ./configure \
     --prefix=$INSTALL_DIR \
     --enable-static=no \
@@ -874,7 +895,7 @@ if [ ${UPDATE_FFMPEG} != "FALSE" ]; then
      $BUILD_DIR/src/lame* $BUILD_DIR/src/libsndfile* $BUILD_DIR/src/twolame* $BUILD_DIR/src/soxr* $BUILD_DIR/src/speex* \
      $BUILD_DIR/src/expat* $BUILD_DIR/src/freetype* $BUILD_DIR/src/libiconv* $BUILD_DIR/src/fontconfig* \
      $BUILD_DIR/src/libpng* $BUILD_DIR/src/libass* $BUILD_DIR/src/bzip2* $BUILD_DIR/src/libbluray* \
-     $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* \
+     $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* $BUILD_DIR/src/harfbuzz* \
       > /dev/null
 fi
 

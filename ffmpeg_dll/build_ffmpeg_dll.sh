@@ -1,8 +1,10 @@
 #!/bin/bash
 #MSYS2用ffmpeg dllビルドスクリプト
 #Visual Studioへの環境変数を通しておくこと
-#pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain
+#pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain autotools
 #pacman -S p7zip git nasm python unzip
+# harfbuzz関連
+#pacman -S gtk-doc mingw64/mingw-w64-x86_64-ragel mingw32/mingw-w64-i686-ragel
 #普通にpacman -S mesonとやるとうまくdav1dがビルドできないので注意
 #pacman -S mingw32/mingw-w64-i686-meson mingw64/mingw-w64-x86_64-meson
 #pacman -S mingw32/mingw-w64-i686-python-lxml mingw64/mingw-w64-x86_64-python-lxml
@@ -786,6 +788,7 @@ pwd
 PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
 ./configure \
 --prefix=${BUILD_DIR}/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH \
+--pkg-config-flags="--static" \
 --arch="${FFMPEG_ARCH}" \
 --target-os="mingw32" \
 --enable-version3 \
@@ -801,6 +804,12 @@ $SWSCALE_ARG \
 --disable-amd3dnowext \
 --disable-dxva2 \
 --disable-d3d11va \
+--disable-cuda-nvcc \
+--disable-cuda-llvm \
+--disable-cuvid \
+--disable-ffnvcodec \
+--disable-nvdec \
+--disable-nvenc \
 --disable-xop \
 --disable-fma4 \
 --disable-network \
@@ -830,6 +839,7 @@ else
 PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
 ./configure \
 --prefix=${BUILD_DIR}/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH \
+--pkg-config-flags="--static" \
 --arch="${FFMPEG_ARCH}" \
 --target-os="mingw32" \
 --enable-version3 \
@@ -848,6 +858,12 @@ $SWSCALE_ARG \
 --disable-w32threads \
 --disable-dxva2 \
 --disable-d3d11va \
+--disable-cuda-nvcc \
+--disable-cuda-llvm \
+--disable-cuvid \
+--disable-ffnvcodec \
+--disable-nvdec \
+--disable-nvenc \
 --enable-pthreads \
 --enable-bsfs \
 --enable-swresample \

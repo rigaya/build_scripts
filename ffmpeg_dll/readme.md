@@ -10,9 +10,10 @@ pacman -Syuu
 
 #### Install tools required to MSYS2
 ```
-pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain p7zip git nasm python unzip
+pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain autotools p7zip git nasm python unzip gtk-doc
 pacman -S mingw32/mingw-w64-i686-meson mingw64/mingw-w64-x86_64-meson
 pacman -S mingw32/mingw-w64-i686-python-lxml mingw64/mingw-w64-x86_64-python-lxml
+pacman -S mingw32/mingw-w64-i686-ragel mingw64/mingw-w64-x86_64-ragel
 ```
 
 #### Copy scripts to $HOME dir

@@ -10,7 +10,7 @@ echo %ENCODER_NAME%_%ENCODER_VERSION%ÇçÏê¨ÇµÇ‹Ç∑...
 if not exist "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%" (
     echo "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%Ç™ë∂ç›ÇµÇ‹ÇπÇÒ"
     pause
-    exit 1
+    exit /b 1
 )
 
 timeout 2
@@ -25,19 +25,6 @@ set EXE_64_SRC_PATH=%ENCODER_SRC_DIR%\_build\x64\ReleaseStatic\%ENCODER_NAME%C64
 set AUO_SRC_PATH=%ENCODER_SRC_DIR%\_build\Win32\Release\%ENCODER_NAME%.auo
 set INI_SRC_PATH=%ENCODER_SRC_DIR%\%ENCODER_NAME%\%ENCODER_NAME%.ini
 set COPY_PATH=F:\temp\
-
-set EXE_VER_RESULT=
-for /f "usebackq tokens=3" %%i in (`"%EXE_64_SRC_PATH%" --version`) DO (
-    set EXE_VER_RESULT=%%i
-    goto GOT_EXE_VER
-)
-:GOT_EXE_VER
-if not "%EXE_VER_RESULT%" == "%ENCODER_VERSION%" (
-    echo exe version do not match! set %ENCODER_VERSION%, exe %EXE_VER_RESULT%
-    pause
-    exit 1
-)
-echo check exe version OK! set %ENCODER_VERSION%, exe %EXE_VER_RESULT%
 
 copy /y "%EXE_32_SRC_PATH%" "Y:\Encoders\x86"
 copy /y "%EXE_64_SRC_PATH%" "Y:\Encoders\x64"
@@ -54,6 +41,16 @@ copy /y "%INI_SRC_PATH%" "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%\auo"
 copy /y "%EXE_32_SRC_PATH%" "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%\%ENCODER_NAME%C\x86"
 copy /y "%EXE_64_SRC_PATH%" "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%\%ENCODER_NAME%C\x64"
 
+set PKG_EXE_32=%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%\%ENCODER_NAME%C\x86\%ENCODER_NAME%C.exe
+call :CheckEXEVersion %ENCODER_VERSION% "%PKG_EXE_32%"
+call :CheckEXEDll "%PKG_EXE_32%"
+REM call :CheckSimpleRun "%PKG_EXE_32%"
+
+set PKG_EXE_64=%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%\%ENCODER_NAME%C\x64\%ENCODER_NAME%C64.exe
+call :CheckEXEVersion %ENCODER_VERSION% "%PKG_EXE_64%"
+call :CheckEXEDll "%PKG_EXE_64%"
+call :CheckSimpleRun "%PKG_EXE_64%"
+
 if exist "%ENCODER_NAME%_%ENCODER_VERSION%.zip" del "%ENCODER_NAME%_%ENCODER_VERSION%.zip"
 if exist "%ENCODER_NAME%_%ENCODER_VERSION%_7zip.7z" del "%ENCODER_NAME%_%ENCODER_VERSION%_7zip.7z"
 start "7-zipà≥èk" /b "%SEVENZIP_PATH%" a -t7z -mx=8 -mmt=off "%ENCODER_NAME%_%ENCODER_VERSION%_7zip.7z" "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%"
@@ -63,3 +60,42 @@ start "7-zipà≥èk" /b "%SEVENZIP_PATH%" a -t7z -mx=8 -mmt=off "%ENCODER_NAME%_%EN
 "%CUR_DIR%\%ENCODER_NAME%_%ENCODER_VERSION%\%ENCODER_NAME%C\x64\%ENCODER_NAME%C64.exe" --version
 
 pause
+exit /b
+
+:CheckEXEVersion
+set ENC_VERSION=%1
+set EXE_PATH=%2
+set EXE_VER_RESULT=
+for /f "usebackq tokens=3" %%i in (`"%EXE_PATH%" --version`) DO (
+    set EXE_VER_RESULT=%%i
+    goto GOT_EXE_VER
+)
+:GOT_EXE_VER
+if not "%EXE_VER_RESULT%" == "%ENC_VERSION%" (
+    echo exe version do not match! set %ENC_VERSION%, exe %EXE_VER_RESULT%
+    pause
+    exit /b 1
+)
+echo check exe version OK! set %ENC_VERSION%, exe %EXE_VER_RESULT%
+exit /b 0
+
+:CheckEXEDll
+set EXE_PATH=%1
+echo check dll %EXE_PATH%
+"%EXE_PATH%" --check-avcodec-dll
+if not "%errorlevel%" == "0" (
+    pause
+    exit /b 1
+)
+exit /b 0
+
+:CheckSimpleRun
+set EXE_PATH=%1
+set INPUT_PATH=Y:\Encoders\sakura_op.mp4
+set OUTPUT_PATH=Y:\temp\test_pkg.mp4
+"%EXE_PATH%" -i "%INPUT_PATH%" --audio-codec aac --output-res 512x288 -o "%OUTPUT_PATH%"
+if not "%errorlevel%" == "0" (
+    pause
+    exit /b 1
+)
+exit /b 0

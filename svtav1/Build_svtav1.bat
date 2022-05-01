@@ -4,11 +4,10 @@ set CMAKE_DIR=C:\Program Files\CMake\bin
 set TMP_PATH=F:\temp\build_svtav1
 set INSTALL_DIR=%TMP_PATH%\build
 set SVTAV1_PATH=%TMP_PATH%\svt-av1
-set SVTAV1_DIFF=C:\ProgramEx\build_svtav1_forceAVX512.diff
+set SVTAV1_DIFF=build_svtav1_forceAVX512.diff
 set BUILD_PROP_PATH=Build_svtav1.props
 set YUVFILE=Y:\Encoders\sakura_op_1280x720.yuv
 set YUVFILE_10=Y:\Encoders\sakura_10.yuv
-set STATSFILE=%TMP_PATH%\profile.stats
 
 set PATH=%CMAKE_DIR%;%PATH%
 

@@ -1,6 +1,6 @@
 @echo off
 set CUR_DIR=%~dp0
-set ENCODER_NAME=x265guiEx
+set ENCODER_NAME=svtAV1guiEx
 set ENCODER_SRC_DIR=F:\VisualStudio2022\Projects\%ENCODER_NAME%
 set GET_VERSION_PATH=Y:\Encoders\x64\getFileVersionInfo.exe
 set SEVENZIP_PATH=C:\Program Files\7-Zip\7z.exe
@@ -20,6 +20,7 @@ cd /d "%ENCODER_SRC_DIR%"
 call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat" x86
 msbuild %ENCODER_NAME%.sln /t:build /p:Configuration=Release;Platform="Win32"
 cd /d "%CUR_DIR%"
+
 
 set AUO_SRC_PATH=%ENCODER_SRC_DIR%\Release\%ENCODER_NAME%.auo
 set INI_SRC_PATH=%ENCODER_SRC_DIR%\Release\%ENCODER_NAME%.ini

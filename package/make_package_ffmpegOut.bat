@@ -1,6 +1,6 @@
 @echo off
 set CUR_DIR=%~dp0
-set ENCODER_NAME=x265guiEx
+set ENCODER_NAME=ffmpegOut
 set ENCODER_SRC_DIR=F:\VisualStudio2022\Projects\%ENCODER_NAME%
 set GET_VERSION_PATH=Y:\Encoders\x64\getFileVersionInfo.exe
 set SEVENZIP_PATH=C:\Program Files\7-Zip\7z.exe
@@ -21,6 +21,7 @@ call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build
 msbuild %ENCODER_NAME%.sln /t:build /p:Configuration=Release;Platform="Win32"
 cd /d "%CUR_DIR%"
 
+
 set AUO_SRC_PATH=%ENCODER_SRC_DIR%\Release\%ENCODER_NAME%.auo
 set INI_SRC_PATH=%ENCODER_SRC_DIR%\Release\%ENCODER_NAME%.ini
 set COPY_PATH=F:\temp\
@@ -40,7 +41,6 @@ REM start "7-zipà≥èk" /b "%SEVENZIP_PATH%" a -t7z -mx=9 -mmt=off "%ENCODER_NAME%
 
 pause
 exit /b
-
 
 :CheckEXEVersion
 set ENC_VERSION=%~1

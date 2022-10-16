@@ -114,9 +114,9 @@ else
     git clone git://source.ffmpeg.org/ffmpeg.git ffmpeg
 fi
 
-if [ ! -d "libpng-1.6.37" ]; then
-    wget https://download.sourceforge.net/libpng/libpng-1.6.37.tar.xz
-    tar xf libpng-1.6.37.tar.xz
+if [ ! -d "libpng-1.6.38" ]; then
+    wget https://download.sourceforge.net/libpng/libpng-1.6.38.tar.xz
+    tar xf libpng-1.6.38.tar.xz
 fi
 
 if [ ! -d "bzip2-1.0.8" ]; then
@@ -124,19 +124,19 @@ if [ ! -d "bzip2-1.0.8" ]; then
     tar xf bzip2-1.0.8.tar.gz
 fi
 
-if [ ! -d "expat-2.4.4" ]; then
-    wget https://github.com/libexpat/libexpat/releases/download/R_2_4_4/expat-2.4.4.tar.xz
-    tar xf expat-2.4.4.tar.xz
+if [ ! -d "expat-2.4.8" ]; then
+    wget https://github.com/libexpat/libexpat/releases/download/R_2_4_8/expat-2.4.8.tar.xz
+    tar xf expat-2.4.8.tar.xz
 fi
 
-if [ ! -d "freetype-2.11.0" ]; then
-    wget https://download.savannah.gnu.org/releases/freetype/freetype-2.11.0.tar.xz
-    tar xf freetype-2.11.0.tar.xz
+if [ ! -d "freetype-2.12.1" ]; then
+    wget https://download.savannah.gnu.org/releases/freetype/freetype-2.12.1.tar.xz
+    tar xf freetype-2.12.1.tar.xz
 fi
 
-if [ ! -d "libiconv-1.16" ]; then
-    wget https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.16.tar.gz
-    tar xf libiconv-1.16.tar.gz
+if [ ! -d "libiconv-1.17" ]; then
+    wget https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.17.tar.gz
+    tar xf libiconv-1.17.tar.gz
 fi
 
 #2.12.6でないといろいろ面倒 -> 2.12.1もだめ, 2.13.0もだめ
@@ -175,9 +175,9 @@ if [ ! -d "opus-1.3.1" ]; then
     tar xf opus-1.3.1.tar.gz
 fi
 
-if [ ! -d "speex-1.2.0" ]; then
-    wget http://downloads.xiph.org/releases/speex/speex-1.2.0.tar.gz
-    tar xf speex-1.2.0.tar.gz
+if [ ! -d "speex-1.2.1" ]; then
+    wget http://downloads.xiph.org/releases/speex/speex-1.2.1.tar.gz
+    tar xf speex-1.2.1.tar.gz
 fi
 
 if [ ! -d "lame-3.100" ]; then
@@ -190,9 +190,9 @@ if [ ! -d "twolame-0.4.0" ]; then
     tar xf twolame-0.4.0.tar.gz
 fi
 
-if [ ! -d "libsndfile-1.0.31" ]; then
-    wget https://github.com/libsndfile/libsndfile/releases/download/1.0.31/libsndfile-1.0.31.tar.bz2
-    tar xf libsndfile-1.0.31.tar.bz2
+if [ ! -d "libsndfile-1.1.0" ]; then
+    wget https://github.com/libsndfile/libsndfile/releases/download/1.1.0/libsndfile-1.1.0.tar.xz
+    tar xf libsndfile-1.1.0.tar.xz
 fi
 
 if [ ! -d "soxr-0.1.3-Source" ]; then
@@ -210,9 +210,9 @@ fi
 #    tar xf apache-ant-1.10.6-src.tar.xz
 #fi
 
-if [ ! -d "libbluray-1.3.0" ]; then
-    wget https://download.videolan.org/pub/videolan/libbluray/1.3.0/libbluray-1.3.0.tar.bz2
-    tar xf libbluray-1.3.0.tar.bz2
+if [ ! -d "libbluray-1.3.2" ]; then
+    wget https://download.videolan.org/pub/videolan/libbluray/1.3.2/libbluray-1.3.2.tar.bz2
+    tar xf libbluray-1.3.2.tar.bz2
 fi
 
 if [ ! -d "aribb24-master" ]; then
@@ -241,9 +241,9 @@ fi
     # tar xf gnutls-3.3.19.tar.xz
 # fi
 
-if [ ! -d "dav1d-0.9.2" ]; then
-    wget https://code.videolan.org/videolan/dav1d/-/archive/0.9.2/dav1d-0.9.2.tar.bz2
-    tar xf dav1d-0.9.2.tar.bz2
+if [ ! -d "dav1d-1.0.0" ]; then
+    wget https://code.videolan.org/videolan/dav1d/-/archive/1.0.0/dav1d-1.0.0.tar.bz2
+    tar xf dav1d-1.0.0.tar.bz2
 fi
 
 # --- 出力先の古いデータを削除 ----------------------

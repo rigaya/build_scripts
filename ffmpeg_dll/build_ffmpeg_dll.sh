@@ -1,7 +1,7 @@
 #!/bin/bash
 #MSYS2用ffmpeg dllビルドスクリプト
 #Visual Studioへの環境変数を通しておくこと
-#pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain autotools
+#pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain autotools autogen
 #pacman -S p7zip git nasm python unzip
 # harfbuzz関連
 #pacman -S gtk-doc mingw64/mingw-w64-x86_64-ragel mingw32/mingw-w64-i686-ragel
@@ -10,34 +10,44 @@
 #pacman -S mingw32/mingw-w64-i686-python-lxml mingw64/mingw-w64-x86_64-python-lxml
 #そのほかにcmake(windows版)のインストールが必要
 NJOBS=$NUMBER_OF_PROCESSORS
-BUILD_DIR=$HOME/build_ffmpeg_dll
 CMAKE_PATH="/C/Program Files/CMake/bin/cmake.exe"
 PATCHES_DIR=$HOME/patches
-
-mkdir -p $BUILD_DIR
-mkdir -p $BUILD_DIR/src
-cd $BUILD_DIR/src
 
 BUILD_ALL="FALSE"
 SSE4_2="FALSE"
 UPDATE_FFMPEG="FALSE"
 ENABLE_SWSCALE="FALSE"
+FOR_FFMPEG4="FALSE"
 FOR_AUDENC="FALSE"
 
 # [ bitrate, swscale ]
 TARGET_BUILD=""
 
 
-while getopts "ast:u" OPT
+while getopts "ast:ur" OPT
 do
   case $OPT in
     "a" ) BUILD_ALL="TRUE" ;;
     "s" ) SSE4_2="TRUE" ;;
     "t" ) TARGET_BUILD=$OPTARG ;;
-    "u" ) UPDATE_FFMPEG="TRUE" ;
+    "u" ) UPDATE_FFMPEG="TRUE" ;;
+    "r" ) FOR_FFMPEG4="TRUE" ;;
   esac
 done
 
+
+if [ "$FOR_FFMPEG4" = "TRUE" ]; then
+    BUILD_DIR=$HOME/build_ffmpeg4_dll
+else
+    BUILD_DIR=$HOME/build_ffmpeg_dll
+fi
+
+echo FOR_FFMPEG4=$FOR_FFMPEG4
+echo BUILD_DIR=$BUILD_DIR
+
+mkdir -p $BUILD_DIR
+mkdir -p $BUILD_DIR/src
+cd $BUILD_DIR/src
 
 if [ "$TARGET_BUILD" = "swscale" ]; then
     ENABLE_SWSCALE="TRUE"
@@ -58,33 +68,43 @@ fi
 
 INSTALL_DIR=$BUILD_DIR/$TARGET_ARCH/build
 
+FFMPEG_DISABLE_ASM=""
 if [ $TARGET_ARCH = "x64" ]; then
     BUILD_CCFLAGS="-mtune=skylake -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
     BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
 elif [ $TARGET_ARCH = "x86" ]; then
     BUILD_CCFLAGS="-m32 -mtune=skylake -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -mstackrealign -I${INSTALL_DIR}/include"
     BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
+    #  libavcodec/h264_cabac.c: In function 'ff_h264_decode_mb_cabac': libavcodec/x86/cabac.h:192:5: error: 'asm' operand has impossible 対策
+    FFMPEG_DISABLE_ASM="--disable-inline-asm"
 else
     echo "invalid TARGET_ARCH: ${TARGET_ARCH}"
     exit
 fi
 
-FFMPEG_DIR_NAME="ffmpeg_dll"
+if [ "$FOR_FFMPEG4" = "TRUE" ]; then
+    FFMPEG_DIR_NAME="ffmpeg4_dll"
+else
+    FFMPEG_DIR_NAME="ffmpeg_dll"
+fi
 FFMPEG_SSE="-msse2"
 if [ $SSE4_2 = "TRUE" ]; then
-    FFMPEG_DIR_NAME="ffmpeg_dll_sse42"
+    FFMPEG_DIR_NAME="${FFMPEG_DIR_NAME}_sse42"
     FFMPEG_SSE="-msse4.2 -mpopcnt"
 fi
 
 # static link用のフラグ (これらがないとundefined referenceが出る)
 BUILD_CCFLAGS="${BUILD_CCFLAGS} -DLIBXML_STATIC -DFRIBIDI_LIB_STATIC"
 
+# lameのstaticビルドに必要
+BUILD_CCFLAGS="-O3 ${BUILD_CCFLAGS} -DNCURSES_STATIC"
+
 # small build用のフラグと通常用のフラグ
 BUILD_CCFLAGS_SMALL="-Os -fno-unroll-loops ${BUILD_CCFLAGS}"
 BUILD_CCFLAGS="-O3 ${BUILD_CCFLAGS}"
 
 if [ $ENABLE_SWSCALE = "TRUE" ]; then
-    FFMPEG_DIR_NAME="ffmpeg_dll_swscale"
+    FFMPEG_DIR_NAME="${FFMPEG_DIR_NAME}_swscale"
 fi
 if [ $FOR_AUDENC = "TRUE" ]; then
     FFMPEG_DIR_NAME="ffmpeg_audenc"
@@ -102,7 +122,13 @@ echo ENABLE_SWSCALE=$ENABLE_SWSCALE
 echo FFMPEG_DIR_NAME=$FFMPEG_DIR_NAME
 
 #--- ソースのダウンロード ---------------------------------------
-if [ -d "ffmpeg" ]; then
+if [ "$FOR_FFMPEG4" = "TRUE" ]; then
+    if [ ! -d "ffmpeg" ]; then
+        wget https://ffmpeg.org/releases/ffmpeg-4.4.3.tar.xz
+        tar xf ffmpeg-4.4.3.tar.xz
+        mv ffmpeg-4.4.3 ffmpeg
+    fi
+elif [ -d "ffmpeg" ]; then
     if [ $UPDATE_FFMPEG != "FALSE" ]; then
         cd ffmpeg
         make uninstall && make distclean &> /dev/null
@@ -745,6 +771,7 @@ if [ ! -e ./ffmpeg.exe ]; then
     --prefix=${INSTALL_DIR}/$FFMPEG_DIR_NAME \
     --arch="${FFMPEG_ARCH}" \
     --target-os="mingw32" \
+    $FFMPEG_DISABLE_ASM \
     --disable-doc \
     --disable-avdevice \
     --disable-hwaccels \
@@ -783,18 +810,27 @@ else
     SWSCALE_ARG="--disable-swscale"
 fi
 
+if [ $FOR_FFMPEG4 = "TRUE" ]; then
+    PKG_CONFIG_FLAGS=""
+    FFMPEG5_CUDA_DISABLE_FLAGS=""
+else
+    PKG_CONFIG_FLAGS="--pkg-config-flags=\"--static\""
+    FFMPEG5_CUDA_DISABLE_FLAGS=" --disable-cuda-nvcc --disable-cuda-llvm --disable-cuvid --disable-ffnvcodec --disable-nvdec --disable-nvenc "
+fi
+
 cd $BUILD_DIR/$TARGET_ARCH/$FFMPEG_DIR_NAME
 if [ $FOR_AUDENC = "TRUE" ]; then
 pwd
 PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
 ./configure \
 --prefix=${BUILD_DIR}/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH \
---pkg-config-flags="--static" \
+$PKG_CONFIG_FLAGS \
 --arch="${FFMPEG_ARCH}" \
 --target-os="mingw32" \
 --enable-version3 \
 --disable-doc \
 $SWSCALE_ARG \
+$FFMPEG_DISABLE_ASM \
 --disable-postproc \
 --disable-avdevice \
 --disable-hwaccels \
@@ -805,12 +841,7 @@ $SWSCALE_ARG \
 --disable-amd3dnowext \
 --disable-dxva2 \
 --disable-d3d11va \
---disable-cuda-nvcc \
---disable-cuda-llvm \
---disable-cuvid \
---disable-ffnvcodec \
---disable-nvdec \
---disable-nvenc \
+$FFMPEG5_CUDA_DISABLE_FLAGS \
 --disable-xop \
 --disable-fma4 \
 --disable-network \
@@ -840,12 +871,13 @@ else
 PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
 ./configure \
 --prefix=${BUILD_DIR}/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH \
---pkg-config-flags="--static" \
+$PKG_CONFIG_FLAGS \
 --arch="${FFMPEG_ARCH}" \
 --target-os="mingw32" \
 --enable-version3 \
 --disable-doc \
 $SWSCALE_ARG \
+$FFMPEG_DISABLE_ASM \
 --disable-postproc \
 --disable-hwaccels \
 --disable-outdevs \
@@ -859,12 +891,7 @@ $SWSCALE_ARG \
 --disable-w32threads \
 --disable-dxva2 \
 --disable-d3d11va \
---disable-cuda-nvcc \
---disable-cuda-llvm \
---disable-cuvid \
---disable-ffnvcodec \
---disable-nvdec \
---disable-nvenc \
+$FFMPEG5_CUDA_DISABLE_FLAGS \
 --enable-pthreads \
 --enable-bsfs \
 --enable-swresample \

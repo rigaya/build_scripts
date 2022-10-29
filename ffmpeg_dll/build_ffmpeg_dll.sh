@@ -129,14 +129,15 @@ if [ ! -d "expat-2.4.8" ]; then
     tar xf expat-2.4.8.tar.xz
 fi
 
-if [ ! -d "freetype-2.12.1" ]; then
-    wget https://download.savannah.gnu.org/releases/freetype/freetype-2.12.1.tar.xz
-    tar xf freetype-2.12.1.tar.xz
+# freetype-2.12.1‚Íƒ_ƒ
+if [ ! -d "freetype-2.11.0" ]; then
+    wget https://download.savannah.gnu.org/releases/freetype/freetype-2.11.0.tar.xz
+    tar xf freetype-2.11.0.tar.xz
 fi
 
-if [ ! -d "libiconv-1.17" ]; then
-    wget https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.17.tar.gz
-    tar xf libiconv-1.17.tar.gz
+if [ ! -d "libiconv-1.16" ]; then
+    wget https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.16.tar.gz
+    tar xf libiconv-1.16.tar.gz
 fi
 
 #2.12.6‚Å‚È‚¢‚Æ‚¢‚ë‚¢‚ë–Ê“| -> 2.12.1‚à‚¾‚ß, 2.13.0‚à‚¾‚ß

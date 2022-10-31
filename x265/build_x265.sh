@@ -82,10 +82,21 @@ else
     cd ..
 fi
 
-if [ -d "SVT-HEVC" ]; then
-    if [ $UPDATE_X265 != "FALSE" ]; then
+if [ "${ENABLE_SVT_HEVC}" = "ON" ]; then
+    if [ -d "SVT-HEVC" ]; then
+        if [ $UPDATE_X265 != "FALSE" ]; then
+            cd SVT-HEVC
+            git pull
+            if [ "${SVT_HEVC_REV}" != "" ]; then
+                git checkout --force $SVT_HEVC_REV
+            else
+                git checkout --force HEAD
+            fi
+            cd ..
+        fi
+    else
+        git clone https://github.com/OpenVisualCloud/SVT-HEVC.git
         cd SVT-HEVC
-        git pull
         if [ "${SVT_HEVC_REV}" != "" ]; then
             git checkout --force $SVT_HEVC_REV
         else
@@ -93,15 +104,6 @@ if [ -d "SVT-HEVC" ]; then
         fi
         cd ..
     fi
-else
-    git clone https://github.com/OpenVisualCloud/SVT-HEVC.git
-    cd SVT-HEVC
-    if [ "${SVT_HEVC_REV}" != "" ]; then
-        git checkout --force $SVT_HEVC_REV
-    else
-        git checkout --force HEAD
-    fi
-    cd ..
 fi
 
 # --- 出力先を準備 --------------------------------------
@@ -113,12 +115,12 @@ if [ -d x265 ]; then
     rm -rf x265
 fi
 cp -r ../src/x265 .
-cp -r ../src/SVT-HEVC .
 
 if [ ${TARGET_ARCH} = "x86" ]; then
     ENABLE_SVT_HEVC=OFF
 fi
 if [ "${ENABLE_SVT_HEVC}" = "ON" ]; then
+    cp -r ../src/SVT-HEVC .
     cd ${BUILD_DIR}/${TARGET_ARCH}/SVT-HEVC
     #static linkを強制
     find ./ -type f -name *.txt | xargs sed -i -e 's/-flto//g'

@@ -39,8 +39,8 @@ fi
 echo "TARGET_ARCH=${TARGET_ARCH}"
 
 if [ ${TARGET_ARCH} = "x64" ]; then
-    BUILD_CCFLAGS="-O3 -msse2 -fpermissive -I${INSTALL_DIR}/include"
-    BUILD_LDFLAGS="-static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
+    BUILD_CCFLAGS="-O3 -msse2 -fpermissive -flto -I${INSTALL_DIR}/include"
+    BUILD_LDFLAGS="-static -static-libgcc -static-libstdc++ -flto -L${INSTALL_DIR}/lib"
 elif [ ${TARGET_ARCH} = "x86" ]; then
     BUILD_CCFLAGS="-m32 -msse2 -I${INSTALL_DIR}/include" 
     BUILD_LDFLAGS="-static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"

@@ -143,6 +143,7 @@ fi
 # --- ビルド ----------------------------------------------
 cd ${BUILD_DIR}/${TARGET_ARCH}/x265
 patch -p 1 < ~/patch/x265_version.diff
+patch -p 1 < ~/patch/x265_zone_param.diff
 
 cd ${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys
 

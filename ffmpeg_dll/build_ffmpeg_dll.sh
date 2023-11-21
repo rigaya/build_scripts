@@ -60,10 +60,12 @@ if [ $MSYSTEM = "MINGW32" ]; then
     TARGET_ARCH="x86"
     VC_ARCH="win32"
     FFMPEG_ARCH="i686"
+    MINGWDIR="mingw32"
 else
     TARGET_ARCH="x64"
     VC_ARCH="x64"
     FFMPEG_ARCH="x86_64"
+    MINGWDIR="mingw64"
 fi
 
 INSTALL_DIR=$BUILD_DIR/$TARGET_ARCH/build
@@ -132,17 +134,21 @@ elif [ -d "ffmpeg" ]; then
     if [ $UPDATE_FFMPEG != "FALSE" ]; then
         cd ffmpeg
         make uninstall && make distclean &> /dev/null
-        git pull
         cd ..
+        rm -rf ffmpeg
+        wget https://ffmpeg.org/releases/ffmpeg-6.1.tar.xz
+        tar xf ffmpeg-6.1.tar.xz
+        mv ffmpeg-6.1 ffmpeg
     fi
 else
-    UPDATE_FFMPEG=TRUE
-    git clone git://source.ffmpeg.org/ffmpeg.git ffmpeg
+    wget https://ffmpeg.org/releases/ffmpeg-6.1.tar.xz
+    tar xf ffmpeg-6.1.tar.xz
+    mv ffmpeg-6.1 ffmpeg
 fi
 
-if [ ! -d "libpng-1.6.39" ]; then
-    wget https://download.sourceforge.net/libpng/libpng-1.6.39.tar.xz
-    tar xf libpng-1.6.39.tar.xz
+if [ ! -d "libpng-1.6.40" ]; then
+    wget https://download.sourceforge.net/libpng/libpng-1.6.40.tar.xz
+    tar xf libpng-1.6.40.tar.xz
 fi
 
 if [ ! -d "bzip2-1.0.8" ]; then
@@ -182,6 +188,7 @@ fi
 #    tar xf harfbuzz-3.3.1.tar.xz
 #fi
 
+#0.14.0でないとバイナリが異常に大きくなる
 if [ ! -d "libass-0.14.0" ]; then
     wget https://github.com/libass/libass/releases/download/0.14.0/libass-0.14.0.tar.xz
     tar xf libass-0.14.0.tar.xz
@@ -197,9 +204,9 @@ if [ ! -d "libvorbis-1.3.7" ]; then
     tar xf libvorbis-1.3.7.tar.xz
 fi
 
-if [ ! -d "opus-1.3.1" ]; then
-    wget https://archive.mozilla.org/pub/opus/opus-1.3.1.tar.gz
-    tar xf opus-1.3.1.tar.gz
+if [ ! -d "opus-1.4" ]; then
+    wget https://downloads.xiph.org/releases/opus/opus-1.4.tar.gz
+    tar xf opus-1.4.tar.gz
 fi
 
 if [ ! -d "speex-1.2.1" ]; then
@@ -217,9 +224,9 @@ if [ ! -d "twolame-0.4.0" ]; then
     tar xf twolame-0.4.0.tar.gz
 fi
 
-if [ ! -d "libsndfile-1.2.0" ]; then
-    wget https://github.com/libsndfile/libsndfile/releases/download/1.2.0/libsndfile-1.2.0.tar.xz
-    tar xf libsndfile-1.2.0.tar.xz
+if [ ! -d "libsndfile-1.2.2" ]; then
+    wget https://github.com/libsndfile/libsndfile/releases/download/1.2.2/libsndfile-1.2.2.tar.xz
+    tar xf libsndfile-1.2.2.tar.xz
 fi
 
 if [ ! -d "soxr-0.1.3-Source" ]; then
@@ -227,9 +234,9 @@ if [ ! -d "soxr-0.1.3-Source" ]; then
     tar xf soxr-0.1.3-Source.tar.xz
 fi
 
-if [ ! -d "libxml2-2.10.3" ]; then
-    wget https://download.gnome.org/sources/libxml2/2.10/libxml2-2.10.3.tar.xz
-    tar xf libxml2-2.10.3.tar.xz
+if [ ! -d "libxml2-v2.12.0" ]; then
+    wget https://gitlab.gnome.org/GNOME/libxml2/-/archive/v2.12.0/libxml2-v2.12.0.tar.gz
+    tar xf libxml2-v2.12.0.tar.gz
 fi
 
 #if [ ! -d "apache-ant-1.10.6-src.tar.xz" ]; then
@@ -246,6 +253,12 @@ if [ ! -d "aribb24-master" ]; then
     wget https://github.com/nkoriyama/aribb24/archive/master.zip
     mv master.zip aribb24-master.zip
     unzip aribb24-master.zip
+fi
+
+if [ ! -d "libaribcaption-1.1.1" ]; then
+    wget https://github.com/xqq/libaribcaption/archive/refs/tags/v1.1.1.tar.gz
+    mv v1.1.1.tar.gz libaribcaption-v1.1.1.tar.gz
+    tar xf libaribcaption-v1.1.1.tar.gz
 fi
 
 # if [ ! -d "gperf-3.0.4" ]; then
@@ -268,9 +281,9 @@ fi
     # tar xf gnutls-3.3.19.tar.xz
 # fi
 
-if [ ! -d "dav1d-1.0.0" ]; then
-    wget https://code.videolan.org/videolan/dav1d/-/archive/1.0.0/dav1d-1.0.0.tar.bz2
-    tar xf dav1d-1.0.0.tar.bz2
+if [ ! -d "dav1d-1.3.0" ]; then
+    wget https://code.videolan.org/videolan/dav1d/-/archive/1.3.0/dav1d-1.3.0.tar.gz
+    tar xf dav1d-1.3.0.tar.gz
 fi
 
 # --- 出力先の古いデータを削除 ----------------------
@@ -706,6 +719,22 @@ if [ ! -d "aribb24" ]; then
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "libaribcaption" ]; then
+    find ../src/ -type d -name "libaribcaption-*" | xargs -i cp -r {} ./libaribcaption
+    cd ./libaribcaption
+    mkdir build && cd build
+    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    LDFLAGS="${BUILD_LDFLAGS}" \
+    cmake .. -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release -DARIBCC_USE_FONTCONFIG=ON -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
+    cmake --build . -j$NJOBS
+    cmake --install .
+    #sed -i -e 's/-lC:\//-l\/c\//g' ${INSTALL_DIR}/lib/pkgconfig/libaribcaption.pc
+    #下記のように変更しないと適切にリンクできない
+    sed -i -e "s/-lC:\/ProgramAnother\/msys64\/${MINGWDIR}\/lib\/libstdc++.a/-lstdc++/g" ${INSTALL_DIR}/lib/pkgconfig/libaribcaption.pc
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "dav1d" ]; then
     find ../src/ -type d -name "dav1d-*" | xargs -i cp -r {} ./dav1d
     cd ./dav1d
@@ -912,6 +941,7 @@ $FFMPEG5_CUDA_DISABLE_FLAGS \
 --disable-filters \
 --enable-filter=$CONFIGURE_AUDFILTER_LIST \
 --pkg-config-flags="--static" \
+--enable-libaribcaption \
 --enable-libaribb24 \
 --extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
 --extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib"
@@ -939,7 +969,7 @@ if [ ${UPDATE_FFMPEG} != "FALSE" ]; then
      $BUILD_DIR/src/lame* $BUILD_DIR/src/libsndfile* $BUILD_DIR/src/twolame* $BUILD_DIR/src/soxr* $BUILD_DIR/src/speex* \
      $BUILD_DIR/src/expat* $BUILD_DIR/src/freetype* $BUILD_DIR/src/libiconv* $BUILD_DIR/src/fontconfig* \
      $BUILD_DIR/src/libpng* $BUILD_DIR/src/libass* $BUILD_DIR/src/bzip2* $BUILD_DIR/src/libbluray* \
-     $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* \
+     $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libaribcaption* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* \
       > /dev/null
 fi
 

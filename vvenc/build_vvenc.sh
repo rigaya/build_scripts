@@ -25,29 +25,30 @@ fi
 
 INSTALL_DIR=$BUILD_DIR/$TARGET_ARCH/build
 
-if [ -d "utvideo" ]; then
-    cd utvideo
+if [ -d "vvenc" ]; then
+    cd vvenc
     git reset --hard HEAD
     git pull
     cd ..
 else
-    git clone https://github.com/umezawatakeshi/utvideo.git utvideo
+    git clone https://github.com/fraunhoferhhi/vvenc.git vvenc
 fi
 
 
 mkdir -p $BUILD_DIR/$TARGET_ARCH
 cd $BUILD_DIR/$TARGET_ARCH
-if [ -d "utvideo" ]; then
-    rm -rf utvideo
+if [ -d "vvenc" ]; then
+    rm -rf vvenc
 fi
-cp -r ../src/utvideo utvideo
+cp -r ../src/vvenc vvenc
 
-cd $BUILD_DIR/$TARGET_ARCH/utvideo
+cd $BUILD_DIR/$TARGET_ARCH/vvenc
 mkdir build
 cd build
 cmake -G "MSYS Makefiles" \
   -DCMAKE_BUILD_TYPE=Release \
   -DVVENC_ENABLE_LINK_TIME_OPT=OFF \
+  -DVVENC_INSTALL_FULLFEATURE_APP=ON \
   -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
   -DCMAKE_C_FLAGS="${BUILD_CCFLAGS}" \
   -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS}" \

@@ -177,14 +177,14 @@ if [ ! -d "fribidi-1.0.11" ]; then
     tar xf fribidi-1.0.11.tar.xz
 fi
 
-if [ ! -d "harfbuzz-3.3.1" ]; then
-    wget https://github.com/harfbuzz/harfbuzz/releases/download/3.3.1/harfbuzz-3.3.1.tar.xz
-    tar xf harfbuzz-3.3.1.tar.xz
-fi
+#if [ ! -d "harfbuzz-3.3.1" ]; then
+#    wget https://github.com/harfbuzz/harfbuzz/releases/download/3.3.1/harfbuzz-3.3.1.tar.xz
+#    tar xf harfbuzz-3.3.1.tar.xz
+#fi
 
-if [ ! -d "libass-0.15.2" ]; then
-    wget https://github.com/libass/libass/releases/download/0.15.2/libass-0.15.2.tar.xz
-    tar xf libass-0.15.2.tar.xz
+if [ ! -d "libass-0.14.0" ]; then
+    wget https://github.com/libass/libass/releases/download/0.14.0/libass-0.14.0.tar.xz
+    tar xf libass-0.14.0.tar.xz
 fi
 
 if [ ! -d "libogg-1.3.5" ]; then

@@ -140,9 +140,9 @@ else
     git clone git://source.ffmpeg.org/ffmpeg.git ffmpeg
 fi
 
-if [ ! -d "libpng-1.6.38" ]; then
-    wget https://download.sourceforge.net/libpng/libpng-1.6.38.tar.xz
-    tar xf libpng-1.6.38.tar.xz
+if [ ! -d "libpng-1.6.39" ]; then
+    wget https://download.sourceforge.net/libpng/libpng-1.6.39.tar.xz
+    tar xf libpng-1.6.39.tar.xz
 fi
 
 if [ ! -d "bzip2-1.0.8" ]; then
@@ -150,9 +150,9 @@ if [ ! -d "bzip2-1.0.8" ]; then
     tar xf bzip2-1.0.8.tar.gz
 fi
 
-if [ ! -d "expat-2.4.8" ]; then
-    wget https://github.com/libexpat/libexpat/releases/download/R_2_4_8/expat-2.4.8.tar.xz
-    tar xf expat-2.4.8.tar.xz
+if [ ! -d "expat-2.5.0" ]; then
+    wget https://github.com/libexpat/libexpat/releases/download/R_2_5_0/expat-2.5.0.tar.xz
+    tar xf expat-2.5.0.tar.xz
 fi
 
 # freetype-2.12.1‚Íƒ_ƒ
@@ -217,9 +217,9 @@ if [ ! -d "twolame-0.4.0" ]; then
     tar xf twolame-0.4.0.tar.gz
 fi
 
-if [ ! -d "libsndfile-1.1.0" ]; then
-    wget https://github.com/libsndfile/libsndfile/releases/download/1.1.0/libsndfile-1.1.0.tar.xz
-    tar xf libsndfile-1.1.0.tar.xz
+if [ ! -d "libsndfile-1.2.0" ]; then
+    wget https://github.com/libsndfile/libsndfile/releases/download/1.2.0/libsndfile-1.2.0.tar.xz
+    tar xf libsndfile-1.2.0.tar.xz
 fi
 
 if [ ! -d "soxr-0.1.3-Source" ]; then
@@ -227,9 +227,9 @@ if [ ! -d "soxr-0.1.3-Source" ]; then
     tar xf soxr-0.1.3-Source.tar.xz
 fi
 
-if [ ! -d "libxml2-2.9.12" ]; then
-    wget http://xmlsoft.org/sources/libxml2-2.9.12.tar.gz
-    tar xf libxml2-2.9.12.tar.gz
+if [ ! -d "libxml2-2.10.3" ]; then
+    wget https://download.gnome.org/sources/libxml2/2.10/libxml2-2.10.3.tar.xz
+    tar xf libxml2-2.10.3.tar.xz
 fi
 
 #if [ ! -d "apache-ant-1.10.6-src.tar.xz" ]; then
@@ -237,9 +237,9 @@ fi
 #    tar xf apache-ant-1.10.6-src.tar.xz
 #fi
 
-if [ ! -d "libbluray-1.3.2" ]; then
-    wget https://download.videolan.org/pub/videolan/libbluray/1.3.2/libbluray-1.3.2.tar.bz2
-    tar xf libbluray-1.3.2.tar.bz2
+if [ ! -d "libbluray-1.3.4" ]; then
+    wget https://download.videolan.org/pub/videolan/libbluray/1.3.4/libbluray-1.3.4.tar.bz2
+    tar xf libbluray-1.3.4.tar.bz2
 fi
 
 if [ ! -d "aribb24-master" ]; then
@@ -455,21 +455,21 @@ if [ ! -d "fribidi" ]; then
     make -j$NJOBS && make install
 fi
 
-cd $BUILD_DIR/$TARGET_ARCH
-if [ ! -d "harfbuzz" ]; then
-    find ../src/ -type d -name "harfbuzz-*" | xargs -i cp -r {} ./harfbuzz
-    cd ./harfbuzz
-    autoreconf -fvi
-    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
-    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
-    ./configure \
-    --prefix=$INSTALL_DIR \
-    --enable-static \
-    --enable-shared=no \
-    --enable-gtk-doc-html=no
-    make -j$NJOBS && make install
-fi
+# cd $BUILD_DIR/$TARGET_ARCH
+# if [ ! -d "harfbuzz" ]; then
+    # find ../src/ -type d -name "harfbuzz-*" | xargs -i cp -r {} ./harfbuzz
+    # cd ./harfbuzz
+    # autoreconf -fvi
+    # PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+    # CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    # CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    # ./configure \
+    # --prefix=$INSTALL_DIR \
+    # --enable-static \
+    # --enable-shared=no \
+    # --enable-gtk-doc-html=no
+    # make -j$NJOBS && make install
+# fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "libass" ]; then
@@ -495,7 +495,7 @@ if [ ! -d "libass" ]; then
     CC="gcc -static-libgcc -static-libstdc++" \
     CFLAGS="${BUILD_CCFLAGS_SMALL}" \
     CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
-    LDFLAGS="-L${INSTALL_DIR}/lib -static-libgcc -static-libstdc++ -Wl,-Bstatic -Wl,-lm,-liconv,-lharfbuzz,-lfreetype,-lfribidi,-lfontconfig,-lexpat,-lfreetype,-lpng,-lbz2,-lz" \
+    LDFLAGS="-L${INSTALL_DIR}/lib -static-libgcc -static-libstdc++ -Wl,-Bstatic -Wl,-lm,-liconv,-lfreetype,-lfribidi,-lfontconfig,-lexpat,-lfreetype,-lpng,-lbz2,-lz" \
     ./configure \
     --prefix=$INSTALL_DIR \
     --enable-static=no \
@@ -939,7 +939,7 @@ if [ ${UPDATE_FFMPEG} != "FALSE" ]; then
      $BUILD_DIR/src/lame* $BUILD_DIR/src/libsndfile* $BUILD_DIR/src/twolame* $BUILD_DIR/src/soxr* $BUILD_DIR/src/speex* \
      $BUILD_DIR/src/expat* $BUILD_DIR/src/freetype* $BUILD_DIR/src/libiconv* $BUILD_DIR/src/fontconfig* \
      $BUILD_DIR/src/libpng* $BUILD_DIR/src/libass* $BUILD_DIR/src/bzip2* $BUILD_DIR/src/libbluray* \
-     $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* $BUILD_DIR/src/harfbuzz* \
+     $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* \
       > /dev/null
 fi
 

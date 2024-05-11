@@ -136,19 +136,19 @@ elif [ -d "ffmpeg" ]; then
         make uninstall && make distclean &> /dev/null
         cd ..
         rm -rf ffmpeg
-        wget https://ffmpeg.org/releases/ffmpeg-6.1.tar.xz
-        tar xf ffmpeg-6.1.tar.xz
-        mv ffmpeg-6.1 ffmpeg
+        wget https://ffmpeg.org/releases/ffmpeg-7.0.tar.xz
+        tar xf ffmpeg-7.0.tar.xz
+        mv ffmpeg-7.0 ffmpeg
     fi
 else
-    wget https://ffmpeg.org/releases/ffmpeg-6.1.tar.xz
-    tar xf ffmpeg-6.1.tar.xz
-    mv ffmpeg-6.1 ffmpeg
+    wget https://ffmpeg.org/releases/ffmpeg-7.0.tar.xz
+    tar xf ffmpeg-7.0.tar.xz
+    mv ffmpeg-7.0 ffmpeg
 fi
 
-if [ ! -d "libpng-1.6.40" ]; then
-    wget https://download.sourceforge.net/libpng/libpng-1.6.40.tar.xz
-    tar xf libpng-1.6.40.tar.xz
+if [ ! -d "libpng-1.6.43" ]; then
+    wget https://download.sourceforge.net/libpng/libpng-1.6.43.tar.xz
+    tar xf libpng-1.6.43.tar.xz
 fi
 
 if [ ! -d "bzip2-1.0.8" ]; then
@@ -156,9 +156,9 @@ if [ ! -d "bzip2-1.0.8" ]; then
     tar xf bzip2-1.0.8.tar.gz
 fi
 
-if [ ! -d "expat-2.5.0" ]; then
-    wget https://github.com/libexpat/libexpat/releases/download/R_2_5_0/expat-2.5.0.tar.xz
-    tar xf expat-2.5.0.tar.xz
+if [ ! -d "expat-2.6.2" ]; then
+    wget https://github.com/libexpat/libexpat/releases/download/R_2_6_2/expat-2.6.2.tar.xz
+    tar xf expat-2.6.2.tar.xz
 fi
 
 # freetype-2.12.1はダメ
@@ -204,9 +204,9 @@ if [ ! -d "libvorbis-1.3.7" ]; then
     tar xf libvorbis-1.3.7.tar.xz
 fi
 
-if [ ! -d "opus-1.4" ]; then
-    wget https://downloads.xiph.org/releases/opus/opus-1.4.tar.gz
-    tar xf opus-1.4.tar.gz
+if [ ! -d "opus-1.5.2" ]; then
+    wget https://downloads.xiph.org/releases/opus/opus-1.5.2.tar.gz
+    tar xf opus-1.5.2.tar.gz
 fi
 
 if [ ! -d "speex-1.2.1" ]; then
@@ -234,9 +234,9 @@ if [ ! -d "soxr-0.1.3-Source" ]; then
     tar xf soxr-0.1.3-Source.tar.xz
 fi
 
-if [ ! -d "libxml2-v2.12.0" ]; then
-    wget https://gitlab.gnome.org/GNOME/libxml2/-/archive/v2.12.0/libxml2-v2.12.0.tar.gz
-    tar xf libxml2-v2.12.0.tar.gz
+if [ ! -d "libxml2-2.12.6" ]; then
+    wget -O libxml2-2.12.6.tar.gz https://github.com/GNOME/libxml2/archive/refs/tags/v2.12.6.tar.gz
+    tar xf libxml2-2.12.6.tar.gz
 fi
 
 #if [ ! -d "apache-ant-1.10.6-src.tar.xz" ]; then
@@ -256,9 +256,18 @@ if [ ! -d "aribb24-master" ]; then
 fi
 
 if [ ! -d "libaribcaption-1.1.1" ]; then
-    wget https://github.com/xqq/libaribcaption/archive/refs/tags/v1.1.1.tar.gz
-    mv v1.1.1.tar.gz libaribcaption-v1.1.1.tar.gz
-    tar xf libaribcaption-v1.1.1.tar.gz
+    wget -O libaribcaption-1.1.1.tar.gz https://github.com/xqq/libaribcaption/archive/refs/tags/v1.1.1.tar.gz
+    tar xf libaribcaption-1.1.1.tar.gz
+fi
+
+if [ ! -d "libvpl-2.11.0" ]; then
+    wget -O libvpl-2.11.0.tar.gz https://github.com/intel/libvpl/archive/refs/tags/v2.11.0.tar.gz
+    tar xf libvpl-2.11.0.tar.gz
+fi
+
+if [ ! -d "nv-codec-headers-12.2.72.0" ]; then
+    wget https://github.com/FFmpeg/nv-codec-headers/releases/download/n12.2.72.0/nv-codec-headers-12.2.72.0.tar.gz
+    tar xf nv-codec-headers-12.2.72.0.tar.gz
 fi
 
 # if [ ! -d "gperf-3.0.4" ]; then
@@ -281,9 +290,9 @@ fi
     # tar xf gnutls-3.3.19.tar.xz
 # fi
 
-if [ ! -d "dav1d-1.3.0" ]; then
-    wget https://code.videolan.org/videolan/dav1d/-/archive/1.3.0/dav1d-1.3.0.tar.gz
-    tar xf dav1d-1.3.0.tar.gz
+if [ ! -d "dav1d-1.4.1" ]; then
+    wget https://code.videolan.org/videolan/dav1d/-/archive/1.4.1/dav1d-1.4.1.tar.gz
+    tar xf dav1d-1.4.1.tar.gz
 fi
 
 # --- 出力先の古いデータを削除 ----------------------
@@ -748,6 +757,30 @@ if [ ! -d "dav1d" ]; then
     ninja -C build install
 fi
 
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "libvpl" ]; then
+    find ../src/ -type d -name "libvpl-*" | xargs -i cp -r {} ./libvpl
+    cd libvpl
+    script/bootstrap
+    cmake -G "MSYS Makefiles" -B _build -DBUILD_SHARED_LIBS=OFF -DUSE_MSVC_STATIC_RUNTIME=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
+    cmake --build _build --config Release
+    cmake --install _build --config Release
+    # x86版の場合、$INSTALL_DIR/libに入るべきものが$INSTALL_DIR/lib/x86に入ってしまう
+    # あとから強制的に移動する
+    # vpl.pcのパスも移動に合わせる
+    if [ $TARGET_ARCH = "x86" ]; then
+        cp -r $INSTALL_DIR/lib/x86/* $INSTALL_DIR/lib/
+        rm -rf $INSTALL_DIR/lib/x86
+        sed -i -e 's/${pcfiledir}\/../${pcfiledir}/g' $INSTALL_DIR/lib/pkgconfig/vpl.pc
+    fi
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "nv-codec-headers" ]; then
+    find ../src/ -type d -name "nv-codec-headers-*" | xargs -i cp -r {} ./nv-codec-headers
+    cd nv-codec-headers
+    make PREFIX=$INSTALL_DIR install
+fi
 
 # cd $BUILD_DIR/$TARGET_ARCH
 # if [ ! -d "gmp" ]; then
@@ -908,7 +941,6 @@ $PKG_CONFIG_FLAGS \
 $SWSCALE_ARG \
 $FFMPEG_DISABLE_ASM \
 --disable-postproc \
---disable-hwaccels \
 --disable-outdevs \
 --disable-debug \
 --disable-static \
@@ -938,6 +970,10 @@ $FFMPEG5_CUDA_DISABLE_FLAGS \
 --enable-libbluray \
 --enable-libass \
 --enable-libdav1d \
+--enable-libvpl \
+--enable-ffnvcodec \
+--enable-nvdec \
+--enable-cuvid \
 --disable-filters \
 --enable-filter=$CONFIGURE_AUDFILTER_LIST \
 --pkg-config-flags="--static" \
@@ -969,7 +1005,7 @@ if [ ${UPDATE_FFMPEG} != "FALSE" ]; then
      $BUILD_DIR/src/lame* $BUILD_DIR/src/libsndfile* $BUILD_DIR/src/twolame* $BUILD_DIR/src/soxr* $BUILD_DIR/src/speex* \
      $BUILD_DIR/src/expat* $BUILD_DIR/src/freetype* $BUILD_DIR/src/libiconv* $BUILD_DIR/src/fontconfig* \
      $BUILD_DIR/src/libpng* $BUILD_DIR/src/libass* $BUILD_DIR/src/bzip2* $BUILD_DIR/src/libbluray* \
-     $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libaribcaption* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* \
+     $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libaribcaption* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* $BUILD_DIR/src/libvpl* $BUILD_DIR/src/nv-codec-headers* \
       > /dev/null
 fi
 

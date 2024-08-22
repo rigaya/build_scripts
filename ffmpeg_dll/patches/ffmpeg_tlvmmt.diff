@@ -1,0 +1,2149 @@
+diff --git a/libavcodec/codec_par.c b/libavcodec/codec_par.c
+index 212cb97d77..56293dde45 100644
+--- a/libavcodec/codec_par.c
++++ b/libavcodec/codec_par.c
+@@ -249,9 +249,9 @@
+         break;
+     }
+
+-    av_freep(&codec->extradata);
+-    codec->extradata_size = 0;
+     if (par->extradata) {
++        av_freep(&codec->extradata);
++        codec->extradata_size = 0;
+         codec->extradata = av_mallocz(par->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
+         if (!codec->extradata)
+             return AVERROR(ENOMEM);
+diff --git a/libavformat/Makefile b/libavformat/Makefile
+index 8efe26b6df..35a23fd8a3 100644
+--- a/libavformat/Makefile
++++ b/libavformat/Makefile
+@@ -366,6 +366,7 @@ OBJS-$(CONFIG_MLV_DEMUXER)               += mlvdec.o riffdec.o
+ OBJS-$(CONFIG_MM_DEMUXER)                += mm.o
+ OBJS-$(CONFIG_MMF_DEMUXER)               += mmf.o
+ OBJS-$(CONFIG_MMF_MUXER)                 += mmf.o rawenc.o
++OBJS-$(CONFIG_MMTTLV_DEMUXER)            += mmtp.o mmttlv.o
+ OBJS-$(CONFIG_MODS_DEMUXER)              += mods.o
+ OBJS-$(CONFIG_MOFLEX_DEMUXER)            += moflex.o
+ OBJS-$(CONFIG_MOV_DEMUXER)               += mov.o mov_chan.o mov_esds.o \
+diff --git a/libavformat/allformats.c b/libavformat/allformats.c
+index 305fa46532..b7dd579030 100644
+--- a/libavformat/allformats.c
++++ b/libavformat/allformats.c
+@@ -281,6 +281,7 @@ extern const FFInputFormat  ff_mlv_demuxer;
+ extern const FFInputFormat  ff_mm_demuxer;
+ extern const FFInputFormat  ff_mmf_demuxer;
+ extern const FFOutputFormat ff_mmf_muxer;
++extern const FFInputFormat  ff_mmttlv_demuxer;
+ extern const FFInputFormat  ff_mods_demuxer;
+ extern const FFInputFormat  ff_moflex_demuxer;
+ extern const FFInputFormat  ff_mov_demuxer;
+diff --git a/libavformat/mmtp.c b/libavformat/mmtp.c
+new file mode 100644
+index 0000000000..5dc45ef309
+--- /dev/null
++++ b/libavformat/mmtp.c
+@@ -0,0 +1,1688 @@
++/*
++ * MPEG Media Transport Protocol (MMTP) parser, as defined in ISO/IEC 23008-1.
++ * Copyright (c) 2023 SuperFashi
++ *
++ * This file is part of FFmpeg.
++ *
++ * FFmpeg is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * FFmpeg is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with FFmpeg; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ */
++
++#include <stdbool.h>
++
++#include "libavcodec/bytestream.h"
++#include "libavutil/avassert.h"
++#include "libavutil/intreadwrite.h"
++#include "libavutil/mem.h"
++#include "demux.h"
++#include "internal.h"
++#include "mmtp.h"
++#include "network.h"
++
++struct MMTGeneralLocationInfo {
++    uint8_t location_type;
++    union {
++        struct {
++            uint16_t packet_id;
++        } type0;
++        struct {
++            struct in_addr ipv4_src_addr;
++            struct in_addr ipv4_dst_addr;
++            uint16_t       dst_port;
++            uint16_t       packet_id;
++        } type1;
++        struct {
++            struct in6_addr ipv6_src_addr;
++            struct in6_addr ipv6_dst_addr;
++            uint16_t        dst_port;
++            uint16_t        packet_id;
++        } type2;
++        struct {
++            uint16_t network_id;
++            uint16_t MPEG_2_transport_stream_id;
++            uint16_t MPEG_2_PID: 13;
++        } type3;
++        struct {
++            struct in6_addr ipv6_src_addr;
++            struct in6_addr ipv6_dst_addr;
++            uint16_t        dst_port;
++            uint16_t        MPEG_2_PID: 13;
++        } type4;
++        struct {
++            char URL[0x100 + 1];
++        } type5;
++    };
++};
++
++static int parse_mmt_general_location_info(
++    struct MMTGeneralLocationInfo *info, GetByteContext *gbc)
++{
++    uint8_t url_size;
++
++    if (bytestream2_get_bytes_left(gbc) < 1)
++        return AVERROR_INVALIDDATA;
++    switch (info->location_type = bytestream2_get_byteu(gbc)) {
++    case 0x00:
++        if (bytestream2_get_bytes_left(gbc) < 2)
++            return AVERROR_INVALIDDATA;
++        info->type0.packet_id = bytestream2_get_be16u(gbc);
++        break;
++    case 0x01:
++        if (bytestream2_get_bytes_left(gbc) < (32 + 32 + 16 + 16) / 8)
++            return AVERROR_INVALIDDATA;
++        bytestream2_get_bufferu(gbc, (uint8_t *) &info->type1.ipv4_src_addr, 4);
++        bytestream2_get_bufferu(gbc, (uint8_t *) &info->type1.ipv4_dst_addr, 4);
++        info->type1.dst_port  = bytestream2_get_be16u(gbc);
++        info->type1.packet_id = bytestream2_get_be16u(gbc);
++        break;
++    case 0x02:
++        if (bytestream2_get_bytes_left(gbc) < (128 + 128 + 16 + 16) / 8)
++            return AVERROR_INVALIDDATA;
++        bytestream2_get_bufferu(
++            gbc, (uint8_t *) &info->type2.ipv6_src_addr, 16);
++        bytestream2_get_bufferu(
++            gbc, (uint8_t *) &info->type2.ipv6_dst_addr, 16);
++        info->type2.dst_port  = bytestream2_get_be16u(gbc);
++        info->type2.packet_id = bytestream2_get_be16u(gbc);
++        break;
++    case 0x03:
++        if (bytestream2_get_bytes_left(gbc) < (16 + 16 + 3 + 13) / 8)
++            return AVERROR_INVALIDDATA;
++        info->type3.network_id                 = bytestream2_get_be16u(gbc);
++        info->type3.MPEG_2_transport_stream_id = bytestream2_get_be16u(gbc);
++        info->type3.MPEG_2_PID =
++            bytestream2_get_be16u(gbc) & 0b1111111111111;
++        break;
++    case 0x04:
++        if (bytestream2_get_bytes_left(gbc) < (128 + 128 + 16 + 3 + 13) / 8)
++            return AVERROR_INVALIDDATA;
++        bytestream2_get_bufferu(
++            gbc, (uint8_t *) &info->type4.ipv6_src_addr, 16);
++        bytestream2_get_bufferu(
++            gbc, (uint8_t *) &info->type4.ipv6_dst_addr, 16);
++        info->type4.dst_port   = bytestream2_get_be16u(gbc);
++        info->type4.MPEG_2_PID = bytestream2_get_be16u(gbc) & 0b1111111111111;
++        break;
++    case 0x05:
++        url_size = bytestream2_get_byte(gbc);
++        bytestream2_get_buffer(gbc, (uint8_t *) info->type5.URL, url_size);
++        info->type5.URL[url_size] = '\0';
++        break;
++    default:
++        return AVERROR_INVALIDDATA;
++    }
++    return 0;
++}
++
++struct Streams {
++    AVStream *stream;
++
++    int num_timestamp_descriptors;
++    struct MPUTimestampDescriptor {
++        uint32_t seq_num;
++        int64_t  presentation_time;
++    } *timestamp_descriptor;
++
++    int num_ext_timestamp_descriptors;
++    struct MPUExtendedTimestampDescriptor {
++        uint32_t seq_num;
++        uint16_t decoding_time_offset;
++        uint8_t  num_of_au;
++        struct {
++            uint16_t dts_pts_offset;
++            uint16_t pts_offset;
++        } au[0x100];
++    } *ext_timestamp_descriptor;
++
++    uint32_t    last_sequence_number;
++    uint16_t    au_count;
++    AVBufferRef *pending_buffer;
++    int64_t     offset;
++    int         flags;
++
++    struct Streams *next;
++};
++
++struct MMTPContext {
++    struct FragmentAssembler *assembler;
++    struct Streams           *streams;
++    AVProgram                *program;
++    // struct MMTGeneralLocationInfo mpt_location; TODO
++
++    // below are temporary fields available for the scope of a single packet
++    AVFormatContext *s;
++    AVPacket        *pkt;
++    uint16_t        current_pid;
++    bool            is_rap;
++};
++
++static struct Streams *find_current_stream(struct MMTPContext *ctx)
++{
++    struct Streams *streams;
++    for (streams = ctx->streams; streams != NULL; streams = streams->next)
++        if (streams->stream->id == ctx->current_pid)
++            return streams;
++    return NULL;
++}
++
++static struct Streams *
++find_or_allocate_stream(struct MMTPContext *ctx, uint16_t pid)
++{
++    AVStream       *stream;
++    struct Streams *streams;
++    for (streams = ctx->streams; streams != NULL; streams = streams->next)
++        if (streams->stream->id == pid) {
++            ffstream(streams->stream)->need_context_update = 1;
++            return streams;
++        }
++
++    stream = avformat_new_stream(ctx->s, NULL);
++    if (stream == NULL) return NULL;
++    stream->id = pid;
++    av_program_add_stream_index(ctx->s, ctx->program->id, stream->index);
++
++    streams = av_mallocz(sizeof(struct Streams));
++    if (streams == NULL) return NULL;
++    streams->stream = stream;
++    streams->next   = ctx->streams;
++    streams->offset = -1;
++    ctx->streams    = streams;
++    return streams;
++}
++
++enum {
++    MMT_PACKAGE_TABLE_ID  = 0x20,
++    PACKAGE_LIST_TABLE_ID = 0x80,
++    MH_EIT_TABLE_ID       = 0x8B,
++};
++
++enum {
++    MPU_TIMESTAMP_DESCRIPTOR                  = 0x0001,
++    ACCESS_CONTROL_DESCRIPTOR                 = 0x8004,
++    VIDEO_COMPONENT_DESCRIPTOR                = 0x8010,
++    MH_STREAM_IDENTIFIER_DESCRIPTOR           = 0x8011,
++    MH_CONTENT_DESCRIPTOR                     = 0x8012,
++    MH_AUDIO_COMPONENT_DESCRIPTOR             = 0x8014,
++    MH_DATA_COMPONENT_DESCRIPTOR              = 0x8020,
++    MPU_EXTENDED_TIMESTAMP_DESCRIPTOR         = 0x8026,
++    CONTENT_COPY_CONTROL_DESCRIPTOR           = 0x8038,
++    CONTENT_USAGE_CONTROL_DESCRIPTOR          = 0x8039,
++    MULTIMEDIA_SERVICE_INFORMATION_DESCRIPTOR = 0x803F,
++    MH_SHORT_EVENT_DESCRIPTOR                 = 0xF001,
++    MH_EXTENDED_EVENT_DESCRIPTOR              = 0xF002,
++};
++
++static int
++parse_video_component_descriptor(AVStream *stream, GetByteContext *gbc)
++{
++    uint8_t descriptor_length;
++    uint8_t language_code[4];
++
++    if (bytestream2_get_bytes_left(gbc) < (16 + 8) / 8)
++        return AVERROR_INVALIDDATA;
++    if (bytestream2_get_be16u(gbc) != VIDEO_COMPONENT_DESCRIPTOR)
++        return AVERROR_INVALIDDATA;
++    descriptor_length = bytestream2_get_byteu(gbc);
++
++    if (bytestream2_get_bytes_left(gbc) < descriptor_length)
++        return AVERROR_INVALIDDATA;
++    {
++        GetByteContext ngbc;
++        bytestream2_init(&ngbc, gbc->buffer, descriptor_length);
++        /*
++         * skip:
++         * - video_resolution
++         * - video_aspect_ratio
++         * - video_scan_flag
++         * - reserved
++         * - video_frame_rate
++         * - component_tag
++         * - video_transfer_characteristics
++         * - reserved
++         */
++        bytestream2_skip(&ngbc, (4 + 4 + 1 + 2 + 5 + 16 + 4 + 4) / 8);
++
++        if (bytestream2_get_bytes_left(&ngbc) < 3)
++            return AVERROR_INVALIDDATA;
++        bytestream2_get_bufferu(&ngbc, language_code, 3);
++        language_code[3] = '\0';
++    }
++    bytestream2_skipu(gbc, descriptor_length);
++
++    if (stream == NULL) return 0;
++    return av_dict_set(&stream->metadata, "language", language_code, 0);
++}
++
++static int
++parse_mh_audio_component_descriptor(AVStream *stream, GetByteContext *gbc)
++{
++    uint8_t descriptor_length;
++    uint8_t stream_content;
++    uint8_t stream_type;
++    uint8_t language_code[4];
++
++    if (bytestream2_get_bytes_left(gbc) < (16 + 8) / 8)
++        return AVERROR_INVALIDDATA;
++    if (bytestream2_get_be16u(gbc) != MH_AUDIO_COMPONENT_DESCRIPTOR)
++        return AVERROR_INVALIDDATA;
++    descriptor_length = bytestream2_get_byteu(gbc);
++
++    if (bytestream2_get_bytes_left(gbc) < descriptor_length)
++        return AVERROR_INVALIDDATA;
++    {
++        uint8_t byte;
++        bool ES_multi_lingual_flag;
++
++        GetByteContext ngbc;
++        bytestream2_init(&ngbc, gbc->buffer, descriptor_length);
++
++        if (bytestream2_get_bytes_left(&ngbc) <
++            (4 + 4 + 8 + 16 + 8 + 8 + 1 + 1 + 2 + 3 + 1 + 24) / 8)
++            return AVERROR_INVALIDDATA;
++
++        byte           = bytestream2_get_byteu(&ngbc);
++        stream_content = byte & 0b1111;
++
++        /*
++         * skip:
++         * - component_type
++         * - component_tag
++         */
++        bytestream2_skipu(&ngbc, 3);
++        stream_type = bytestream2_get_byteu(&ngbc);
++
++        // skip: simulcast_group_tag
++        bytestream2_skipu(&ngbc, 1);
++
++        byte                  = bytestream2_get_byteu(&ngbc);
++        ES_multi_lingual_flag = byte >> 7;
++
++        bytestream2_get_bufferu(&ngbc, language_code, 3);
++        language_code[3] = '\0';
++
++        if (ES_multi_lingual_flag) {
++            if (bytestream2_get_bytes_left(&ngbc) < 3)
++                return AVERROR_INVALIDDATA;
++            bytestream2_skipu(&ngbc, 3);
++        }
++    }
++    bytestream2_skipu(gbc, descriptor_length);
++
++    if (stream == NULL) return 0;
++
++    switch (stream_content) {
++    case 0x3:
++        switch (stream_type) {
++        case 0x11:
++            stream->codecpar->codec_id = AV_CODEC_ID_AAC_LATM;
++            break;
++        case 0x1c:
++            stream->codecpar->codec_id = AV_CODEC_ID_AAC;
++            break;
++        }
++        break;
++    case 0x4:
++        stream->codecpar->codec_id = AV_CODEC_ID_MP4ALS;
++        break;
++    }
++
++    return av_dict_set(&stream->metadata, "language", language_code, 0);
++}
++
++#define MAX_NUM_TIMESTAMP_DESCRIPTOR 32
++#define DIFF(a, b) ((a) > (b) ? ((a) - (b)) : ((b) - (a)))
++
++static int
++parse_mpu_timestamp_descriptor(struct Streams *streams, GetByteContext *gbc)
++{
++    uint8_t descriptor_length;
++
++    if (bytestream2_get_bytes_left(gbc) < (16 + 8) / 8)
++        return AVERROR_INVALIDDATA;
++
++    if (bytestream2_get_be16u(gbc) != MPU_TIMESTAMP_DESCRIPTOR)
++        return AVERROR_INVALIDDATA;
++    descriptor_length = bytestream2_get_byteu(gbc);
++
++    if (bytestream2_get_bytes_left(gbc) < descriptor_length)
++        return AVERROR_INVALIDDATA;
++    {
++        GetByteContext ngbc;
++        bytestream2_init(&ngbc, gbc->buffer, descriptor_length);
++
++        while (bytestream2_get_bytes_left(&ngbc) > 0) {
++            uint64_t mpu_seq_num;
++            int64_t  mpu_presentation_time;
++            size_t   i;
++
++            struct MPUTimestampDescriptor *desc;
++
++            if (bytestream2_get_bytes_left(&ngbc) < (32 + 64) / 8)
++                return AVERROR_INVALIDDATA;
++            mpu_seq_num = bytestream2_get_be32u(&ngbc);
++            mpu_presentation_time =
++                ff_parse_ntp_time(bytestream2_get_be64u(&ngbc)) - NTP_OFFSET_US;
++
++            if (mpu_seq_num >= streams->last_sequence_number) {
++                for (i = 0; i < streams->num_timestamp_descriptors; ++i)
++                    if (streams->timestamp_descriptor[i].seq_num ==
++                        mpu_seq_num) {
++                        desc = streams->timestamp_descriptor + i;
++                        goto end2;
++                    }
++
++                for (i = 0; i < streams->num_timestamp_descriptors; ++i)
++                    if (streams->timestamp_descriptor[i].seq_num <
++                        streams->last_sequence_number) {
++                        desc = streams->timestamp_descriptor + i;
++                        goto end1;
++                    }
++
++                if (streams->num_timestamp_descriptors + 1 >
++                    MAX_NUM_TIMESTAMP_DESCRIPTOR) {
++                    // we have all descriptors larger than the current sequence number
++                    // we can't add more, so we should evict the one with the largest distance
++                    uint64_t max_dist = 0;
++                    for (i = 0; i < streams->num_timestamp_descriptors; ++i)
++                        if (DIFF(
++                                streams->timestamp_descriptor[i].seq_num,
++                                mpu_seq_num) > max_dist) {
++                            desc     = streams->timestamp_descriptor + i;
++                            max_dist = DIFF(
++                                streams->timestamp_descriptor[i].seq_num,
++                                mpu_seq_num);
++                        }
++                    av_assert1(desc != NULL); // should never fail
++                    goto end1;
++                }
++
++                desc = av_dynarray2_add(
++                    (void **) &streams->timestamp_descriptor,
++                    &streams->num_timestamp_descriptors,
++                    sizeof(struct MPUTimestampDescriptor), NULL);
++                if (desc == NULL) return AVERROR(ENOMEM);
++
++                end1:
++                desc->seq_num           = mpu_seq_num;
++                end2:
++                desc->presentation_time = mpu_presentation_time;
++            }
++        }
++    }
++    bytestream2_skipu(gbc, descriptor_length);
++
++    return 0;
++}
++
++static int parse_mpu_extended_timestamp_descriptor(
++    struct Streams *streams, GetByteContext *gbc)
++{
++    uint8_t descriptor_length;
++
++    AVStream *stream = streams->stream;
++
++    if (bytestream2_get_bytes_left(gbc) < (16 + 8) / 8)
++        return AVERROR_INVALIDDATA;
++    if (bytestream2_get_be16u(gbc) != MPU_EXTENDED_TIMESTAMP_DESCRIPTOR)
++        return AVERROR_INVALIDDATA;
++    descriptor_length = bytestream2_get_byteu(gbc);
++
++    if (bytestream2_get_bytes_left(gbc) < descriptor_length)
++        return AVERROR_INVALIDDATA;
++    {
++        uint8_t  byte;
++        uint8_t  pts_offset_type;
++        bool timescale_flag;
++        uint16_t default_pts_offset = 0;
++
++        GetByteContext ngbc;
++        bytestream2_init(&ngbc, gbc->buffer, descriptor_length);
++
++        if (bytestream2_get_bytes_left(&ngbc) < (5 + 2 + 1) / 8)
++            return AVERROR_INVALIDDATA;
++        byte            = bytestream2_get_byte(&ngbc);
++        pts_offset_type = (byte >> 1) & 0b11;
++        timescale_flag  = byte & 1;
++
++        if (timescale_flag) {
++            if (bytestream2_get_bytes_left(&ngbc) < 4)
++                return AVERROR_INVALIDDATA;
++            stream->time_base.num = 1;
++            stream->time_base.den = bytestream2_get_be32u(&ngbc);
++        }
++
++        if (pts_offset_type == 1) {
++            if (bytestream2_get_bytes_left(&ngbc) < 2)
++                return AVERROR_INVALIDDATA;
++            default_pts_offset = bytestream2_get_be16u(&ngbc);
++        }
++
++        while (bytestream2_get_bytes_left(&ngbc) > 0) {
++            size_t   i;
++            uint8_t  num_of_au;
++            uint16_t decoding_time_offset;
++            uint64_t mpu_seq_num;
++
++            struct MPUExtendedTimestampDescriptor *desc = NULL;
++
++            if (pts_offset_type == 0)
++                return AVERROR_PATCHWELCOME;  // we don't know how to handle this
++
++            if (bytestream2_get_bytes_left(&ngbc) < (32 + 2 + 6 + 16 + 8) / 8)
++                return AVERROR_INVALIDDATA;
++            mpu_seq_num = bytestream2_get_be32u(&ngbc);
++            // skip: leap_indicator
++            bytestream2_skip(&ngbc, (2 + 6) / 8);
++            decoding_time_offset = bytestream2_get_be16u(&ngbc);
++            num_of_au            = bytestream2_get_byteu(&ngbc);
++
++            if (mpu_seq_num >= streams->last_sequence_number) {
++                for (i = 0; i < streams->num_ext_timestamp_descriptors; ++i)
++                    if (streams->ext_timestamp_descriptor[i].seq_num ==
++                        mpu_seq_num) {
++                        desc = streams->ext_timestamp_descriptor + i;
++                        goto end2;
++                    }
++
++                for (i = 0; i < streams->num_ext_timestamp_descriptors; ++i)
++                    if (streams->ext_timestamp_descriptor[i].seq_num <
++                        streams->last_sequence_number) {
++                        desc = streams->ext_timestamp_descriptor + i;
++                        goto end1;
++                    }
++
++                if (streams->num_ext_timestamp_descriptors + 1 >
++                    MAX_NUM_TIMESTAMP_DESCRIPTOR) {
++                    uint64_t max_diff = 0;
++                    for (i = 0; i < streams->num_ext_timestamp_descriptors; ++i)
++                        if (DIFF(
++                                streams->ext_timestamp_descriptor[i].seq_num,
++                                mpu_seq_num) > max_diff) {
++                            desc     = streams->ext_timestamp_descriptor + i;
++                            max_diff = DIFF(
++                                streams->ext_timestamp_descriptor[i].seq_num,
++                                mpu_seq_num);
++                        }
++                    av_assert1(desc != NULL);
++                    goto end1;
++                }
++
++                desc = av_dynarray2_add(
++                    (void **) &streams->ext_timestamp_descriptor,
++                    &streams->num_ext_timestamp_descriptors,
++                    sizeof(struct MPUExtendedTimestampDescriptor), NULL);
++                if (desc == NULL)
++                    return AVERROR(ENOMEM);
++
++                end1:
++                desc->seq_num              = mpu_seq_num;
++                end2:
++                desc->decoding_time_offset = decoding_time_offset;
++                desc->num_of_au            = num_of_au;
++            }
++
++            for (i = 0; i < num_of_au; ++i) {
++                if (bytestream2_get_bytes_left(&ngbc) < 2)
++                    return AVERROR_INVALIDDATA;
++                if (desc != NULL)
++                    desc->au[i].dts_pts_offset = bytestream2_get_be16u(&ngbc);
++                else
++                    bytestream2_skipu(&ngbc, 2);
++
++                if (pts_offset_type == 2) {
++                    if (bytestream2_get_bytes_left(&ngbc) < 2)
++                        return AVERROR_INVALIDDATA;
++                    if (desc != NULL)
++                        desc->au[i].pts_offset = bytestream2_get_be16u(&ngbc);
++                    else
++                        bytestream2_skipu(&ngbc, 2);
++                } else if (desc != NULL) {
++                    desc->au[i].pts_offset = default_pts_offset;
++                }
++            }
++        }
++    }
++    bytestream2_skipu(gbc, descriptor_length);
++
++    return 0;
++}
++
++static int
++parse_additional_arib_subtitle_info(AVStream *stream, GetByteContext *gbc)
++{
++    bool    start_mpu_sequence_number_flag;
++    char    language_code[4];
++    uint8_t subtitle_format;
++
++    if (bytestream2_get_bytes_left(gbc) <
++        (8 + 4 + 1 + 3 + 24 + 2 + 4 + 2 + 4 + 4 + 4 + 4) / 8)
++        return AVERROR_INVALIDDATA;
++    // skip: subtitle_tag
++    bytestream2_skipu(gbc, 1);
++    start_mpu_sequence_number_flag = (bytestream2_get_byteu(gbc) >> 3) & 1;
++    bytestream2_get_bufferu(gbc, language_code, 3);
++    language_code[3] = '\0';
++    subtitle_format = (bytestream2_get_byteu(gbc) >> 2) & 0b1111;
++    /*
++     * skip:
++     * - TMD
++     * - DMF
++     * - resolution
++     * - compression_type
++     */
++    bytestream2_skipu(gbc, (4 + 4 + 4 + 4) / 8);
++
++    if (start_mpu_sequence_number_flag)
++        bytestream2_skip(gbc, 32);
++
++    switch (subtitle_format) {
++    case 0b0000:
++        stream->codecpar->codec_id = AV_CODEC_ID_TTML;
++        break;
++    }
++
++    return av_dict_set(&stream->metadata, "language", language_code, 0);
++}
++
++static int
++parse_mh_data_component_descriptor(AVStream *stream, GetByteContext *gbc)
++{
++    uint8_t descriptor_length;
++
++    if (bytestream2_get_bytes_left(gbc) < (16 + 8) / 8)
++        return AVERROR_INVALIDDATA;
++    if (bytestream2_get_be16u(gbc) != MH_DATA_COMPONENT_DESCRIPTOR)
++        return AVERROR_INVALIDDATA;
++    descriptor_length = bytestream2_get_byteu(gbc);
++
++    if (bytestream2_get_bytes_left(gbc) < descriptor_length)
++        return AVERROR_INVALIDDATA;
++    {
++        GetByteContext ngbc;
++        bytestream2_init(&ngbc, gbc->buffer, descriptor_length);
++        bytestream2_skipu(gbc, descriptor_length);
++
++        if (bytestream2_get_bytes_left(&ngbc) < 16 / 8)
++            return AVERROR_INVALIDDATA;
++        switch (bytestream2_get_be16u(&ngbc)) {
++        case 0x0020: // additional ARIB subtitle info (Table 7-74, ARIB STD-B60, Version 1.14-E1)
++            return parse_additional_arib_subtitle_info(stream, &ngbc);
++        }
++    }
++
++    return 0;
++}
++
++static int
++parse_stream_identifier_descriptor(AVStream *stream, GetByteContext *gbc)
++{
++    uint8_t descriptor_length;
++
++    if (bytestream2_get_bytes_left(gbc) < (16 + 8) / 8)
++        return AVERROR_INVALIDDATA;
++    if (bytestream2_get_be16u(gbc) != MH_STREAM_IDENTIFIER_DESCRIPTOR)
++        return AVERROR_INVALIDDATA;
++    descriptor_length = bytestream2_get_byteu(gbc);
++
++    if (bytestream2_get_bytes_left(gbc) < descriptor_length)
++        return AVERROR_INVALIDDATA;
++    {
++        // no need for now
++    }
++    bytestream2_skipu(gbc, descriptor_length);
++
++    return 0;
++}
++
++static int parse_mpt_descriptor(struct Streams *streams, GetByteContext *gbc)
++{
++    if (bytestream2_get_bytes_left(gbc) < 3)
++        return AVERROR_INVALIDDATA;
++    switch (bytestream2_peek_be16u(gbc)) {
++    case MPU_TIMESTAMP_DESCRIPTOR:
++        return parse_mpu_timestamp_descriptor(streams, gbc);
++    case VIDEO_COMPONENT_DESCRIPTOR:
++        return parse_video_component_descriptor(streams->stream, gbc);
++    case MH_STREAM_IDENTIFIER_DESCRIPTOR:
++        return parse_stream_identifier_descriptor(streams->stream, gbc);
++    case MH_AUDIO_COMPONENT_DESCRIPTOR:
++        return parse_mh_audio_component_descriptor(streams->stream, gbc);
++    case MH_DATA_COMPONENT_DESCRIPTOR:
++        return parse_mh_data_component_descriptor(streams->stream, gbc);
++    case MPU_EXTENDED_TIMESTAMP_DESCRIPTOR:
++        return parse_mpu_extended_timestamp_descriptor(streams, gbc);
++    case ACCESS_CONTROL_DESCRIPTOR:
++        bytestream2_skipu(gbc, 2);
++        bytestream2_skip(gbc, bytestream2_get_byteu(gbc));
++        return 0;
++    }
++    av_log(streams->stream, AV_LOG_INFO, "Unknown descriptor: 0x%04x\n",
++           bytestream2_peek_be16u(gbc));
++    return AVERROR_PATCHWELCOME;
++}
++
++static int parse_mh_short_event_descriptor(
++    MMTPContext *ctx, GetByteContext *gbc)
++{
++    uint16_t descriptor_length;
++
++    if (bytestream2_get_bytes_left(gbc) < (16 + 16) / 8)
++        return AVERROR_INVALIDDATA;
++    if (bytestream2_get_be16u(gbc) != MH_SHORT_EVENT_DESCRIPTOR)
++        return AVERROR_INVALIDDATA;
++    descriptor_length = bytestream2_get_be16u(gbc);
++
++    if (bytestream2_get_bytes_left(gbc) < descriptor_length)
++        return AVERROR_INVALIDDATA;
++    {
++        uint8_t  language_code[4];
++        uint8_t  event_name_length;
++        uint16_t text_length;
++        char     *event_name, *text;
++
++        GetByteContext ngbc;
++        bytestream2_init(&ngbc, gbc->buffer, descriptor_length);
++
++        bytestream2_get_buffer(&ngbc, language_code, 3);
++        language_code[3] = '\0';
++
++        event_name_length = bytestream2_get_byte(&ngbc);
++        if (bytestream2_get_bytes_left(&ngbc) < event_name_length)
++            return AVERROR_INVALIDDATA;
++        event_name = av_strndup(ngbc.buffer, event_name_length);
++        bytestream2_skipu(&ngbc, event_name_length);
++
++        av_dict_set(&ctx->program->metadata, "language", language_code, 0);
++        av_dict_set(&ctx->program->metadata, "title", event_name,
++                    AV_DICT_DONT_STRDUP_VAL);
++
++        text_length = bytestream2_get_be16u(&ngbc);
++        if (bytestream2_get_bytes_left(&ngbc) < text_length)
++            return AVERROR_INVALIDDATA;
++        text = av_strndup(ngbc.buffer, text_length);
++        bytestream2_skipu(&ngbc, text_length);
++
++        av_dict_set(&ctx->program->metadata, "description", text,
++                    AV_DICT_DONT_STRDUP_VAL);
++    }
++    bytestream2_skipu(gbc, descriptor_length);
++
++    return 0;
++}
++
++static int parse_mh_eit_descriptor(MMTPContext *ctx, GetByteContext *gbc)
++{
++    if (bytestream2_get_bytes_left(gbc) < 3)
++        return AVERROR_INVALIDDATA;
++    switch (bytestream2_peek_be16u(gbc)) {
++    case VIDEO_COMPONENT_DESCRIPTOR:
++        return parse_video_component_descriptor(NULL, gbc);
++    case MH_AUDIO_COMPONENT_DESCRIPTOR:
++        return parse_mh_audio_component_descriptor(NULL, gbc);
++    case MH_SHORT_EVENT_DESCRIPTOR:
++        return parse_mh_short_event_descriptor(ctx, gbc);
++    case MH_CONTENT_DESCRIPTOR:
++    case CONTENT_COPY_CONTROL_DESCRIPTOR:
++    case CONTENT_USAGE_CONTROL_DESCRIPTOR:
++    case MULTIMEDIA_SERVICE_INFORMATION_DESCRIPTOR:
++        bytestream2_skipu(gbc, 2);
++        bytestream2_skip(gbc, bytestream2_get_byteu(gbc));
++        return 0;
++    case MH_EXTENDED_EVENT_DESCRIPTOR:
++        bytestream2_skipu(gbc, 2);
++        if (bytestream2_get_bytes_left(gbc) < 2)
++            return AVERROR_INVALIDDATA;
++        bytestream2_skip(gbc, bytestream2_get_be16u(gbc));
++        return 0;
++    }
++    av_log(ctx->s, AV_LOG_INFO, "Unknown descriptor: 0x%04x\n",
++           bytestream2_peek_be16u(gbc));
++    return AVERROR_PATCHWELCOME;
++}
++
++static int parse_mmt_package_table(MMTPContext *ctx, GetByteContext *gbc)
++{
++    uint16_t length;
++
++    if (bytestream2_get_bytes_left(gbc) < (8 + 8 + 16) / 8)
++        return AVERROR_INVALIDDATA;
++    if (bytestream2_get_byteu(gbc) != MMT_PACKAGE_TABLE_ID)
++        return AVERROR_INVALIDDATA;
++    // skip: version
++    bytestream2_skipu(gbc, 1);
++    length = bytestream2_get_be16u(gbc);
++
++    if (bytestream2_get_bytes_left(gbc) < length)
++        return AVERROR_INVALIDDATA;
++    {
++        size_t   i, j;
++        uint8_t  package_id_length;
++        uint16_t descriptors_length;
++        uint8_t  number_of_assets;
++
++        GetByteContext ngbc;
++        bytestream2_init(&ngbc, gbc->buffer, length);
++
++        if (bytestream2_get_bytes_left(&ngbc) < (6 + 2 + 8) / 8)
++            return AVERROR_INVALIDDATA;
++
++        // skip: MPT_mode
++        bytestream2_skipu(&ngbc, 1);
++        package_id_length = bytestream2_get_byteu(&ngbc);
++
++        bytestream2_skip(&ngbc, package_id_length);
++
++        descriptors_length = bytestream2_get_be16(&ngbc);
++        bytestream2_skip(&ngbc, descriptors_length);
++
++        if (bytestream2_get_bytes_left(&ngbc) < 1)
++            return AVERROR_INVALIDDATA;
++        number_of_assets = bytestream2_get_byteu(&ngbc);
++
++        for (i = 0; i < number_of_assets; ++i) {
++            int err;
++
++            uint8_t  asset_id_length;
++            uint8_t  location_count;
++            uint16_t asset_descriptors_length;
++            uint32_t asset_type;
++
++            struct Streams *stream = NULL;
++
++            struct MMTGeneralLocationInfo info;
++
++            if (bytestream2_get_bytes_left(&ngbc) < (8 + 32 + 8) / 8)
++                return AVERROR_INVALIDDATA;
++            /*
++             * skip:
++             * - identifier_type
++             * - asset_id_scheme
++             */
++            bytestream2_skipu(&ngbc, (8 + 32) / 8);
++            asset_id_length = bytestream2_get_byteu(&ngbc);
++
++            bytestream2_skip(&ngbc, asset_id_length);
++
++            asset_type = bytestream2_get_le32(&ngbc);
++
++            // skip: asset_clock_relation_flag
++            bytestream2_skip(&ngbc, 1);
++
++            if (bytestream2_get_bytes_left(&ngbc) < 1)
++                return AVERROR_INVALIDDATA;
++            location_count = bytestream2_get_byteu(&ngbc);
++
++            for (j = 0; j < location_count; ++j)
++                if ((err = parse_mmt_general_location_info(&info, &ngbc)) < 0)
++                    return err;
++
++            switch (asset_type) {
++            case MKTAG('h', 'e', 'v', '1'):
++                if (info.location_type != 0x00) return AVERROR_PATCHWELCOME;
++                stream = find_or_allocate_stream(ctx, info.type0.packet_id);
++                if (stream == NULL) return AVERROR(ENOMEM);
++                stream->stream->codecpar->codec_type = AVMEDIA_TYPE_VIDEO;
++                stream->stream->codecpar->codec_id   = AV_CODEC_ID_HEVC;
++                stream->stream->codecpar->codec_tag  = asset_type;
++                break;
++            case MKTAG('m', 'p', '4', 'a'):
++                if (info.location_type != 0x00) return AVERROR_PATCHWELCOME;
++                stream = find_or_allocate_stream(ctx, info.type0.packet_id);
++                if (stream == NULL) return AVERROR(ENOMEM);
++                stream->stream->codecpar->codec_type = AVMEDIA_TYPE_AUDIO;
++                stream->stream->codecpar->codec_tag  = asset_type;
++                break;
++            case MKTAG('s', 't', 'p', 'p'):
++                if (info.location_type == 0x00) {
++                    stream = find_or_allocate_stream(ctx, info.type0.packet_id);
++                    if (stream == NULL) return AVERROR(ENOMEM);
++                    stream->stream->codecpar->codec_type = AVMEDIA_TYPE_SUBTITLE;
++                    stream->stream->codecpar->codec_tag  = asset_type;
++                }
++                break;
++            case MKTAG('a', 'a', 'p', 'p'):
++            case MKTAG('a', 's', 'g', 'd'):
++            case MKTAG('a', 'a', 'g', 'd'):
++                break; // TODO
++            }
++
++            if (bytestream2_get_bytes_left(&ngbc) < 2)
++                return AVERROR_INVALIDDATA;
++            asset_descriptors_length = bytestream2_get_be16u(&ngbc);
++            if (bytestream2_get_bytes_left(&ngbc) < asset_descriptors_length)
++                return AVERROR_INVALIDDATA;
++            if (stream != NULL) {
++                GetByteContext nngbc;
++                bytestream2_init(&nngbc, ngbc.buffer, asset_descriptors_length);
++
++                while (bytestream2_get_bytes_left(&nngbc) > 0)
++                    if ((err = parse_mpt_descriptor(stream, &nngbc)) < 0)
++                        return err;
++            }
++            bytestream2_skipu(&ngbc, asset_descriptors_length);
++        }
++    }
++    bytestream2_skipu(gbc, length);
++
++    return 0;
++}
++
++static int parse_package_list_table(MMTPContext *ctx, GetByteContext *gbc)
++{
++    size_t   i;
++    uint32_t length;
++
++    if (bytestream2_get_bytes_left(gbc) < (8 + 8 + 16) / 8)
++        return AVERROR_INVALIDDATA;
++    if (bytestream2_get_byteu(gbc) != PACKAGE_LIST_TABLE_ID)
++        return AVERROR_INVALIDDATA;
++    // skip: version
++    bytestream2_skipu(gbc, 1);
++    length = bytestream2_get_be16u(gbc);
++
++    if (bytestream2_get_bytes_left(gbc) < length)
++        return AVERROR_INVALIDDATA;
++    {
++        int     err;
++        uint8_t num_of_package;
++        uint8_t num_of_ip_delivery;
++
++        GetByteContext ngbc;
++        bytestream2_init(&ngbc, gbc->buffer, length);
++
++        if (bytestream2_get_bytes_left(gbc) < 1)
++            return AVERROR_INVALIDDATA;
++        num_of_package = bytestream2_get_byteu(&ngbc);
++
++        for (i = 0; i < num_of_package; ++i) {
++            uint8_t                       package_id_length;
++            struct MMTGeneralLocationInfo info;
++
++            package_id_length = bytestream2_get_byte(&ngbc);
++            bytestream2_skip(&ngbc, package_id_length);
++
++            if ((err = parse_mmt_general_location_info(&info, &ngbc)) < 0)
++                return err;
++        }
++
++        if (bytestream2_get_bytes_left(&ngbc) < 1)
++            return AVERROR_INVALIDDATA;
++        num_of_ip_delivery = bytestream2_get_byteu(&ngbc);
++
++        for (i = 0; i < num_of_ip_delivery; ++i)
++            return AVERROR_PATCHWELCOME;
++    }
++    bytestream2_skipu(gbc, length);
++
++    return 0;
++}
++
++static int parse_mh_eit_table(MMTPContext *ctx, GetByteContext *gbc)
++{
++    uint16_t section_length;
++
++    if (bytestream2_get_bytes_left(gbc) < (8 + 1 + 1 + 2 + 12) / 8)
++        return AVERROR_INVALIDDATA;
++    if (bytestream2_get_byteu(gbc) != MH_EIT_TABLE_ID)
++        return AVERROR_INVALIDDATA;
++    section_length = bytestream2_get_be16u(gbc) & 0b0000111111111111;
++
++    if (bytestream2_get_bytes_left(gbc) < section_length || section_length < 4)
++        return AVERROR_INVALIDDATA;
++    {
++        GetByteContext ngbc;
++        bytestream2_init(&ngbc, gbc->buffer, section_length - 4);
++
++        bytestream2_skip(&ngbc, (16 + 2 + 5 + 1 + 8 + 8 + 16 + 16 + 8 + 8) / 8);
++
++        while (bytestream2_get_bytes_left(&ngbc) > 0) {
++            uint16_t descriptors_loop_length;
++
++            bytestream2_skip(&ngbc, (16 + 40 + 24) / 8);
++            descriptors_loop_length =
++                bytestream2_get_be16u(&ngbc) & 0b0000111111111111;
++
++            if (bytestream2_get_bytes_left(&ngbc) < descriptors_loop_length)
++                return AVERROR_INVALIDDATA;
++            {
++                int            err;
++                GetByteContext nngbc;
++                bytestream2_init(&nngbc, ngbc.buffer, descriptors_loop_length);
++
++                while (bytestream2_get_bytes_left(&nngbc) > 0)
++                    if ((err = parse_mh_eit_descriptor(ctx, &nngbc)) < 0)
++                        return err;
++            }
++            bytestream2_skipu(&ngbc, descriptors_loop_length);
++        }
++    }
++    bytestream2_skipu(gbc, section_length);
++
++    return 0;
++}
++
++static int parse_table(MMTPContext *ctx, GetByteContext *gbc)
++{
++    if (bytestream2_get_bytes_left(gbc) < 2)
++        return AVERROR_INVALIDDATA;
++    switch (bytestream2_peek_byteu(gbc)) {
++    case MMT_PACKAGE_TABLE_ID:
++        return parse_mmt_package_table(ctx, gbc);
++    case PACKAGE_LIST_TABLE_ID:
++        return parse_package_list_table(ctx, gbc);
++    case MH_EIT_TABLE_ID:
++        return parse_mh_eit_table(ctx, gbc);
++    }
++    bytestream2_skipu(gbc, bytestream2_get_bytes_left(gbc)); // TODO
++    return 0;
++}
++
++enum {
++    PA_MESSAGE_ID      = 0x0000,
++    M2_SECTION_MESSAGE = 0x8000,
++};
++
++static int parse_pa_message(MMTPContext *ctx, GetByteContext *gbc)
++{
++    uint32_t length;
++
++    if (bytestream2_get_bytes_left(gbc) < (16 + 8 + 32) / 8)
++        return AVERROR_INVALIDDATA;
++    if (bytestream2_get_be16u(gbc) != PA_MESSAGE_ID)
++        return AVERROR_INVALIDDATA;
++    // skip: version
++    bytestream2_skipu(gbc, 1);
++    length = bytestream2_get_be32u(gbc);
++
++    if (bytestream2_get_bytes_left(gbc) < length)
++        return AVERROR_INVALIDDATA;
++    {
++        size_t  i;
++        uint8_t num_of_tables;
++
++        GetByteContext ngbc;
++        bytestream2_init(&ngbc, gbc->buffer, length);
++
++        if (bytestream2_get_bytes_left(gbc) < 1)
++            return AVERROR_INVALIDDATA;
++        num_of_tables = bytestream2_get_byteu(&ngbc);
++
++        for (i = 0; i < num_of_tables; ++i) {
++            bytestream2_skip(&ngbc, (8 + 8 + 16) / 8);
++        }
++
++        while (bytestream2_get_bytes_left(&ngbc) > 0) {
++            int err = parse_table(ctx, &ngbc);
++            if (err < 0) return err;
++        }
++    }
++    bytestream2_skipu(gbc, length);
++
++    return 0;
++}
++
++static int parse_m2_section_message(MMTPContext *ctx, GetByteContext *gbc)
++{
++    int      err;
++    uint16_t length;
++
++    if (bytestream2_get_bytes_left(gbc) < (16 + 8 + 16) / 8)
++        return AVERROR_INVALIDDATA;
++    if (bytestream2_get_be16u(gbc) != M2_SECTION_MESSAGE)
++        return AVERROR_INVALIDDATA;
++    // skip: version
++    bytestream2_skipu(gbc, 1);
++    length = bytestream2_get_be16u(gbc);
++
++    if (bytestream2_get_bytes_left(gbc) < length)
++        return AVERROR_INVALIDDATA;
++    {
++        GetByteContext ngbc;
++        bytestream2_init(&ngbc, gbc->buffer, length);
++        err = parse_table(ctx, &ngbc);
++    }
++    bytestream2_skipu(gbc, length);
++
++    return err;
++}
++
++static int parse_signalling_message(MMTPContext *ctx, GetByteContext *gbc)
++{
++    if (bytestream2_get_bytes_left(gbc) < 4)
++        return AVERROR_INVALIDDATA;
++    switch (bytestream2_peek_be16u(gbc)) {
++    case PA_MESSAGE_ID:
++        return parse_pa_message(ctx, gbc);
++    case M2_SECTION_MESSAGE:
++        return parse_m2_section_message(ctx, gbc);
++    }
++    return 0;
++}
++
++enum FragmentationIndicator {
++    NOT_FRAGMENTED  = 0b00,
++    FIRST_FRAGMENT  = 0b01,
++    MIDDLE_FRAGMENT = 0b10,
++    LAST_FRAGMENT   = 0b11,
++};
++
++struct FragmentAssembler {
++    uint16_t                 pid;
++    struct FragmentAssembler *next;
++
++    uint8_t *data;
++    size_t  size, cap;
++
++    uint32_t last_seq;
++
++    enum {
++        INIT = 0,
++        NOT_STARTED,
++        IN_FRAGMENT,
++        SKIP,
++    } state;
++};
++
++static int
++append_data(struct FragmentAssembler *ctx, const uint8_t *data, uint32_t size)
++{
++    if (ctx->size + size > UINT32_MAX) return AVERROR(EOVERFLOW);
++    if (ctx->cap < ctx->size + size) {
++        void   *new_data;
++        size_t new_cap = ctx->cap == 0 ? 1024 : ctx->cap * 2;
++        while (new_cap < ctx->size + size) new_cap *= 2;
++
++        new_data = av_realloc(ctx->data, new_cap);
++        if (new_data == NULL) return AVERROR(errno);
++        ctx->data = new_data;
++        ctx->cap  = new_cap;
++    }
++    memcpy(ctx->data + ctx->size, data, size);
++    ctx->size += size;
++    return 0;
++}
++
++static int
++check_state(MMTPContext *ctx, struct FragmentAssembler *ass, uint32_t seq_num)
++{
++    if (ass->state == INIT) {
++        ass->state = SKIP;
++    } else if (seq_num != ass->last_seq + 1) {
++        if (ass->size != 0) {
++            av_log(ctx->s, AV_LOG_WARNING,
++                   "Packet sequence number jump: %u + 1 != %u, drop %zu bytes\n",
++                   ass->last_seq, seq_num, ass->size);
++            ass->size = 0;
++        } else {
++            av_log(ctx->s, AV_LOG_WARNING,
++                   "Packet sequence number jump: %u + 1 != %u\n",
++                   ass->last_seq, seq_num);
++        }
++        ass->state = SKIP;
++    }
++    ass->last_seq = seq_num;
++    return 0;
++}
++
++static int assemble_fragment(
++    struct FragmentAssembler *ctx, uint32_t seq_num,
++    enum FragmentationIndicator indicator,
++    const uint8_t *data, uint32_t size,
++    int (*parser)(MMTPContext *, GetByteContext *),
++    MMTPContext *opaque)
++{
++    GetByteContext gbc;
++    int            err;
++
++    switch (indicator) {
++    case NOT_FRAGMENTED:
++        if (ctx->state == IN_FRAGMENT) return AVERROR_INVALIDDATA;
++        ctx->state = NOT_STARTED;
++        bytestream2_init(&gbc, data, size);
++        return parser(opaque, &gbc);
++    case FIRST_FRAGMENT:
++        if (ctx->state == IN_FRAGMENT) return AVERROR_INVALIDDATA;
++        ctx->state = IN_FRAGMENT;
++        return append_data(ctx, data, size);
++    case MIDDLE_FRAGMENT:
++        if (ctx->state == SKIP) {
++            av_log(opaque->s, AV_LOG_VERBOSE, "Drop packet %u\n", seq_num);
++            return 0;
++        }
++        if (ctx->state != IN_FRAGMENT) return AVERROR_INVALIDDATA;
++        return append_data(ctx, data, size);
++    case LAST_FRAGMENT:
++        if (ctx->state == SKIP) {
++            av_log(opaque->s, AV_LOG_VERBOSE, "Drop packet %u\n", seq_num);
++            return 0;
++        }
++        if (ctx->state != IN_FRAGMENT) return AVERROR_INVALIDDATA;
++        if ((err = append_data(ctx, data, size)) < 0) return err;
++
++        bytestream2_init(&gbc, ctx->data, ctx->size);
++        err = parser(opaque, &gbc);
++
++        ctx->size  = 0;
++        ctx->state = NOT_STARTED;
++        return err;
++    default:
++        return AVERROR_INVALIDDATA;
++    }
++}
++
++static struct FragmentAssembler *
++find_or_allocate_assembler(MMTPContext *ctx, uint16_t pid)
++{
++    struct FragmentAssembler *ass;
++    for (ass = ctx->assembler; ass != NULL; ass = ass->next)
++        if (ass->pid == pid)
++            return ass;
++
++    ass = av_mallocz(sizeof(struct FragmentAssembler));
++    if (ass == NULL) return NULL;
++    ass->pid              = pid;
++    ass->next             = ctx->assembler;
++    return ctx->assembler = ass;
++}
++
++static int parse_signalling_messages(
++    MMTPContext *ctx, uint32_t seq_num, GetByteContext *gbc)
++{
++    int                         err;
++    uint8_t                     byte;
++    enum FragmentationIndicator fragmentation_indicator;
++    bool                        length_extension_flag;
++    bool                        aggregation_flag;
++
++    struct FragmentAssembler *assembler = find_or_allocate_assembler(
++        ctx, ctx->current_pid);
++    if (assembler == NULL) return AVERROR(errno);
++
++    if (bytestream2_get_bytes_left(gbc) < (2 + 4 + 1 + 1 + 8) / 8)
++        return AVERROR_INVALIDDATA;
++    byte                    = bytestream2_get_byteu(gbc);
++    fragmentation_indicator = byte >> 6;
++    length_extension_flag   = (byte >> 1) & 1;
++    aggregation_flag        = byte & 1;
++
++    bytestream2_skipu(gbc, 1);
++
++    if ((err = check_state(ctx, assembler, seq_num)) < 0)
++        return err;
++
++    if (!aggregation_flag)
++        return assemble_fragment(
++            assembler, seq_num, fragmentation_indicator,
++            gbc->buffer, bytestream2_get_bytes_left(gbc),
++            parse_signalling_message, ctx);
++
++    if (fragmentation_indicator != NOT_FRAGMENTED)
++        return AVERROR_INVALIDDATA; // cannot be both fragmented and aggregated
++
++    while (bytestream2_get_bytes_left(gbc) > 0) {
++        uint32_t length;
++
++        if (length_extension_flag)
++            length = bytestream2_get_be32(gbc);
++        else
++            length = bytestream2_get_be16(gbc);
++
++        if (bytestream2_get_bytes_left(gbc) < length)
++            return AVERROR_INVALIDDATA;
++        if ((err = assemble_fragment(
++            assembler, seq_num, NOT_FRAGMENTED,
++            gbc->buffer, length, parse_signalling_message, ctx)) < 0)
++            return err;
++        bytestream2_skipu(gbc, length);
++    }
++
++    return 0;
++}
++
++static int fill_pts_dts(MMTPContext *ctx, struct Streams *s)
++{
++    struct MPUTimestampDescriptor         *desc     = NULL;
++    struct MPUExtendedTimestampDescriptor *ext_desc = NULL;
++
++    int64_t ptime;
++    size_t  i, j;
++
++    for (i = 0; i < s->num_timestamp_descriptors; ++i) {
++        if (s->timestamp_descriptor[i].seq_num ==
++            s->last_sequence_number) {
++            desc = s->timestamp_descriptor + i;
++            break;
++        }
++    }
++
++    for (i = 0; i < s->num_ext_timestamp_descriptors; ++i) {
++        if (s->ext_timestamp_descriptor[i].seq_num ==
++            s->last_sequence_number) {
++            ext_desc = s->ext_timestamp_descriptor + i;
++            break;
++        }
++    }
++
++    if (desc == NULL || ext_desc == NULL) return FFERROR_REDO;
++    ptime = av_rescale(desc->presentation_time, s->stream->time_base.den,
++                       1000000ll * s->stream->time_base.num);
++
++    if (s->au_count >= ext_desc->num_of_au)
++        return AVERROR_INVALIDDATA;
++
++    ctx->pkt->dts = ptime - ext_desc->decoding_time_offset;
++
++    for (j = 0; j < s->au_count; ++j)
++        ctx->pkt->dts += ext_desc->au[j].pts_offset;
++
++    ctx->pkt->pts = ctx->pkt->dts + ext_desc->au[s->au_count].dts_pts_offset;
++
++    ++s->au_count;
++    return 0;
++}
++
++static int emit_closed_caption_mfu(MMTPContext *ctx, struct Streams *st,
++                                   GetByteContext *gbc)
++{
++    uint8_t  data_type, subsample_number, last_subsample_number, byte;
++    uint32_t data_size;
++    size_t   i;
++    int      err;
++    bool     length_ext_flag, subsample_info_list_flag;
++
++    av_assert0(ctx->pkt != NULL);
++
++    if (bytestream2_get_bytes_left(gbc) < (8 + 8 + 8 + 8 + 4 + 1 + 1 + 2) / 8)
++        return AVERROR_INVALIDDATA;
++
++    /*
++     * skip:
++     * - subtitle_tag
++     * - subtitle_sequence_number
++     */
++    bytestream2_skipu(gbc, (8 + 8) / 8);
++
++    subsample_number      = bytestream2_get_byteu(gbc);
++    last_subsample_number = bytestream2_get_byteu(gbc);
++
++    byte                     = bytestream2_get_byteu(gbc);
++    data_type                = byte >> 4;
++    length_ext_flag          = (byte >> 3) & 1;
++    subsample_info_list_flag = (byte >> 2) & 1;
++
++    if (data_type != 0b0000) return AVERROR_PATCHWELCOME;
++
++    if (length_ext_flag)
++        data_size = bytestream2_get_be32(gbc);
++    else
++        data_size = bytestream2_get_be16(gbc);
++
++    if (subsample_number == 0 && last_subsample_number > 0 &&
++        subsample_info_list_flag) {
++        for (i = 0; i < last_subsample_number; ++i) {
++            // skip: subsample_i_data_type
++            bytestream2_skip(gbc, (4 + 4) / 8);
++            // skip: subsample_i_data_size
++            if (length_ext_flag) {
++                bytestream2_skip(gbc, 32 / 8);
++            } else {
++                bytestream2_skip(gbc, 16 / 8);
++            }
++        }
++    }
++
++    if (bytestream2_get_bytes_left(gbc) < data_size)
++        return AVERROR_INVALIDDATA;
++    if ((err = av_new_packet(ctx->pkt, data_size)) < 0) return err;
++    bytestream2_get_bufferu(gbc, ctx->pkt->data, data_size);
++
++    ctx->pkt->stream_index = st->stream->index;
++    ctx->pkt->flags        = st->flags;
++    ctx->pkt->pos          = st->offset;
++    ctx->pkt               = NULL;
++
++    st->flags  = 0;
++    st->offset = -1;
++    return 0;
++}
++
++static int emit_packet(MMTPContext *ctx, struct Streams *st, AVBufferRef *buf)
++{
++    int err;
++    av_assert0(ctx->pkt != NULL);
++    av_packet_unref(ctx->pkt);
++    if ((err = fill_pts_dts(ctx, st)) < 0) {
++        av_buffer_unref(&buf);
++        return err;
++    }
++    ctx->pkt->buf          = buf;
++    ctx->pkt->data         = buf->data;
++    ctx->pkt->size         = buf->size - AV_INPUT_BUFFER_PADDING_SIZE;
++    ctx->pkt->stream_index = st->stream->index;
++    ctx->pkt->flags        = st->flags;
++    ctx->pkt->pos          = st->offset;
++    ctx->pkt               = NULL;
++
++    st->flags  = 0;
++    st->offset = -1;
++    return 0;
++}
++
++static int consume_mfu(MMTPContext *ctx, GetByteContext *gbc)
++{
++    int            err;
++    AVBufferRef    *buf_ref;
++    unsigned int   size;
++    uint8_t        byte;
++    size_t         old_size;
++    struct Streams *st = find_current_stream(ctx);
++    av_assert0(st != NULL);
++
++    switch (st->stream->codecpar->codec_id) {
++    case AV_CODEC_ID_HEVC:
++        size = bytestream2_get_be32(gbc);
++        if (size != bytestream2_get_bytes_left(gbc)) return AVERROR_INVALIDDATA;
++        if (size < 1) // we expect to extract NAL unit header type below
++            return AVERROR_INVALIDDATA;
++        byte = bytestream2_peek_byteu(gbc);
++        if ((byte >> 7) != 0) return AVERROR_INVALIDDATA; // forbidden_zero_bit
++
++        old_size = st->pending_buffer == NULL ? 0 :
++                   (st->pending_buffer->size - AV_INPUT_BUFFER_PADDING_SIZE);
++        if ((err = av_buffer_realloc(
++            &st->pending_buffer,
++            old_size + size + 4 + AV_INPUT_BUFFER_PADDING_SIZE)) < 0)
++            return err;
++        // fix start code (00 00 00 01)
++        AV_WB32(st->pending_buffer->data + old_size, 1);
++        bytestream2_get_bufferu(
++            gbc, st->pending_buffer->data + old_size + 4, size);
++        if (((byte >> 1) & 0b111111) < 0x20) { // a VCL NAL unit
++            // Because we can't emit a packet without a valid PTS, we need to
++            // aggregate the non-VCL NAL units with VCL ones. Although we didn't
++            // technically identify an access unit here, this works for all samples
++            // we have.
++            buf_ref = st->pending_buffer;
++            st->pending_buffer = NULL;
++
++            memset(buf_ref->data + old_size + size + 4, 0,
++                   AV_INPUT_BUFFER_PADDING_SIZE);
++            return emit_packet(ctx, st, buf_ref);
++        }
++        return 0;
++    case AV_CODEC_ID_AAC_LATM:
++        size = bytestream2_get_bytes_left(gbc);
++        if (size >> 13) return AVERROR(EOVERFLOW);
++        if ((buf_ref = av_buffer_alloc(
++            size + 3 + AV_INPUT_BUFFER_PADDING_SIZE)) == NULL)
++            return AVERROR(ENOMEM);
++        buf_ref->data[0] = 0x56;
++        buf_ref->data[1] = 0xe0 | (size >> 8);
++        buf_ref->data[2] = size & 0xff;
++        bytestream2_get_bufferu(gbc, buf_ref->data + 3, size);
++        memset(buf_ref->data + 3 + size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
++        return emit_packet(ctx, st, buf_ref);
++    case AV_CODEC_ID_TTML:
++        return emit_closed_caption_mfu(ctx, st, gbc);
++    default:
++        return AVERROR_PATCHWELCOME;
++    }
++}
++
++static int parse_mfu_timed_data(
++    MMTPContext *ctx, struct FragmentAssembler *assembler,
++    uint32_t seq_num, enum FragmentationIndicator indicator,
++    GetByteContext *gbc)
++{
++    bytestream2_skip(gbc, (32 + 32 + 32 + 8 + 8) / 8);
++    return assemble_fragment(
++        assembler, seq_num, indicator,
++        gbc->buffer, bytestream2_get_bytes_left(gbc),
++        consume_mfu, ctx);
++}
++
++static int parse_mfu_non_timed_data(
++    MMTPContext *ctx, struct FragmentAssembler *assembler,
++    uint32_t seq_num, enum FragmentationIndicator indicator,
++    GetByteContext *gbc)
++{
++    bytestream2_skip(gbc, 32 / 8);
++    return assemble_fragment(
++        assembler, seq_num, indicator,
++        gbc->buffer, bytestream2_get_bytes_left(gbc),
++        consume_mfu, ctx);
++}
++
++static int parse_mpu(MMTPContext *ctx, uint32_t seq_num, GetByteContext *gbc)
++{
++    int                         err;
++    uint8_t                     byte, fragment_type;
++    bool                        timed_flag;
++    enum FragmentationIndicator fragmentation_indicator;
++    bool                        aggregation_flag;
++    uint16_t                    length;
++    uint32_t                    mpu_sequence_number;
++    struct FragmentAssembler    *assembler;
++    struct Streams              *streams;
++
++    streams = find_current_stream(ctx);
++    if (streams == NULL || streams->stream->discard >= AVDISCARD_ALL)
++        return 0;
++
++    assembler = find_or_allocate_assembler(ctx, ctx->current_pid);
++    if (assembler == NULL) return AVERROR(errno);
++
++    if (bytestream2_get_bytes_left(gbc) < (16 + 4 + 1 + 2 + 1 + 8 + 32) / 8)
++        return AVERROR_INVALIDDATA;
++
++    length = bytestream2_get_be16u(gbc);
++    if (length != bytestream2_get_bytes_left(gbc))
++        return AVERROR_INVALIDDATA;
++
++    byte                    = bytestream2_get_byteu(gbc);
++    fragment_type           = byte >> 4;
++    timed_flag              = (byte >> 3) & 1;
++    fragmentation_indicator = (byte >> 1) & 0b11;
++    aggregation_flag        = byte & 1;
++
++    // skip: fragment_counter
++    bytestream2_skipu(gbc, 1);
++
++    mpu_sequence_number = bytestream2_get_be32u(gbc);
++
++    if (aggregation_flag && fragmentation_indicator != NOT_FRAGMENTED)
++        return AVERROR_INVALIDDATA; // cannot be both fragmented and aggregated
++
++    if (fragment_type != 2)
++        return 0; // not MFU
++
++    if (assembler->state == INIT && !ctx->is_rap)
++        return 0; // wait for the first RAP
++
++    if (assembler->state == INIT) {
++        streams->last_sequence_number = mpu_sequence_number;
++    } else if (mpu_sequence_number == streams->last_sequence_number + 1) {
++        streams->last_sequence_number = mpu_sequence_number;
++        streams->au_count             = 0;
++    } else if (mpu_sequence_number != streams->last_sequence_number) {
++        av_log(streams->stream, AV_LOG_ERROR,
++               "MPU sequence number jump: %u + 1 != %u\n",
++               streams->last_sequence_number, mpu_sequence_number);
++        return AVERROR_INVALIDDATA;
++    }
++
++    if ((err = check_state(ctx, assembler, seq_num)) < 0)
++        return err;
++
++    if (fragmentation_indicator == NOT_FRAGMENTED ||
++        fragmentation_indicator == FIRST_FRAGMENT)
++        streams->offset = ctx->pkt->pos;
++
++    if (ctx->is_rap)
++        streams->flags |= AV_PKT_FLAG_KEY;
++
++    if (timed_flag) {
++        if (aggregation_flag) {
++            while (bytestream2_get_bytes_left(gbc) > 0) {
++                length = bytestream2_get_be16(gbc);
++                if (bytestream2_get_bytes_left(gbc) < length)
++                    return AVERROR_INVALIDDATA;
++                {
++                    GetByteContext ngbc;
++                    bytestream2_init(&ngbc, gbc->buffer, length);
++
++                    err = parse_mfu_timed_data(
++                        ctx, assembler, seq_num, NOT_FRAGMENTED, &ngbc);
++                    if (err < 0) return err;
++                }
++                bytestream2_skipu(gbc, length);
++            }
++        } else {
++            return parse_mfu_timed_data(
++                ctx, assembler, seq_num, fragmentation_indicator, gbc);
++        }
++    } else {
++        if (aggregation_flag) {
++            while (bytestream2_get_bytes_left(gbc) > 0) {
++                length = bytestream2_get_be16(gbc);
++                if (bytestream2_get_bytes_left(gbc) < length)
++                    return AVERROR_INVALIDDATA;
++                {
++                    GetByteContext ngbc;
++                    bytestream2_init(&ngbc, gbc->buffer, length);
++
++                    err = parse_mfu_non_timed_data(
++                        ctx, assembler, seq_num, NOT_FRAGMENTED, &ngbc);
++                    if (err < 0) return err;
++                }
++                bytestream2_skipu(gbc, length);
++            }
++        } else {
++            return parse_mfu_non_timed_data(
++                ctx, assembler, seq_num, fragmentation_indicator, gbc);
++        }
++    }
++
++    return 0;
++}
++
++MMTPContext *ff_mmtp_parse_open(AVProgram *program)
++{
++    MMTPContext *ctx = av_mallocz(sizeof(MMTPContext));
++    if (ctx == NULL) return NULL;
++    ctx->program = program;
++    return ctx;
++}
++
++int ff_mmtp_parse_packet(MMTPContext *ctx, AVFormatContext *s, AVPacket *pkt,
++                         const uint8_t *buf, uint16_t size)
++{
++    bool     packet_counter_flag;
++    bool     extension_header_flag;
++    uint8_t  payload_type;
++    uint32_t packet_sequence_number;
++    uint8_t  byte;
++    int      err = 0;
++
++    GetByteContext gbc;
++
++    ctx->s   = s;
++    ctx->pkt = pkt;
++
++    bytestream2_init(&gbc, buf, size);
++    if (bytestream2_get_bytes_left(&gbc) <
++        (2 + 1 + 2 + 1 + 1 + 1 + 2 + 6 + 16 + 32 + 32) / 8)
++        return AVERROR_INVALIDDATA;
++
++    byte                  = bytestream2_get_byteu(&gbc);
++    packet_counter_flag   = (byte >> 5) & 1;
++    extension_header_flag = (byte >> 1) & 1;
++    ctx->is_rap = byte & 1;
++
++    byte         = bytestream2_get_byteu(&gbc);
++    payload_type = byte & 0b111111;
++
++    ctx->current_pid = bytestream2_get_be16u(&gbc);
++
++    // skip: distribute_timestamp
++    bytestream2_skipu(&gbc, 4);
++
++    packet_sequence_number = bytestream2_get_be32u(&gbc);
++
++    if (packet_counter_flag)
++        bytestream2_skip(&gbc, 4);
++
++    if (extension_header_flag) {
++        uint16_t extension_header_length;
++        // skip: extension_type
++        bytestream2_skip(&gbc, 2);
++        extension_header_length = bytestream2_get_be16(&gbc);
++        bytestream2_skip(&gbc, extension_header_length);
++    }
++
++    switch (payload_type) {
++    case 0x00: // MPU
++        if (pkt != NULL)
++            err = parse_mpu(ctx, packet_sequence_number, &gbc);
++        break;
++    case 0x02: // signalling messages
++        err = parse_signalling_messages(ctx, packet_sequence_number, &gbc);
++        break;
++    }
++    if (err < 0) return err;
++    return ctx->pkt == NULL ? 0 : FFERROR_REDO;
++}
++
++void ff_mmtp_reset_state(MMTPContext *ctx)
++{
++    struct Streams           *streams;
++    struct FragmentAssembler *assembler;
++
++    for (assembler = ctx->assembler;
++         assembler != NULL; assembler = assembler->next) {
++        assembler->state = INIT;
++        assembler->size  = 0;
++    }
++    for (streams = ctx->streams; streams != NULL; streams = streams->next) {
++        streams->last_sequence_number = 0;
++        streams->au_count             = 0;
++        streams->flags                = 0;
++        streams->offset               = -1;
++        av_buffer_unref(&streams->pending_buffer);
++    }
++}
++
++void ff_mmtp_parse_close(MMTPContext *ctx)
++{
++    struct FragmentAssembler *ass;
++    struct Streams           *streams;
++
++    for (ass = ctx->assembler; ass != NULL;) {
++        struct FragmentAssembler *next = ass->next;
++        av_free(ass->data);
++        av_free(ass);
++        ass = next;
++    }
++
++    for (streams = ctx->streams; streams != NULL;) {
++        struct Streams *next = streams->next;
++        av_free(streams->timestamp_descriptor);
++        av_free(streams->ext_timestamp_descriptor);
++        av_buffer_unref(&streams->pending_buffer);
++        av_free(streams);
++        streams = next;
++    }
++
++    av_free(ctx);
++}
+diff --git a/libavformat/mmtp.h b/libavformat/mmtp.h
+new file mode 100644
+index 0000000000..300a6a1aea
+--- /dev/null
++++ b/libavformat/mmtp.h
+@@ -0,0 +1,64 @@
++/*
++ * MPEG Media Transport Protocol (MMTP) parser, as defined in ISO/IEC 23008-1.
++ * Copyright (c) 2023 SuperFashi
++ *
++ * This file is part of FFmpeg.
++ *
++ * FFmpeg is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * FFmpeg is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with FFmpeg; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ */
++#ifndef AVFORMAT_MMTP_H
++#define AVFORMAT_MMTP_H
++
++#include "avformat.h"
++
++typedef struct MMTPContext MMTPContext;
++
++/**
++ * Open an MMT protocol parser context.
++ * @param program The AVProgram this context is associated with.
++ * @return A new MMTPContext, or NULL on allocation error.
++ */
++MMTPContext *ff_mmtp_parse_open(AVProgram *program);
++
++/**
++ * Parse an MMT protocol packet.
++ *
++ * @param ctx The MMT protocol parser context.
++ * @param s The AVFormatContext.
++ * @param pkt The AVPacket to fill.
++ * @param buf The packet data.
++ * @param size The size of the packet data.
++ * @return >= 0 if a new AVPacket is emitted,
++ *         FFERROR_REDO if the next packet is needed,
++ *         or another negative value on error.
++ */
++int ff_mmtp_parse_packet(MMTPContext *ctx, AVFormatContext *s, AVPacket *pkt,
++                         const uint8_t *buf, uint16_t size);
++
++/**
++ * Reset the state of the MMTP parser. Useful when seeking.
++ *
++ * @param ctx The MMT protocol parser context.
++ */
++void ff_mmtp_reset_state(MMTPContext *ctx);
++
++/**
++ * Close an MMT protocol parser context, frees all associated resources.
++ *
++ * @param ctx The MMT protocol parser context.
++ */
++void ff_mmtp_parse_close(MMTPContext *ctx);
++
++#endif /* AVFORMAT_MMTP_H */
+diff --git a/libavformat/mmttlv.c b/libavformat/mmttlv.c
+new file mode 100644
+index 0000000000..48b4b1eaca
+--- /dev/null
++++ b/libavformat/mmttlv.c
+@@ -0,0 +1,338 @@
++/*
++ * MMT protocol over TLV packets (MMT/TLV) demuxer, as defined in ARIB STD-B32.
++ * Copyright (c) 2023 SuperFashi
++ *
++ * This file is part of FFmpeg.
++ *
++ * FFmpeg is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * FFmpeg is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with FFmpeg; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ */
++
++#include "config_components.h"
++
++#include "libavutil/mem.h"
++#include "libavutil/intreadwrite.h"
++#include "avformat.h"
++#include "avio_internal.h"
++#include "demux.h"
++#include "internal.h"
++#include "mmtp.h"
++
++#define HEADER_BYTE 0b01111111
++
++enum {
++    UNDEFINED_PACKET            = 0x00,
++    IPV4_PACKET                 = 0x01,
++    IPV6_PACKET                 = 0x02,
++    HEADER_COMPRESSED_IP_PACKET = 0x03,
++    TRANSMISSION_CONTROL_PACKET = 0xFE,
++    NULL_PACKET                 = 0xFF,
++};
++
++enum {
++    CONTEXT_IDENTIFICATION_PARTIAL_IPV4_AND_PARTIAL_UDP_HEADER = 0x20,
++    CONTEXT_IDENTIFICATION_IPV4_HEADER                         = 0x21,
++    CONTEXT_IDENTIFICATION_PARTIAL_IPV6_AND_PARTIAL_UDP_HEADER = 0x60,
++    CONTEXT_IDENTIFICATION_NO_COMPRESSED_HEADER                = 0x61,
++};
++
++static int mmttlv_probe(const AVProbeData *p)
++{
++    size_t   i, j;
++    uint8_t  packet_type;
++    uint16_t data_length;
++
++    int processed  = 0;
++    int recognized = 0;
++
++    for (i = 0; i + 4 < p->buf_size && processed < 100; ++processed) {
++        if (p->buf[i] != HEADER_BYTE) return 0;
++
++        packet_type = p->buf[i + 1];
++        data_length = AV_RB16(p->buf + i + 2);
++        i += 4;
++
++        if (packet_type == HEADER_COMPRESSED_IP_PACKET) {
++            if (data_length < 3 || i + 2 >= p->buf_size) goto skip;
++            switch (p->buf[i + 2]) {
++            case CONTEXT_IDENTIFICATION_PARTIAL_IPV4_AND_PARTIAL_UDP_HEADER:
++            case CONTEXT_IDENTIFICATION_IPV4_HEADER:
++            case CONTEXT_IDENTIFICATION_PARTIAL_IPV6_AND_PARTIAL_UDP_HEADER:
++            case CONTEXT_IDENTIFICATION_NO_COMPRESSED_HEADER:
++                ++recognized;
++            }
++        } else if (packet_type == NULL_PACKET) {
++            // null packets should contain all 0xFFs
++            for (j = i; j < i + data_length && j < p->buf_size; ++j) {
++                if (p->buf[j] != 0xFF) goto skip;
++            }
++            ++recognized;
++        }
++
++        skip:
++        i += data_length;
++    }
++
++    return recognized * AVPROBE_SCORE_MAX / FFMAX(processed, 10);
++}
++
++struct MMTTLVContext {
++    struct Program {
++        uint32_t       cid;
++        MMTPContext    *mmtp;
++        struct Program *next;
++    } *programs;
++
++    int64_t last_pos;
++    size_t  resync_size;
++
++    size_t  cap;
++    uint8_t *buf;
++};
++
++static int mmttlv_read_compressed_ip_packet(
++    struct MMTTLVContext *ctx, AVFormatContext *s, AVPacket *pkt,
++    const uint8_t *buf, uint16_t size)
++{
++    // partial udp header are udp header without data length (16 bits) and checksum (16 bits)
++#define PARTIAL_UDP_HEADER_LENGTH (8 - 4)
++    // partial ipv6 header are ipv6 header without payload length (16 bits)
++#define PARTIAL_IPV6_HEADER_LENGTH (40 - 2)
++
++    uint32_t       context_id;
++    struct Program *program;
++
++    if (size < 3)
++        return AVERROR_INVALIDDATA;
++    context_id = AV_RB16(buf) >> 4;
++    buf += 3;
++    size -= 3;
++
++    for (program = ctx->programs; program != NULL; program = program->next)
++        if (program->cid == context_id)
++            break;
++
++    if (program == NULL) {
++        AVProgram *p = av_new_program(s, context_id);
++        if (p == NULL) return AVERROR(errno);
++
++        program = av_malloc(sizeof(struct Program));
++        if (program == NULL) return AVERROR(errno);
++
++        program->mmtp = ff_mmtp_parse_open(p);
++        program->next = ctx->programs;
++        ctx->programs = program;
++        program->cid  = context_id;
++    }
++
++    switch (buf[-1]) {
++    case CONTEXT_IDENTIFICATION_PARTIAL_IPV4_AND_PARTIAL_UDP_HEADER:
++    case CONTEXT_IDENTIFICATION_IPV4_HEADER:
++        return AVERROR_PATCHWELCOME;
++    case CONTEXT_IDENTIFICATION_PARTIAL_IPV6_AND_PARTIAL_UDP_HEADER:
++        if (size < PARTIAL_IPV6_HEADER_LENGTH + PARTIAL_UDP_HEADER_LENGTH)
++            return AVERROR_INVALIDDATA;
++        size -= PARTIAL_IPV6_HEADER_LENGTH + PARTIAL_UDP_HEADER_LENGTH;
++        buf += PARTIAL_IPV6_HEADER_LENGTH + PARTIAL_UDP_HEADER_LENGTH;
++    case CONTEXT_IDENTIFICATION_NO_COMPRESSED_HEADER:
++        break;
++    default:
++        return AVERROR_INVALIDDATA;
++    }
++
++    return ff_mmtp_parse_packet(program->mmtp, s, pkt, buf, size);
++}
++
++static int mmttlv_read_packet(AVFormatContext *s, AVPacket *pkt)
++{
++    uint8_t              header[4];
++    uint16_t             size;
++    int                  err;
++    struct MMTTLVContext *ctx = s->priv_data;
++    int64_t              pos  = avio_tell(s->pb);
++
++    if (pos < 0) return (int) pos;
++    if (pos != ctx->last_pos) {
++        ctx->last_pos = pos;
++
++        while (pos - ctx->last_pos < ctx->resync_size) {
++            if ((err = ffio_ensure_seekback(s->pb, 4)) < 0)
++                return err;
++
++            if ((err = avio_read(s->pb, header, 4)) < 0)
++                return avio_feof(s->pb) ? AVERROR_EOF : err;
++
++            if (header[0] != HEADER_BYTE) {
++                if ((pos = avio_seek(s->pb, -3, SEEK_CUR)) < 0)
++                    return (int) pos;
++                continue;
++            }
++
++            size = AV_RB16(header + 2);
++
++            if ((pos = avio_seek(s->pb, -4, SEEK_CUR)) < 0)
++                return (int) pos;
++
++            if ((err = ffio_ensure_seekback(s->pb, 4 + size + 1)) < 0)
++                return err;
++
++            if ((pos = avio_skip(s->pb, 4 + size)) < 0)
++                return (int) pos;
++
++            if ((err = avio_read(s->pb, header, 1)) < 0)
++                return avio_feof(s->pb) ? AVERROR_EOF : err;
++
++            if (header[0] == HEADER_BYTE) {
++                // found HEADER, [size], HEADER, should be good
++                if ((pos = avio_seek(s->pb, -size - 1 - 4, SEEK_CUR)) < 0)
++                    return (int) pos;
++                goto success;
++            }
++
++            if ((pos = avio_seek(s->pb, -size - 1 - 3, SEEK_CUR)) < 0)
++                return (int) pos;
++        }
++        return AVERROR_INVALIDDATA;
++
++        success:
++        ctx->last_pos = pos;
++
++        for (struct Program *program = ctx->programs;
++             program != NULL; program = program->next)
++            ff_mmtp_reset_state(program->mmtp);
++    }
++
++    if (pkt != NULL) pkt->pos = ctx->last_pos;
++    if ((err = ffio_read_size(s->pb, header, 4)) < 0)
++        return avio_feof(s->pb) ? AVERROR_EOF : err;
++    ctx->last_pos += 4;
++
++    if (header[0] != HEADER_BYTE)
++        return AVERROR_INVALIDDATA;
++
++    size = AV_RB16(header + 2);
++    if (header[1] != HEADER_COMPRESSED_IP_PACKET) {
++        if ((ctx->last_pos = avio_skip(s->pb, size)) < 0)
++            return (int) ctx->last_pos;
++        return pkt == NULL ? 0 : FFERROR_REDO;
++    }
++
++    if (ctx->cap < size) {
++        av_free(ctx->buf);
++        if ((ctx->buf = av_malloc(ctx->cap = size)) == NULL)
++            return AVERROR(errno);
++    }
++    if ((err = ffio_read_size(s->pb, ctx->buf, size)) < 0)
++        return avio_feof(s->pb) ? AVERROR_EOF : err;
++    ctx->last_pos += size;
++    return mmttlv_read_compressed_ip_packet(ctx, s, pkt, ctx->buf, size);
++}
++
++static int mmttlv_read_header(AVFormatContext *s)
++{
++    int64_t              pos;
++    int64_t              allow = s->probesize;
++    struct MMTTLVContext *ctx  = s->priv_data;
++
++    ctx->last_pos = avio_tell(s->pb);
++    if (ctx->last_pos < 0)
++        return (int) ctx->last_pos;
++    ctx->last_pos -= 1; // force resync
++
++    ctx->resync_size = 4096;
++    s->ctx_flags |= AVFMTCTX_NOHEADER;
++
++    if (!s->pb->seekable)
++        return 0;
++
++    if ((pos = avio_tell(s->pb)) < 0)
++        return (int) pos;
++
++    while (s->nb_streams <= 0 && allow > 0) {
++        const int64_t cur = ctx->last_pos;
++        const int     err = mmttlv_read_packet(s, NULL);
++        if (err < 0) return err;
++        allow -= ctx->last_pos - cur;
++    }
++
++    ctx->last_pos = avio_tell(s->pb);
++    if (ctx->last_pos < 0)
++        return (int) ctx->last_pos;
++
++    if ((pos = avio_seek(s->pb, pos, SEEK_SET)) < 0)
++        return (int) pos;
++
++    return 0;
++}
++
++static int mmttlv_read_close(AVFormatContext *ctx)
++{
++    struct Program       *program;
++    struct MMTTLVContext *priv = ctx->priv_data;
++    for (program = priv->programs; program != NULL;) {
++        struct Program *next = program->next;
++        ff_mmtp_parse_close(program->mmtp);
++        av_free(program);
++        program = next;
++    }
++    priv->programs = NULL;
++    priv->cap = 0;
++    av_freep(&priv->buf);
++    return 0;
++}
++
++static int64_t mmttlv_read_timestamp(
++    struct AVFormatContext *s, int stream_index,
++    int64_t *pos, int64_t pos_limit)
++{
++    struct MMTTLVContext *ctx = s->priv_data;
++
++    if ((*pos = avio_seek(s->pb, *pos, SEEK_SET)) < 0)
++        return (int) *pos;
++
++    while (pos_limit > 0) {
++        AVPacket      packet = {0};
++        const int     err    = mmttlv_read_packet(s, &packet);
++        const int64_t ts     = packet.dts;
++        const int64_t off    = packet.pos;
++        const int     sid    = packet.stream_index;
++        av_packet_unref(&packet);
++        if (err >= 0 && (stream_index < 0 || sid == stream_index)) {
++            *pos = off;
++            return ts;
++        }
++        pos_limit -= ctx->last_pos - *pos;
++        *pos = ctx->last_pos;
++        if (err < 0 && err != FFERROR_REDO)
++            return AV_NOPTS_VALUE;
++    }
++
++    return AV_NOPTS_VALUE;
++}
++
++#if CONFIG_MMTTLV_DEMUXER
++const FFInputFormat ff_mmttlv_demuxer = {
++    .p.name         = "mmttlv",
++    .p.long_name    = NULL_IF_CONFIG_SMALL(
++        "MMT protocol over TLV packets (ARIB STD-B32)"),
++    .p.flags        = AVFMT_SHOW_IDS,
++    .priv_data_size = sizeof(struct MMTTLVContext),
++    .flags_internal = FF_INFMT_FLAG_INIT_CLEANUP,
++    .read_probe     = mmttlv_probe,
++    .read_header    = mmttlv_read_header,
++    .read_packet    = mmttlv_read_packet,
++    .read_close     = mmttlv_read_close,
++    .read_timestamp = mmttlv_read_timestamp,
++};
++#endif
+\ No newline at end of file

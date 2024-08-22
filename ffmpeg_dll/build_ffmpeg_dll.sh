@@ -18,12 +18,14 @@ UPDATE_FFMPEG="FALSE"
 ENABLE_SWSCALE="FALSE"
 FOR_FFMPEG4="FALSE"
 FOR_AUDENC="FALSE"
+ADD_TLVMMT="FALSE"
+BUILD_EXE="FALSE"
 
-# [ bitrate, swscale ]
+# [ bitrate, swscale, exe ]
 TARGET_BUILD=""
 
 
-while getopts "ast:ur" OPT
+while getopts "ast:urm" OPT
 do
   case $OPT in
     "a" ) BUILD_ALL="TRUE" ;;
@@ -31,6 +33,7 @@ do
     "t" ) TARGET_BUILD=$OPTARG ;;
     "u" ) UPDATE_FFMPEG="TRUE" ;;
     "r" ) FOR_FFMPEG4="TRUE" ;;
+    "m" ) ADD_TLVMMT="TRUE" ;;
   esac
 done
 
@@ -52,6 +55,9 @@ if [ "$TARGET_BUILD" = "swscale" ]; then
     ENABLE_SWSCALE="TRUE"
 elif [ "$TARGET_BUILD" = "audenc" ]; then
     FOR_AUDENC="TRUE"
+    BUILD_EXE="TRUE"
+elif [ "$TARGET_BUILD" = "exe" ]; then
+    BUILD_EXE="TRUE"
 fi
 
 # [ "x86", "x64" ]
@@ -107,8 +113,14 @@ BUILD_CCFLAGS="-O3 ${BUILD_CCFLAGS}"
 if [ $ENABLE_SWSCALE = "TRUE" ]; then
     FFMPEG_DIR_NAME="${FFMPEG_DIR_NAME}_swscale"
 fi
+if [ $ADD_TLVMMT = "TRUE" ]; then
+    FFMPEG_DIR_NAME="${FFMPEG_DIR_NAME}_tlvmmt"
+fi
 if [ $FOR_AUDENC = "TRUE" ]; then
-    FFMPEG_DIR_NAME="ffmpeg_audenc"
+    FFMPEG_DIR_NAME="${FFMPEG_DIR_NAME}_audenc"
+fi
+if [ $BUILD_EXE = "TRUE" ]; then
+    FFMPEG_DIR_NAME="${FFMPEG_DIR_NAME}_exe"
 fi
 if [ $BUILD_ALL != "FALSE" ]; then
     UPDATE_FFMPEG="TRUE"
@@ -121,6 +133,7 @@ echo UPDATE_FFMPEG=$UPDATE_FFMPEG
 echo FOR_AUDENC=$FOR_AUDENC
 echo ENABLE_SWSCALE=$ENABLE_SWSCALE
 echo FFMPEG_DIR_NAME=$FFMPEG_DIR_NAME
+echo BUILD_EXE=$BUILD_EXE
 
 #--- ソースのダウンロード ---------------------------------------
 if [ "$FOR_FFMPEG4" = "TRUE" ]; then
@@ -134,10 +147,14 @@ elif [ -d "ffmpeg" ]; then
         cd ffmpeg
         make uninstall && make distclean &> /dev/null
         cd ..
-        rm -rf ffmpeg
-        wget https://ffmpeg.org/releases/ffmpeg-7.0.tar.xz
-        tar xf ffmpeg-7.0.tar.xz
-        mv ffmpeg-7.0 ffmpeg
+        #rm -rf ffmpeg
+        #git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg 
+        #git checkout -b build a44c3463
+        #wget https://ffmpeg.org/releases/ffmpeg-7.0.tar.xz
+        #tar xf ffmpeg-7.0.tar.xz
+        #mv ffmpeg-7.0 ffmpeg
+        wget https://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2
+        tar xf ffmpeg-snapshot.tar.bz2
     fi
 else
     wget https://ffmpeg.org/releases/ffmpeg-7.0.tar.xz
@@ -294,28 +311,33 @@ if [ ! -d "dav1d-1.4.1" ]; then
     tar xf dav1d-1.4.1.tar.gz
 fi
 
-# --- 出力先の古いデータを削除 ----------------------
-if [ -d $FFMPEG_DIR_NAME ]; then
-    rm -rf $FFMPEG_DIR_NAME
-fi
-
-if [ $UPDATE_FFMPEG != "FALSE" ] && [ -d ffmpeg_test ]; then
-    rm -rf ffmpeg_test
-fi
-
+# --- 出力先を準備 --------------------------------------
 if [ $BUILD_ALL != "FALSE" ]; then
     rm -rf $BUILD_DIR/$TARGET_ARCH
 fi
 
-# --- 出力先を準備 --------------------------------------
 if [ ! -d $BUILD_DIR/$TARGET_ARCH ]; then
     mkdir $BUILD_DIR/$TARGET_ARCH
 fi
 cd $BUILD_DIR/$TARGET_ARCH
+# --- 出力先の古いデータを削除 ----------------------
+if [ $UPDATE_FFMPEG != "FALSE" ] && [ -d ffmpeg_test ]; then
+    rm -rf ffmpeg_test
+fi
 if [ ! -d ffmpeg_test ]; then
     cp -r ../src/ffmpeg ffmpeg_test
 fi
+
+if [ -d $FFMPEG_DIR_NAME ]; then
+    rm -rf $FFMPEG_DIR_NAME
+fi
 cp -r ../src/ffmpeg $FFMPEG_DIR_NAME
+
+if [ $ADD_TLVMMT = "TRUE" ]; then
+    cd $FFMPEG_DIR_NAME
+    patch -p1 < $PATCHES_DIR/ffmpeg_tlvmmt.diff
+    read -p "Check patch and hit enter: "
+fi
   
   #$BUILD_DIR/src/soxr* $BUILD_DIR/src/nettle* $BUILD_DIR/src/gnutls*
 
@@ -927,6 +949,53 @@ $FFMPEG5_CUDA_DISABLE_FLAGS \
 --enable-small \
 --pkg-config-flags="--static" \
 --extra-cflags="${BUILD_CCFLAGS} -Os -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
+--extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib"
+elif [ $BUILD_EXE = "TRUE" ]; then
+PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+./configure \
+--prefix=${BUILD_DIR}/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH \
+$PKG_CONFIG_FLAGS \
+--arch="${FFMPEG_ARCH}" \
+--target-os="mingw32" \
+--enable-version3 \
+--disable-debug \
+--disable-shared \
+--disable-doc \
+$SWSCALE_ARG \
+$FFMPEG_DISABLE_ASM \
+--disable-postproc \
+--disable-outdevs \
+--disable-amd3dnow \
+--disable-amd3dnowext \
+--disable-xop \
+--disable-fma4 \
+--disable-w32threads \
+$FFMPEG5_CUDA_DISABLE_FLAGS \
+--enable-pthreads \
+--enable-bsfs \
+--enable-filters \
+--enable-swresample \
+--disable-decoder=vorbis \
+--enable-libvorbis \
+--enable-libspeex \
+--enable-libmp3lame \
+--enable-libtwolame \
+--enable-fontconfig \
+--enable-libfribidi \
+--enable-libfreetype \
+--enable-libsoxr \
+--enable-libopus \
+--enable-libass \
+--enable-libdav1d \
+--enable-libvpl \
+--enable-libvpx \
+--enable-ffnvcodec \
+--enable-nvdec \
+--enable-cuvid \
+--pkg-config-flags="--static" \
+--enable-libaribcaption \
+--enable-libaribb24 \
+--extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
 --extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib"
 else
 PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \

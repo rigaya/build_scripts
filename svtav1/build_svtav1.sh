@@ -5,8 +5,10 @@ BUILD_LDFLAGS="-static -static-libgcc -flto -Wl,--gc-sections -Wl,--strip-all"
 MAKE_PROCESS=$NUMBER_OF_PROCESSORS
 #cmake.exeÇÃÇ†ÇÈèÍèä
 CMAKE_DIR="/C/Program Files/CMake/bin"
-PROFILE_GEN_CC="-fprofile-generate -fprofile-update=atomic"
-PROFILE_GEN_LD="-fprofile-generate -fprofile-update=atomic"
+#PROFILE_GEN_CC="-fprofile-generate -fprofile-update=atomic"
+#PROFILE_GEN_LD="-fprofile-generate -fprofile-update=atomic"
+PROFILE_GEN_CC="-fprofile-generate -gline-tables-only"
+PROFILE_GEN_LD="-fprofile-generate -gline-tables-only"
 PROFILE_USE_CC="-fprofile-use"
 PROFILE_USE_LD="-fprofile-use"
 YUVFILE="/y/Encoders/sakura_op_short_720p.yuv"
@@ -21,11 +23,16 @@ mkdir -p $BUILD_DIR/src
 cd $BUILD_DIR/src
 git config --global core.autocrlf false
 
-if [ $MSYSTEM != "MINGW64" ]; then
-    echo "This script is for mingw64 only!"
+if [ $MSYSTEM != "MINGW64" ] && [ $MSYSTEM != "CLANG64" ]; then
+    echo "This script is for mingw64/clang64 only!"
     exit 1
 else
     TARGET_ARCH="x64"
+fi
+
+if [ $MSYSTEM == "CLANG64" ]; then
+	export CC=clang
+	export CXX=clang++
 fi
 
 INSTALL_DIR=$BUILD_DIR/$TARGET_ARCH/build
@@ -55,6 +62,7 @@ cmake -G "MSYS Makefiles" \
   -DBUILD_SHARED_LIBS=OFF \
   -DBUILD_TESTING=OFF \
   -DNATIVE=OFF \
+  -DSVT_AV1_LTO=ON \
   -DENABLE_NASM=ON \
   -DENABLE_AVX512=ON \
   -DCMAKE_ASM_NASM_COMPILER=nasm \
@@ -66,18 +74,85 @@ cmake -G "MSYS Makefiles" \
 
 make SvtAv1EncApp -j${NUMBER_OF_PROCESSORS}
 
+prof_files=()
+
 ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx512
+for file in default_*_0.profraw; do
+  new_file="${file%.profraw}_1.${file##*.}"
+  mv "$file" "$new_file"
+  prof_files+=( ${new_file} )
+done
 ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 5 -n 30 --asm avx512
+for file in default_*_0.profraw; do
+  new_file="${file%.profraw}_2.${file##*.}"
+  mv "$file" "$new_file"
+  prof_files+=( ${new_file} )
+done
 ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 7 -n 60 --asm avx512
+for file in default_*_0.profraw; do
+  new_file="${file%.profraw}_3.${file##*.}"
+  mv "$file" "$new_file"
+  prof_files+=( ${new_file} )
+done
 ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx2
+for file in default_*_0.profraw; do
+  new_file="${file%.profraw}_4.${file##*.}"
+  mv "$file" "$new_file"
+  prof_files+=( ${new_file} )
+done
 ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 5 -n 30 --asm avx2
+for file in default_*_0.profraw; do
+  new_file="${file%.profraw}_5.${file##*.}"
+  mv "$file" "$new_file"
+  prof_files+=( ${new_file} )
+done
 ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 7 -n 60 --asm avx2
+for file in default_*_0.profraw; do
+  new_file="${file%.profraw}_6.${file##*.}"
+  mv "$file" "$new_file"
+  prof_files+=( ${new_file} )
+done
 ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx512
+for file in default_*_0.profraw; do
+  new_file="${file%.profraw}_7.${file##*.}"
+  mv "$file" "$new_file"
+  prof_files+=( ${new_file} )
+done
 ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 5 -n 30 --input-depth 10 --asm avx512
+for file in default_*_0.profraw; do
+  new_file="${file%.profraw}_8.${file##*.}"
+  mv "$file" "$new_file"
+  prof_files+=( ${new_file} )
+done
 ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 7 -n 60 --input-depth 10 --asm avx512
+for file in default_*_0.profraw; do
+  new_file="${file%.profraw}_9.${file##*.}"
+  mv "$file" "$new_file"
+  prof_files+=( ${new_file} )
+done
 ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx2
+for file in default_*_0.profraw; do
+  new_file="${file%.profraw}_10.${file##*.}"
+  mv "$file" "$new_file"
+  prof_files+=( ${new_file} )
+done
 ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 5 -n 30 --input-depth 10 --asm avx2
+for file in default_*_0.profraw; do
+  new_file="${file%.profraw}_11.${file##*.}"
+  mv "$file" "$new_file"
+  prof_files+=( ${new_file} )
+done
 ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 7 -n 60 --input-depth 10 --asm avx2
+for file in default_*_0.profraw; do
+  new_file="${file%.profraw}_12.${file##*.}"
+  mv "$file" "$new_file"
+  prof_files+=( ${new_file} )
+done
+
+llvm-profdata merge -output=default.profdata "${prof_files[@]}"
+
+PROFILE_USE_CC=${PROFILE_USE_CC}=`pwd`/default.profdata
+PROFILE_USE_LD=${PROFILE_USE_LD}=`pwd`/default.profdata
 
 cmake -G "MSYS Makefiles" \
   -DCMAKE_BUILD_TYPE=Release \

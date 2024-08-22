@@ -279,9 +279,9 @@ if [ ! -d "libaribcaption-1.1.1" ]; then
     tar xf libaribcaption-1.1.1.tar.gz
 fi
 
-if [ ! -d "libvpl-2.11.0" ]; then
-    wget -O libvpl-2.11.0.tar.gz https://github.com/intel/libvpl/archive/refs/tags/v2.11.0.tar.gz
-    tar xf libvpl-2.11.0.tar.gz
+if [ ! -d "libvpl-2.12.0" ]; then
+    wget -O libvpl-2.12.0.tar.gz https://github.com/intel/libvpl/archive/refs/tags/v2.12.0.tar.gz
+    tar xf libvpl-2.12.0.tar.gz
 fi
 
 if [ ! -d "nv-codec-headers-12.2.72.0" ]; then
@@ -314,9 +314,9 @@ fi
     # tar xf gnutls-3.3.19.tar.xz
 # fi
 
-if [ ! -d "dav1d-1.4.1" ]; then
-    wget https://code.videolan.org/videolan/dav1d/-/archive/1.4.1/dav1d-1.4.1.tar.gz
-    tar xf dav1d-1.4.1.tar.gz
+if [ ! -d "dav1d-1.4.3" ]; then
+    wget https://code.videolan.org/videolan/dav1d/-/archive/1.4.3/dav1d-1.4.3.tar.gz
+    tar xf dav1d-1.4.3.tar.gz
 fi
 
 # --- èoóÕêÊÇèÄîı --------------------------------------

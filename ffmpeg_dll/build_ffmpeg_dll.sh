@@ -152,14 +152,20 @@ elif [ -d "ffmpeg" ]; then
         cd ffmpeg
         make uninstall && make distclean &> /dev/null
         cd ..
-        #rm -rf ffmpeg
-        #git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg 
-        #git checkout -b build a44c3463
+        if [ ! -d "ffmpeg/.git" ]; then
+            rm -rf ffmpeg
+            git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
+        fi
+        cd ffmpeg
+        git fetch
+        git reset --hard
+        git checkout -b build 9d15fe77e33b757c75a4186fa049857462737713
+        cd ..
         #wget https://ffmpeg.org/releases/ffmpeg-7.0.tar.xz
         #tar xf ffmpeg-7.0.tar.xz
         #mv ffmpeg-7.0 ffmpeg
-        wget https://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2
-        tar xf ffmpeg-snapshot.tar.bz2
+        #wget https://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2
+        #tar xf ffmpeg-snapshot.tar.bz2
     fi
 else
     wget https://ffmpeg.org/releases/ffmpeg-7.0.tar.xz

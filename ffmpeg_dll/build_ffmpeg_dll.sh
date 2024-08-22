@@ -2,13 +2,16 @@
 #MSYS2用ffmpeg dllビルドスクリプト
 #Visual Studioへの環境変数を通しておくこと
 #pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain autotools autogen
-#pacman -S p7zip git nasm python unzip
-# harfbuzz関連
-#pacman -S gtk-doc mingw64/mingw-w64-x86_64-ragel mingw32/mingw-w64-i686-ragel
+#pacman -S p7zip git nasm yasm python unzip
+# cmake関連
+#pacman -S mingw32/mingw-w64-i686-cmake mingw64/mingw-w64-x86_64-cmake
+# 通常の pacman -S cmakeで導入しないこと
 #普通にpacman -S mesonとやるとうまくdav1dがビルドできないので注意
 #pacman -S mingw32/mingw-w64-i686-meson mingw64/mingw-w64-x86_64-meson
-#pacman -S mingw32/mingw-w64-i686-python-lxml mingw64/mingw-w64-x86_64-python-lxml
-#そのほかにcmake(windows版)のインストールが必要
+# harfbuzzに必要
+#pacman -S gtk-doc mingw64/mingw-w64-x86_64-ragel mingw32/mingw-w64-i686-ragel
+#fontconfigに必要
+#pacman -S gperf mingw32/mingw-w64-i686-python-lxml mingw64/mingw-w64-x86_64-python-lxml
 NJOBS=$NUMBER_OF_PROCESSORS
 PATCHES_DIR=$HOME/patches
 
@@ -284,6 +287,11 @@ fi
 if [ ! -d "nv-codec-headers-12.2.72.0" ]; then
     wget https://github.com/FFmpeg/nv-codec-headers/releases/download/n12.2.72.0/nv-codec-headers-12.2.72.0.tar.gz
     tar xf nv-codec-headers-12.2.72.0.tar.gz
+fi
+
+if [ ! -d "libvpx-1.14.1" ]; then
+    wget -O libvpx-1.14.1.tar.gz https://github.com/webmproject/libvpx/archive/refs/tags/v1.14.1.tar.gz
+    tar xf libvpx-1.14.1.tar.gz
 fi
 
 # if [ ! -d "gperf-3.0.4" ]; then
@@ -797,6 +805,26 @@ if [ ! -d "libvpl" ]; then
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "libvpx" ]; then
+    find ../src/ -type d -name "libvpx-*" | xargs -i cp -r {} ./libvpx
+    cd ./libvpx
+    CFLAGS="${BUILD_CCFLAGS}" \
+    CPPFLAGS="${BUILD_CCFLAGS}" \
+    LDFLAGS="${BUILD_LDFLAGS}" \
+     ./configure \
+     --prefix=$INSTALL_DIR \
+     --disable-shared \
+     --enable-static \
+     --disable-docs \
+     --disable-examples \
+     --disable-tools \
+     --disable-unit-tests \
+     --enable-vp9-highbitdepth \
+     --enable-runtime-cpu-detect
+    make install -j$NJOBS
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "nv-codec-headers" ]; then
     find ../src/ -type d -name "nv-codec-headers-*" | xargs -i cp -r {} ./nv-codec-headers
     cd nv-codec-headers
@@ -1039,6 +1067,7 @@ $FFMPEG5_CUDA_DISABLE_FLAGS \
 --enable-libass \
 --enable-libdav1d \
 --enable-libvpl \
+--enable-libvpx \
 --enable-ffnvcodec \
 --enable-nvdec \
 --enable-cuvid \
@@ -1073,7 +1102,9 @@ if [ ${UPDATE_FFMPEG} != "FALSE" ]; then
      $BUILD_DIR/src/lame* $BUILD_DIR/src/libsndfile* $BUILD_DIR/src/twolame* $BUILD_DIR/src/soxr* $BUILD_DIR/src/speex* \
      $BUILD_DIR/src/expat* $BUILD_DIR/src/freetype* $BUILD_DIR/src/libiconv* $BUILD_DIR/src/fontconfig* \
      $BUILD_DIR/src/libpng* $BUILD_DIR/src/libass* $BUILD_DIR/src/bzip2* $BUILD_DIR/src/libbluray* \
-     $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libaribcaption* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* $BUILD_DIR/src/libvpl* $BUILD_DIR/src/nv-codec-headers* \
+     $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libaribcaption* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* \
+     $BUILD_DIR/src/libvpl* $BUILD_DIR/src/libvpx* $BUILD_DIR/src/nv-codec-headers* \
+     $PATCHES_DIR/* \
       > /dev/null
 fi
 

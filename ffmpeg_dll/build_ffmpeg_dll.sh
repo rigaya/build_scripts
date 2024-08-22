@@ -10,7 +10,6 @@
 #pacman -S mingw32/mingw-w64-i686-python-lxml mingw64/mingw-w64-x86_64-python-lxml
 #そのほかにcmake(windows版)のインストールが必要
 NJOBS=$NUMBER_OF_PROCESSORS
-CMAKE_PATH="/C/Program Files/CMake/bin/cmake.exe"
 PATCHES_DIR=$HOME/patches
 
 BUILD_ALL="FALSE"
@@ -665,7 +664,7 @@ cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "soxr" ]; then
     find ../src/ -type d -name "soxr-*" | xargs -i cp -r {} ./soxr
     cd ./soxr
-    "${CMAKE_PATH}" -G "MSYS Makefiles" \
+    cmake -G "MSYS Makefiles" \
     -D BUILD_SHARED_LIBS:BOOL=FALSE \
     -D CMAKE_C_FLAGS_RELEASE:STRING="${BUILD_CCFLAGS}" \
     -D CMAKE_EXE_LINKER_FLAGS_RELEASE:STRING="${BUILD_LDFLAGS}" \

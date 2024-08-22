@@ -80,10 +80,10 @@ INSTALL_DIR=$BUILD_DIR/$TARGET_ARCH/build
 
 FFMPEG_DISABLE_ASM=""
 if [ $TARGET_ARCH = "x64" ]; then
-    BUILD_CCFLAGS="-mtune=skylake -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
+    BUILD_CCFLAGS="-mtune=alderlake -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
     BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
 elif [ $TARGET_ARCH = "x86" ]; then
-    BUILD_CCFLAGS="-m32 -mtune=skylake -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -mstackrealign -I${INSTALL_DIR}/include"
+    BUILD_CCFLAGS="-m32 -mtune=alderlake -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -mstackrealign -I${INSTALL_DIR}/include"
     BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
     #  libavcodec/h264_cabac.c: In function 'ff_h264_decode_mb_cabac': libavcodec/x86/cabac.h:192:5: error: 'asm' operand has impossible 対策
     FFMPEG_DISABLE_ASM="--disable-inline-asm"
@@ -107,7 +107,7 @@ fi
 BUILD_CCFLAGS="${BUILD_CCFLAGS} -DLIBXML_STATIC -DFRIBIDI_LIB_STATIC"
 
 # lameのstaticビルドに必要
-BUILD_CCFLAGS="-O3 ${BUILD_CCFLAGS} -DNCURSES_STATIC"
+BUILD_CCFLAGS="${BUILD_CCFLAGS} -DNCURSES_STATIC"
 
 # small build用のフラグと通常用のフラグ
 BUILD_CCFLAGS_SMALL="-Os -fno-unroll-loops ${BUILD_CCFLAGS}"
@@ -467,10 +467,6 @@ cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "fontconfig" ]; then
     find ../src/ -type d -name "fontconfig-*" | xargs -i cp -r {} ./fontconfig
     cd ./fontconfig
-    pip install lxml
-    #/c/ProgramAnother/python27/x86/Scripts/pip install lxml
-    #autoreconf -fvi
-    #pythonは2.7系を使用する
     autoreconf -fvi
     FREETYPE_CFLAGS=-I$INSTALL_DIR/include/freetype2 \
     FREETYPE_LIBS="-L$INSTALL_DIR/lib -lfreetype" \
@@ -931,7 +927,6 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH/$FFMPEG_DIR_NAME
 if [ $FOR_AUDENC = "TRUE" ]; then
-pwd
 PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
 ./configure \
 --prefix=${BUILD_DIR}/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH \

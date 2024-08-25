@@ -164,21 +164,21 @@ if [ "${PROFILE_GEN_CC}" != "" ]; then
     make -j${NJOBS}
 
     #profileのための実行はシングルスレッドで行う
-    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul "${Y4M_PATH}" --preset faster
-    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul "${Y4M_PATH}" --preset fast
-    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul "${Y4M_PATH}"
-    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul "${Y4M_PATH}" --preset slow
-    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul "${Y4M_PATH}" --preset slower
-    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul "${Y4M_PATH}" --output-depth 10 --preset faster
-    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul "${Y4M_PATH}" --output-depth 10 --preset fast
-    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul "${Y4M_PATH}" --output-depth 10
-    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul "${Y4M_PATH}" --output-depth 10 --preset slow
-    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul "${Y4M_PATH}" --output-depth 10 --preset slower
-    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul "${Y4M_PATH}" --output-depth 12 --preset faster
-    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul "${Y4M_PATH}" --output-depth 12 --preset fast
-    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul "${Y4M_PATH}" --output-depth 12
-    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul "${Y4M_PATH}" --output-depth 12 --preset slow
-    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul "${Y4M_PATH}" --output-depth 12 --preset slower
+    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul --input "${Y4M_PATH}" --preset faster
+    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul --input "${Y4M_PATH}" --preset fast
+    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul --input "${Y4M_PATH}"
+    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul --input "${Y4M_PATH}" --preset slow
+    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul --input "${Y4M_PATH}" --preset slower
+    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul --input "${Y4M_PATH}" --output-depth 10 --preset faster
+    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul --input "${Y4M_PATH}" --output-depth 10 --preset fast
+    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul --input "${Y4M_PATH}" --output-depth 10
+    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul --input "${Y4M_PATH}" --output-depth 10 --preset slow
+    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul --input "${Y4M_PATH}" --output-depth 10 --preset slower
+    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul --input "${Y4M_PATH}" --output-depth 12 --preset faster
+    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul --input "${Y4M_PATH}" --output-depth 12 --preset fast
+    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul --input "${Y4M_PATH}" --output-depth 12
+    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul --input "${Y4M_PATH}" --output-depth 12 --preset slow
+    ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/nul --input "${Y4M_PATH}" --output-depth 12 --preset slower
 
 fi
 

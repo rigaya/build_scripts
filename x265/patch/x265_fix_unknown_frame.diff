@@ -1,0 +1,13 @@
+diff --git a/source/abrEncApp.cpp b/source/abrEncApp.cpp
+index 0ae7e5800..b5a4acca2 100644
+--- a/source/abrEncApp.cpp
++++ b/source/abrEncApp.cpp
+@@ -678,7 +678,7 @@ ret:
+                         pic_in[view] = NULL;
+                     else if (readPicture(pic_in[view], view) && view == m_param->numViews - 1)
+                         inFrameCount++;
+-                    else if (!pic_in[view])
++                    else
+                         pic_in[view] = NULL;
+                     if (pic_in[view])
+                     {

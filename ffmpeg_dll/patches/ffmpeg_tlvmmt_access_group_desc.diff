@@ -1,0 +1,18 @@
+--- a/libavformat/mmtp.c
++++ b/libavformat/mmtp.c
+@@ -209,6 +209,7 @@
+ 
+ enum {
+     MPU_TIMESTAMP_DESCRIPTOR                  = 0x0001,
++    ASSET_GROUP_DESCRIPTOR                    = 0x8000,
+     ACCESS_CONTROL_DESCRIPTOR                 = 0x8004,
+     VIDEO_COMPONENT_DESCRIPTOR                = 0x8010,
+     MH_STREAM_IDENTIFIER_DESCRIPTOR           = 0x8011,
+@@ -663,6 +664,7 @@
+     case MPU_EXTENDED_TIMESTAMP_DESCRIPTOR:
+         return parse_mpu_extended_timestamp_descriptor(streams, gbc);
+     case ACCESS_CONTROL_DESCRIPTOR:
++    case ASSET_GROUP_DESCRIPTOR:
+         bytestream2_skipu(gbc, 2);
+         bytestream2_skip(gbc, bytestream2_get_byteu(gbc));
+         return 0;

@@ -120,8 +120,7 @@ if [ "${PROFILE_GEN_CC}" != "" ]; then
             -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
             -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
             -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_GEN_LD}"
-        make -j${NJOBS}
-        cp libx265.a ../8bit/libx265_main12.a
+        make -j${NJOBS} &
         X265_EXTRA_LIB="x265_main12"
     fi
 
@@ -141,12 +140,20 @@ if [ "${PROFILE_GEN_CC}" != "" ]; then
             -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
             -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
             -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_GEN_LD}"
-        make -j${NJOBS}
-        cp libx265.a ../8bit/libx265_main10.a
+        make -j${NJOBS} &
         X265_EXTRA_LIB="x265_main10;${X265_EXTRA_LIB}"
     fi
 
     cd ${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys/8bit
+	if [ $BUILD_10BIT = "ON" ] || [ $BUILD_12BIT = "ON" ]; then
+		wait
+		if [ $BUILD_10BIT = "ON" ]; then
+			cp ../10bit/libx265.a libx265_main10.a
+		fi
+		if [ $BUILD_12BIT = "ON" ]; then
+			cp ../12bit/libx265.a libx265_main12.a
+		fi
+	fi
     cmake -G "MSYS Makefiles" ../../../source \
         -DEXTRA_LIB="${X265_EXTRA_LIB}" \
         -DEXTRA_LINK_FLAGS=-L. \
@@ -206,7 +213,7 @@ if [ $BUILD_12BIT = "ON" ]; then
         -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
         -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
         -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_USE_LD}"
-    make -j${NJOBS}
+    make -j${NJOBS} &
     cp libx265.a ../8bit/libx265_main12.a
     X265_EXTRA_LIB="x265_main12"
 fi
@@ -225,12 +232,21 @@ if [ $BUILD_10BIT = "ON" ]; then
         -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
         -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
         -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_USE_LD}"
-    make -j${NJOBS}
+    make -j${NJOBS} &
     cp libx265.a ../8bit/libx265_main10.a
     X265_EXTRA_LIB="x265_main10;${X265_EXTRA_LIB}"
 fi
 
 cd ${BUILD_DIR}/${TARGET_ARCH}/x265/build/msys/8bit
+if [ $BUILD_10BIT = "ON" ] || [ $BUILD_12BIT = "ON" ]; then
+	wait
+	if [ $BUILD_10BIT = "ON" ]; then
+		cp ../10bit/libx265.a libx265_main10.a
+	fi
+	if [ $BUILD_12BIT = "ON" ]; then
+		cp ../12bit/libx265.a libx265_main12.a
+	fi
+fi
 cmake -G "MSYS Makefiles" ../../../source \
     -DEXTRA_LIB="${X265_EXTRA_LIB}" \
     -DEXTRA_LINK_FLAGS=-L. \

@@ -1,0 +1,26 @@
+--- Makefile_org	2017-12-29 15:03:57 +0900
++++ Makefile	2018-01-10 20:21:22 +0900
+@@ -351,6 +351,14 @@
+ OPT5 = --frames 50 --crf 24 -b3 -m10 -r3 --me tesa -t2
+ OPT6 = --frames 50 -q0 -m9 -r2 --me hex -Aall
+ OPT7 = --frames 50 -q0 -m2 -r1 --me hex --no-cabac
++OPT8 = --output-depth 10 --crf 30 -b1 -m1 -r1 --me dia --no-cabac --direct temporal --ssim --no-weightb
++OPT9 = --output-depth 10 --crf 16 -b2 -m3 -r3 --me hex --no-8x8dct --direct spatial --no-dct-decimate -t0  --slice-max-mbs 50
++OPT10 = --output-depth 10 --crf 26 -b4 -m5 -r2 --me hex --cqm jvt --nr 100 --psnr --no-mixed-refs --b-adapt 2 --slice-max-size 1500
++OPT11 = --output-depth 10 --crf 18 -b3 -m9 -r5 --me umh -t1 -A all --b-pyramid normal --direct auto --no-fast-pskip --no-mbtree
++OPT12 = --output-depth 10 --crf 22 -b3 -m7 -r4 --me esa -t2 -A all --psy-rd 1.0:1.0 --slices 4
++OPT13 = --output-depth 10 --frames 50 --crf 24 -b3 -m10 -r3 --me tesa -t2
++OPT14 = --output-depth 10 --frames 50 -q0 -m9 -r2 --me hex -Aall
++OPT15 = --output-depth 10 --frames 50 -q0 -m2 -r1 --me hex --no-cabac
+ 
+ ifeq (,$(VIDS))
+ fprofiled:
+@@ -361,7 +369,7 @@
+ fprofiled:
+ 	$(MAKE) clean
+ 	$(MAKE) x264$(EXE) CFLAGSPROF="$(PROF_GEN_CC)" LDFLAGSPROF="$(PROF_GEN_LD)"
+-	$(foreach V, $(VIDS), $(foreach I, 0 1 2 3 4 5 6 7, ./x264$(EXE) $(OPT$I) --threads 1 $(V) -o $(DEVNULL) ;))
++	$(foreach V, $(VIDS), $(foreach I, 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15, ./x264$(EXE) $(OPT$I) --threads 1 $(V) -o $(DEVNULL) ;))
+ ifeq ($(COMPILER),CL)
+ # Because Visual Studio timestamps the object files within the PGD, it fails to build if they change - only the executable should be deleted
+ 	rm -f x264$(EXE)

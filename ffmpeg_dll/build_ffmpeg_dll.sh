@@ -16,6 +16,10 @@
 #pacman -S gperf mingw32/mingw-w64-i686-python-lxml mingw64/mingw-w64-x86_64-python-lxml
 NJOBS=$NUMBER_OF_PROCESSORS
 PATCHES_DIR=$HOME/patches
+Y4M_PATH=$HOME/sakura_op_cut.y4m
+Y4M_10_PATH=$HOME/sakura_op_cut_10bit.y4m
+YUVFILE=$HOME/sakura_op_cut.yuv
+YUVFILE_10=$HOME/sakura_op_cut_10bit.yuv
 
 BUILD_ALL="FALSE"
 SSE4_2="FALSE"
@@ -25,21 +29,46 @@ FOR_FFMPEG4="FALSE"
 FOR_AUDENC="FALSE"
 ADD_TLVMMT="FALSE"
 BUILD_EXE="FALSE"
+ENABLE_GPL="FALSE"
 
 # [ bitrate, swscale, exe ]
 TARGET_BUILD=""
 
+while getopts ":-:at:ur" key; do
+  if [[ $key == - ]]; then
+    key=${OPTARG}
+    keyarg=${!OPTIND}
+  fi
 
-while getopts "ast:urm" OPT
-do
-  case $OPT in
-    "a" ) BUILD_ALL="TRUE" ;;
-    "s" ) SSE4_2="TRUE" ;;
-    "t" ) TARGET_BUILD=$OPTARG ;;
-    "u" ) UPDATE_FFMPEG="TRUE" ;;
-    "r" ) FOR_FFMPEG4="TRUE" ;;
-    "m" ) ADD_TLVMMT="TRUE" ;;
+  case $key in
+    mmttlv )
+      ADD_TLVMMT="TRUE"
+      ;;
+    enable-gpl )
+      ENABLE_GPL="TRUE"
+      ;;
+    a | all )
+      BUILD_ALL="TRUE"
+      ;;
+    u | update-ffmpeg )
+      UPDATE_FFMPEG="TRUE"
+      ;;
+    r )
+      FOR_FFMPEG4="TRUE"
+      ;;
+    t | target )
+      TARGET_BUILD=$keyarg
+      ;;
+    ? | *)
+      echo "help message"
+      exit 0
+      ;;
   esac
+
+  while [[ -n ${!OPTIND} && ${!OPTIND} != -* ]]; do
+      args+=(${!OPTIND})
+      OPTIND=$((OPTIND + 1))
+  done
 done
 
 
@@ -63,6 +92,13 @@ elif [ "$TARGET_BUILD" = "audenc" ]; then
     BUILD_EXE="TRUE"
 elif [ "$TARGET_BUILD" = "exe" ]; then
     BUILD_EXE="TRUE"
+fi
+
+if [ "$ENABLE_GPL" != "FALSE" ]; then
+  if [ "$BUILD_EXE" = "FALSE" ]; then
+    echo "--enable-gpl can be only used when --target exe is set."
+    exit 1
+  fi
 fi
 
 # [ "x86", "x64" ]
@@ -93,6 +129,12 @@ else
     echo "invalid TARGET_ARCH: ${TARGET_ARCH}"
     exit
 fi
+
+PROFILE_GEN_CC="-fprofile-generate -fprofile-partial-training"
+PROFILE_GEN_LD="-fprofile-generate -fprofile-partial-training"
+PROFILE_USE_CC="-fprofile-use"
+PROFILE_USE_LD="-fprofile-use"
+PROFILE_SVTAV1="-fprofile-correction"
 
 if [ "$FOR_FFMPEG4" = "TRUE" ]; then
     FFMPEG_DIR_NAME="ffmpeg4_dll"
@@ -325,6 +367,18 @@ fi
 if [ ! -d "dav1d-1.4.3" ]; then
     wget https://code.videolan.org/videolan/dav1d/-/archive/1.4.3/dav1d-1.4.3.tar.gz
     tar xf dav1d-1.4.3.tar.gz
+fi
+
+if [ $ENABLE_GPL = "TRUE" ]; then
+    if [ ! -d "x264" ]; then
+        git clone https://code.videolan.org/videolan/x264.git
+    fi
+    if [ ! -d "x265" ]; then
+        git clone https://bitbucket.org/multicoreware/x265_git.git x265
+    fi
+    if [ ! -d "svt-av1" ]; then
+        git clone https://gitlab.com/AOMediaCodec/SVT-AV1.git svt-av1
+    fi
 fi
 
 # --- 出力先を準備 --------------------------------------
@@ -838,6 +892,198 @@ if [ ! -d "nv-codec-headers" ]; then
     make PREFIX=$INSTALL_DIR install
 fi
 
+if [ $ENABLE_GPL = "TRUE" ]; then
+    cd $BUILD_DIR/$TARGET_ARCH
+    if [ ! -d "x264" ]; then
+        find ../src/ -type d -name "x264*" | xargs -i cp -r {} ./x264
+        cd x264
+        patch < $HOME/patches/x264_makefile.diff
+        PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+        ./configure \
+         --prefix=$INSTALL_DIR \
+         --enable-strip \
+         --disable-ffms \
+         --disable-gpac \
+         --disable-lavf \
+         --enable-static \
+         --disable-shared \
+         --bit-depth=all \
+         --extra-cflags="${BUILD_CCFLAGS}" \
+         --extra-ldflags="${BUILD_LDFLAGS}"
+        make fprofiled VIDS="${Y4M_PATH}" -j$NJOBS && make install
+    fi
+
+    cd $BUILD_DIR/$TARGET_ARCH
+    if [ ! -d "x265" ]; then
+        find ../src/ -type d -name "x265*" | xargs -i cp -r {} ./x265
+        cd x265
+        patch -p 1 < $HOME/patches/x265_version.diff
+        patch -p 1 < $HOME/patches/x265_zone_param.diff
+        patch -p 1 < $HOME/patches/x265_fix_unknown_frame.diff
+        mkdir build/msys2 && cd build/msys2
+        mkdir 8bit
+        mkdir 12bit && cd 12bit
+        cmake -G "MSYS Makefiles" ../../../source \
+            -DHIGH_BIT_DEPTH=ON \
+            -DEXPORT_C_API=OFF \
+            -DENABLE_SHARED=OFF \
+            -DENABLE_HDR10_PLUS=OFF \
+            -DENABLE_CLI=OFF \
+            -DMAIN12=ON \
+            -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
+            -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
+            -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS}"
+        make -j${NJOBS} &
+        
+        cd ../
+        mkdir 10bit && cd 10bit
+        cmake -G "MSYS Makefiles" ../../../source \
+            -DHIGH_BIT_DEPTH=ON \
+            -DEXPORT_C_API=OFF \
+            -DENABLE_SHARED=OFF \
+            -DENABLE_HDR10_PLUS=ON \
+            -DENABLE_CLI=OFF \
+            -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
+            -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
+            -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_GEN_LD}"
+        make -j${NJOBS} &
+
+        cd ../8bit
+        wait
+        cp ../10bit/libx265.a libx265_main10.a
+        cp ../12bit/libx265.a libx265_main12.a
+        X265_EXTRA_LIB="x265_main10;x265_main12"
+        cmake -G "MSYS Makefiles" ../../../source \
+            -DEXTRA_LIB="${X265_EXTRA_LIB}" \
+            -DEXTRA_LINK_FLAGS=-L. \
+            -DLINKED_10BIT=ON \
+            -DLINKED_12BIT=ON \
+            -DENABLE_SHARED=OFF \
+            -DENABLE_HDR10_PLUS=OFF \
+            -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+            -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
+            -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
+            -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_GEN_LD}"
+        make -j${NJOBS}
+
+        #profileのための実行はシングルスレッドで行う
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --preset faster
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --preset fast
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}"
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --preset slow
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --preset slower
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 10 --preset faster
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 10 --preset fast
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 10
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 10 --preset slow
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 10 --preset slower
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 12 --preset faster
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 12 --preset fast
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 12
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 12 --preset slow
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 12 --preset slower
+        
+        cd ../12bit
+        cmake -G "MSYS Makefiles" ../../../source \
+            -DHIGH_BIT_DEPTH=ON \
+            -DEXPORT_C_API=OFF \
+            -DENABLE_SHARED=OFF \
+            -DENABLE_HDR10_PLUS=OFF \
+            -DSTATIC_LINK_CRT=ON \
+            -DENABLE_CLI=OFF \
+            -DMAIN12=ON \
+            -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
+            -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
+            -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS}"
+        make -j${NJOBS} &
+        
+        cd ../10bit
+        cmake -G "MSYS Makefiles" ../../../source \
+            -DHIGH_BIT_DEPTH=ON \
+            -DEXPORT_C_API=OFF \
+            -DENABLE_SHARED=OFF \
+            -DENABLE_HDR10_PLUS=ON \
+            -DSTATIC_LINK_CRT=ON \
+            -DENABLE_CLI=OFF \
+            -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
+            -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
+            -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_GEN_LD}"
+        make -j${NJOBS} &
+
+        cd ../8bit
+        wait
+        cp ../10bit/libx265.a libx265_main10.a
+        cp ../12bit/libx265.a libx265_main12.a
+        X265_EXTRA_LIB="x265_main10;x265_main12"
+        cmake -G "MSYS Makefiles" ../../../source \
+            -DEXTRA_LIB="${X265_EXTRA_LIB}" \
+            -DEXTRA_LINK_FLAGS=-L. \
+            -DLINKED_10BIT=ON \
+            -DLINKED_12BIT=ON \
+            -DSTATIC_LINK_CRT=ON \
+            -DENABLE_SHARED=OFF \
+            -DENABLE_HDR10_PLUS=OFF \
+            -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+            -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
+            -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
+            -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_USE_LD}"
+        make -j${NJOBS}
+
+        mv libx265.a libx265_main.a
+        echo -n -e "create libx265.a\naddlib libx265_main.a\naddlib libx265_main10.a\naddlib libx265_main12.a\nsave\nend" | ar -M
+        make install
+        # static linkがうまくいくように書き換え
+        sed -i -e 's/^Libs.private:.*/Libs.private: -lstdc++/g' $INSTALL_DIR/lib/pkgconfig/x265.pc
+    fi
+
+    cd $BUILD_DIR/$TARGET_ARCH
+    if [ ! -d "svt-av1" ]; then
+        find ../src/ -type d -name "svt-av1*" | xargs -i cp -r {} ./svt-av1
+        cd svt-av1
+        mkdir build/msys2 && cd build/msys2
+        cmake -G "MSYS Makefiles" \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_SHARED_LIBS=OFF \
+          -DBUILD_TESTING=OFF \
+          -DNATIVE=OFF \
+          -DSVT_AV1_LTO=ON \
+          -DENABLE_NASM=ON \
+          -DENABLE_AVX512=ON \
+          -DCMAKE_ASM_NASM_COMPILER=nasm \
+          -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+          -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC} ${PROFILE_SVTAV1}" \
+          -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC} ${PROFILE_SVTAV1}" \
+          -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_GEN_LD} ${PROFILE_SVTAV1}" \
+          ../..
+        make -j${NUMBER_OF_PROCESSORS}
+
+        ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx512
+        ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 8 -n 30 --asm avx512
+        ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx2
+        ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 8 -n 30 --asm avx2
+        ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx512
+        ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 8 -n 30 --input-depth 10 --asm avx512
+        ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx2
+        ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 8 -n 30 --input-depth 10 --asm avx2
+
+        cmake -G "MSYS Makefiles" \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_SHARED_LIBS=OFF \
+          -DBUILD_TESTING=OFF \
+          -DNATIVE=OFF \
+          -DSVT_AV1_LTO=ON \
+          -DENABLE_NASM=ON \
+          -DENABLE_AVX512=ON \
+          -DCMAKE_ASM_NASM_COMPILER=nasm \
+          -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+          -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC} ${PROFILE_SVTAV1}" \
+          -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC} ${PROFILE_SVTAV1}" \
+          -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_USE_LD} ${PROFILE_SVTAV1}" \
+          ../..
+        make -j${NUMBER_OF_PROCESSORS} && make install
+    fi
+fi
+
 # cd $BUILD_DIR/$TARGET_ARCH
 # if [ ! -d "gmp" ]; then
     # find ../src/ -type d -name "gmp-*" | xargs -i cp -r {} ./gmp
@@ -882,45 +1128,50 @@ fi
 # sed -i.orig -e "/Libs.private:/s/$/ -lcrypt32/" lib/gnutls.pc
 # make install -j$NJOBS
 
-cd $BUILD_DIR/$TARGET_ARCH/ffmpeg_test
-if [ ! -e ./ffmpeg.exe ]; then
-    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-    ./configure \
-    --prefix=${INSTALL_DIR}/$FFMPEG_DIR_NAME \
-    --arch="${FFMPEG_ARCH}" \
-    --target-os="mingw32" \
-    $FFMPEG_DISABLE_ASM \
-    --disable-doc \
-    --disable-avdevice \
-    --disable-hwaccels \
-    --disable-devices \
-    --disable-debug \
-    --disable-network \
-    --disable-amd3dnow \
-    --disable-amd3dnowext \
-    --disable-xop \
-    --disable-fma4 \
-    --disable-bsfs \
-    --disable-aesni \
-    --enable-libvorbis \
-    --enable-libspeex \
-    --enable-libmp3lame \
-    --enable-libtwolame \
-    --enable-libsoxr \
-    --enable-libopus \
-    --extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
-    --extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib"
-    make -j$NJOBS
+if [ $BUILD_EXE != "TRUE" ]; then
+  cd $BUILD_DIR/$TARGET_ARCH/ffmpeg_test
+  if [ ! -e ./ffmpeg.exe ]; then
+      PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+      ./configure \
+      --prefix=${INSTALL_DIR}/$FFMPEG_DIR_NAME \
+      --arch="${FFMPEG_ARCH}" \
+      --target-os="mingw32" \
+      $FFMPEG_DISABLE_ASM \
+      --disable-doc \
+      --disable-avdevice \
+      --disable-hwaccels \
+      --disable-devices \
+      --disable-debug \
+      --disable-network \
+      --disable-amd3dnow \
+      --disable-amd3dnowext \
+      --disable-xop \
+      --disable-fma4 \
+      --disable-bsfs \
+      --disable-aesni \
+      --enable-libvorbis \
+      --enable-libspeex \
+      --enable-libmp3lame \
+      --enable-libtwolame \
+      --enable-libsoxr \
+      --enable-libopus \
+      --extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
+      --extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib"
+      make -j$NJOBS
+  fi
+  
+  ./ffmpeg.exe -encoders | grep '^ A.\{5\} ' | cut -d' ' -f3 > ffmpeg_audenc_list.txt
+  ./ffmpeg.exe -encoders | grep '^ S.\{5\} ' | cut -d' ' -f3 >> ffmpeg_audenc_list.txt
+  ./configure --list-encoders | tr '\t' '\n' | grep -v '^\s*$' | sort > ./configure_enc_list.txt
+  CONFIGURE_AUDENC_LIST=`python $HOME/build_get_audlist.py ffmpeg_audenc_list.txt ./configure_enc_list.txt`
+  
+  ./ffmpeg.exe -filters | grep -v 'V->' | grep -v '\->V' | cut -d' ' -f3 > ffmpeg_audfilter_list.txt
+  ./configure --list-filters | tr '\t' '\n' | grep -v '^\s*$' | sort > ./configure_filter_list.txt
+  CONFIGURE_AUDFILTER_LIST=`python $HOME/build_get_audlist.py ffmpeg_audfilter_list.txt ./configure_filter_list.txt`
+else
+  CONFIGURE_AUDENC_LIST=
+  CONFIGURE_AUDFILTER_LIST=
 fi
-
-./ffmpeg.exe -encoders | grep '^ A.\{5\} ' | cut -d' ' -f3 > ffmpeg_audenc_list.txt
-./ffmpeg.exe -encoders | grep '^ S.\{5\} ' | cut -d' ' -f3 >> ffmpeg_audenc_list.txt
-./configure --list-encoders | tr '\t' '\n' | grep -v '^\s*$' | sort > ./configure_enc_list.txt
-CONFIGURE_AUDENC_LIST=`python $HOME/build_get_audlist.py ffmpeg_audenc_list.txt ./configure_enc_list.txt`
-
-./ffmpeg.exe -filters | grep -v 'V->' | grep -v '\->V' | cut -d' ' -f3 > ffmpeg_audfilter_list.txt
-./configure --list-filters | tr '\t' '\n' | grep -v '^\s*$' | sort > ./configure_filter_list.txt
-CONFIGURE_AUDFILTER_LIST=`python $HOME/build_get_audlist.py ffmpeg_audfilter_list.txt ./configure_filter_list.txt`
 
 if [ $ENABLE_SWSCALE = "TRUE" ]; then
     SWSCALE_ARG="--enable-swscale"
@@ -933,7 +1184,13 @@ if [ $FOR_FFMPEG4 = "TRUE" ]; then
     FFMPEG5_CUDA_DISABLE_FLAGS=""
 else
     PKG_CONFIG_FLAGS="--pkg-config-flags=\"--static\""
-    FFMPEG5_CUDA_DISABLE_FLAGS=" --disable-cuda-nvcc --disable-cuda-llvm --disable-cuvid --disable-ffnvcodec --disable-nvdec --disable-nvenc "
+    FFMPEG5_CUDA_DISABLE_FLAGS=" --disable-cuda-nvcc --disable-cuda-llvm"
+fi
+
+if [ $ENABLE_GPL = "TRUE" ]; then
+  GPL_LIBS="--enable-gpl --enable-libx264 --enable-libx265 --enable-libsvtav1"
+else
+  GPL_LIBS=""
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH/$FFMPEG_DIR_NAME
@@ -948,6 +1205,7 @@ $PKG_CONFIG_FLAGS \
 --disable-doc \
 $SWSCALE_ARG \
 $FFMPEG_DISABLE_ASM \
+$GPL_LIBS \
 --disable-postproc \
 --disable-avdevice \
 --disable-hwaccels \
@@ -997,6 +1255,7 @@ $PKG_CONFIG_FLAGS \
 --disable-doc \
 $SWSCALE_ARG \
 $FFMPEG_DISABLE_ASM \
+$GPL_LIBS \
 --disable-postproc \
 --disable-outdevs \
 --disable-amd3dnow \
@@ -1042,6 +1301,7 @@ $PKG_CONFIG_FLAGS \
 --disable-doc \
 $SWSCALE_ARG \
 $FFMPEG_DISABLE_ASM \
+$GPL_LIBS \
 --disable-postproc \
 --disable-outdevs \
 --disable-debug \
@@ -1100,17 +1360,22 @@ cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.lib $BUILD_DIR/$FFMP
 cp -f -r $INSTALL_DIR/include/ass $BUILD_DIR/$FFMPEG_DIR_NAME/include
 
 cd $BUILD_DIR/src
-if [ ${UPDATE_FFMPEG} != "FALSE" ]; then
-    rm -f ffmpeg_lgpl_src.7z
-    echo "compressing src file..."
-    7z a -y -t7z -mx=9 -mmt=off -x\!'*.tar.gz' -x\!'*.tar.bz2' -x\!'*.zip' -x\!'*.tar.xz' -xr\!'.git' ffmpeg_lgpl_src.7z \
-     $BUILD_DIR/src/ffmpeg* $BUILD_DIR/src/opus* $BUILD_DIR/src/libogg* $BUILD_DIR/src/libvorbis* \
-     $BUILD_DIR/src/lame* $BUILD_DIR/src/libsndfile* $BUILD_DIR/src/twolame* $BUILD_DIR/src/soxr* $BUILD_DIR/src/speex* \
-     $BUILD_DIR/src/expat* $BUILD_DIR/src/freetype* $BUILD_DIR/src/libiconv* $BUILD_DIR/src/fontconfig* \
-     $BUILD_DIR/src/libpng* $BUILD_DIR/src/libass* $BUILD_DIR/src/bzip2* $BUILD_DIR/src/libbluray* \
-     $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libaribcaption* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* \
-     $BUILD_DIR/src/libvpl* $BUILD_DIR/src/libvpx* $BUILD_DIR/src/nv-codec-headers* \
-     $PATCHES_DIR/* \
-      > /dev/null
+SRC_7Z_FILENAME=ffmpeg_lgpl_src.7z
+SRC_GPL_LIBS=
+if [ ${ENABLE_GPL} != "FALSE" ]; then
+  SRC_7Z_FILENAME=ffmpeg_gpl_src.7z
+  SRC_GPL_LIBS="$BUILD_DIR/src/x264* $BUILD_DIR/src/x265* $BUILD_DIR/src/svt-av1*"
 fi
+rm -f ${SRC_7Z_FILENAME}
+echo "compressing src file..."
+7z a -y -t7z -mx=9 -mmt=off -x\!'*.tar.gz' -x\!'*.tar.bz2' -x\!'*.zip' -x\!'*.tar.xz' -xr\!'.git' ${SRC_7Z_FILENAME} \
+ $BUILD_DIR/src/ffmpeg* $BUILD_DIR/src/opus* $BUILD_DIR/src/libogg* $BUILD_DIR/src/libvorbis* \
+ $BUILD_DIR/src/lame* $BUILD_DIR/src/libsndfile* $BUILD_DIR/src/twolame* $BUILD_DIR/src/soxr* $BUILD_DIR/src/speex* \
+ $BUILD_DIR/src/expat* $BUILD_DIR/src/freetype* $BUILD_DIR/src/libiconv* $BUILD_DIR/src/fontconfig* \
+ $BUILD_DIR/src/libpng* $BUILD_DIR/src/libass* $BUILD_DIR/src/bzip2* $BUILD_DIR/src/libbluray* \
+ $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libaribcaption* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* \
+ $BUILD_DIR/src/libvpl* $BUILD_DIR/src/libvpx* $BUILD_DIR/src/nv-codec-headers* \
+ $SRC_GPL_LIBS \
+ $PATCHES_DIR/* \
+  > /dev/null
 

@@ -407,8 +407,8 @@ if [ $ADD_TLVMMT = "TRUE" ]; then
     cd $FFMPEG_DIR_NAME
     echo "Patch ffmpeg_tlvmmt.diff..."
     patch -p1 < $PATCHES_DIR/ffmpeg_tlvmmt.diff
-    echo "Patch ffmpeg_tlvmmt_access_group_desc.diff..."
-    patch -p1 < $PATCHES_DIR/ffmpeg_tlvmmt_access_group_desc.diff
+    echo "Patch ffmpeg_tlvmmt_asset_group_desc.diff..."
+    patch -p1 < $PATCHES_DIR/ffmpeg_tlvmmt_asset_group_desc.diff
     read -p "Check patch and hit enter: "
 fi
   

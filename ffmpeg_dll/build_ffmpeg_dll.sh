@@ -508,7 +508,8 @@ if [ ! -d "freetype" ]; then
     --disable-shared \
     --with-png=yes \
     --with-zlib=no \
-    --with-bzip2=yes
+    --with-bzip2=yes \
+    --with-brotli=no
     make -j$NJOBS && make install
     sed -i -e "s/ -lfreetype$/ -lfreetype -liconv -lpng -lbz2 -lz/g" $INSTALL_DIR/lib/pkgconfig/freetype2.pc
 fi

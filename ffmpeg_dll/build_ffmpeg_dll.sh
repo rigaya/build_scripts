@@ -14,6 +14,15 @@
 #pacman -S gtk-doc mingw64/mingw-w64-x86_64-ragel mingw32/mingw-w64-i686-ragel
 #fontconfigに必要
 #pacman -S gperf mingw32/mingw-w64-i686-python-lxml mingw64/mingw-w64-x86_64-python-lxml
+#libdoviに必要
+# curl -o rustup-init.exe -sSL https://win.rustup.rs/
+# ./rustup-init.exe -y --default-host=x86_64-pc-windows-gnu
+# rustup install stable --profile minimal
+# rustup default stable
+# rustup target add x86_64-pc-windows-gnu
+# cargo install cargo-c
+# Vulkan
+# pacman -S mingw-w64-i686-uasm mingw-w64-x86_64-uasm
 NJOBS=$NUMBER_OF_PROCESSORS
 PATCHES_DIR=$HOME/patches
 Y4M_PATH=$HOME/sakura_op_cut.y4m
@@ -118,10 +127,12 @@ INSTALL_DIR=$BUILD_DIR/$TARGET_ARCH/build
 
 FFMPEG_DISABLE_ASM=""
 if [ $TARGET_ARCH = "x64" ]; then
-    BUILD_CCFLAGS="-mtune=alderlake -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
+    #BUILD_CCFLAGS="-mtune=alderlake -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
+    BUILD_CCFLAGS="-mtune=alderlake -msse2 -mfpmath=sse -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
     BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
 elif [ $TARGET_ARCH = "x86" ]; then
-    BUILD_CCFLAGS="-m32 -mtune=alderlake -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -mstackrealign -I${INSTALL_DIR}/include"
+    #BUILD_CCFLAGS="-m32 -mtune=alderlake -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -mstackrealign -I${INSTALL_DIR}/include"
+    BUILD_CCFLAGS="-m32 -mtune=alderlake -msse2 -mfpmath=sse -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -mstackrealign -I${INSTALL_DIR}/include"
     BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
     #  libavcodec/h264_cabac.c: In function 'ff_h264_decode_mb_cabac': libavcodec/x86/cabac.h:192:5: error: 'asm' operand has impossible 対策
     FFMPEG_DISABLE_ASM="--disable-inline-asm"
@@ -189,14 +200,20 @@ if [ "$FOR_FFMPEG4" = "TRUE" ]; then
         tar xf ffmpeg-4.4.3.tar.xz
         mv ffmpeg-4.4.3 ffmpeg
     fi
-elif [ -d "ffmpeg" ]; then
+else
+    if [ ! -d "ffmpeg" ]; then
+        UPDATE_FFMPEG="TRUE"
+    fi
     if [ $UPDATE_FFMPEG != "FALSE" ]; then
-        cd ffmpeg
-        make uninstall && make distclean &> /dev/null
-        cd ..
-        if [ ! -d "ffmpeg/.git" ]; then
-            rm -rf ffmpeg
+        if [ ! -d "ffmpeg" ] || [ ! -d "ffmpeg/.git" ]; then
+            if [ -d "ffmpeg" ]; then
+                rm -rf ffmpeg
+            fi
             git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
+        else
+            cd ffmpeg
+            make uninstall && make distclean &> /dev/null
+            cd ..
         fi
         cd ffmpeg
         git fetch
@@ -209,10 +226,11 @@ elif [ -d "ffmpeg" ]; then
         #wget https://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2
         #tar xf ffmpeg-snapshot.tar.bz2
     fi
-else
-    wget https://ffmpeg.org/releases/ffmpeg-7.0.tar.xz
-    tar xf ffmpeg-7.0.tar.xz
-    mv ffmpeg-7.0 ffmpeg
+fi
+
+if [ ! -d "zlib-1.3.1" ]; then
+    wget https://www.zlib.net/zlib-1.3.1.tar.xz
+    tar xf zlib-1.3.1.tar.xz
 fi
 
 if [ ! -d "libpng-1.6.43" ]; then
@@ -369,6 +387,57 @@ if [ ! -d "dav1d-1.4.3" ]; then
     tar xf dav1d-1.4.3.tar.gz
 fi
 
+if [ ! -d "libxxhash-0.8.2" ]; then
+    wget -O libxxhash-0.8.2.tar.gz https://github.com/Cyan4973/xxHash/archive/refs/tags/v0.8.2.tar.gz
+    tar xf libxxhash-0.8.2.tar.gz
+    mv xxHash-0.8.2 libxxhash-0.8.2
+fi
+
+if [ ! -d "shaderc" ]; then
+    git clone https://github.com/google/shaderc shaderc
+    cd shaderc && git checkout tags/v2024.1 && python ./utils/git-sync-deps && cd ..
+fi
+
+if [ ! -d "SPIRV-Cross" ]; then
+    git clone https://github.com/KhronosGroup/SPIRV-Cross.git
+fi
+
+if [ ! -d "dovi_tool-2.1.2" ]; then
+    wget -O dovi_tool-2.1.2.tar.gz https://github.com/quietvoid/dovi_tool/archive/refs/tags/2.1.2.tar.gz
+    tar xf dovi_tool-2.1.2.tar.gz
+fi
+
+if [ ! -d "libjpeg-turbo-2.1.0" ]; then
+    wget https://github.com/winlibs/libjpeg/archive/refs/tags/libjpeg-turbo-2.1.0.tar.gz
+    tar xf libjpeg-turbo-2.1.0.tar.gz
+    mv libjpeg-libjpeg-turbo-2.1.0 libjpeg-turbo-2.1.0
+fi
+
+if [ ! -d "lcms2-2.16" ]; then
+    wget https://github.com/mm2/Little-CMS/releases/download/lcms2.16/lcms2-2.16.tar.gz
+    tar xf lcms2-2.16.tar.gz
+fi
+
+if [ ! -d "Vulkan-Loader-1.3.295" ]; then
+    wget -O Vulkan-Loader-v1.3.295.tar.gz https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/v1.3.295.tar.gz
+    tar xf Vulkan-Loader-v1.3.295.tar.gz
+fi
+
+# 依存関係は以下の通り
+# [ libjpeg -> lcms2 ], shaderc, SPIRV-Cross, dovi_tool, libxxhash, vulkan-loader -> libplacebo
+# shadercがあればglslangは不要
+if [ ! -d "libplacebo" ]; then
+    git clone --recursive https://code.videolan.org/videolan/libplacebo
+    cd libplacebo && git checkout tags/v7.349.0 && cd ..
+fi
+
+if [ $BUILD_EXE = "TRUE" ]; then
+    if [ ! -d "vvenc-1.12.0" ]; then
+        wget -O vvenc-v1.12.0.tar.gz https://github.com/fraunhoferhhi/vvenc/archive/refs/tags/v1.12.0.tar.gz
+        tar xf vvenc-v1.12.0.tar.gz
+    fi
+fi
+
 if [ $ENABLE_GPL = "TRUE" ]; then
     if [ ! -d "x264" ]; then
         git clone https://code.videolan.org/videolan/x264.git
@@ -429,6 +498,17 @@ fi
     # cp libz.a $INSTALL_DIR/lib/
     # cp zlib.h zconf.h $INSTALL_DIR/include/
 # fi
+
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "zlib" ]; then
+    find ../src/ -type d -name "zlib-*" | xargs -i cp -r {} ./zlib
+    cd ./zlib
+    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CXXFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    ./configure --static --prefix=$INSTALL_DIR
+    make -j$NJOBS && make install
+fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "bzip2" ]; then
@@ -894,6 +974,185 @@ if [ ! -d "nv-codec-headers" ]; then
     make PREFIX=$INSTALL_DIR install
 fi
 
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "libxxhash" ]; then
+    find ../src/ -type d -name "libxxhash-*" | xargs -i cp -r {} ./libxxhash
+    cd ./libxxhash
+    CC=gcc \
+    CXX=g++ \
+    CFLAGS="${BUILD_CCFLAGS} -DXXH_STATIC_LINKING_ONLY" \
+    CPPFLAGS="${BUILD_CCFLAGS} -DXXH_STATIC_LINKING_ONLY" \
+    LDFLAGS="${BUILD_LDFLAGS}" \
+    PREFIX=$INSTALL_DIR \
+    DISPATCH=1 \
+    make 
+    make install
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "dovi_tool" ]; then
+    find ../src/ -type d -name "dovi_tool-*" | xargs -i cp -r {} ./dovi_tool
+    cd ./dovi_tool/dolby_vision
+    cargo cinstall --release --prefix=$INSTALL_DIR
+fi
+
+#cd $BUILD_DIR/$TARGET_ARCH
+#if [ ! -d "glslang" ]; then
+#    find ../src/ -type d -name "glslang-*" | xargs -i cp -r {} ./glslang
+#    cd ./glslang
+#    ./update_glslang_sources.py
+#    mkdir -p build && cd build
+#    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+#    CFLAGS="${BUILD_CCFLAGS}" \
+#    CPPFLAGS="${BUILD_CCFLAGS}" \
+#    LDFLAGS="${BUILD_LDFLAGS}" \
+#    cmake ../ -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DINSTALL_GTEST=OFF -DGLSLANG_TESTS=OFF
+#    make -j$NJOBS && make install
+#fi
+
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "libjpeg-turbo" ]; then
+    find ../src/ -type d -name "libjpeg-*" | xargs -i cp -r {} ./libjpeg-turbo
+    cd ./libjpeg-turbo
+    mkdir build && cd build
+    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+    CFLAGS="${BUILD_CCFLAGS}" \
+    CPPFLAGS="${BUILD_CCFLAGS}" \
+    LDFLAGS="${BUILD_LDFLAGS}" \
+    cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DENABLE_SHARED=OFF -DENABLE_STATIC=ON ..
+    make -j$NJOBS && make install
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "lcms2" ]; then
+    find ../src/ -type d -name "lcms2*" | xargs -i cp -r {} ./lcms2
+    cd ./lcms2
+    CC=gcc \
+    CXX=g++ \
+    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+    CFLAGS="${BUILD_CCFLAGS}" \
+    CPPFLAGS="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include" \
+    LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
+    meson build --buildtype release --prefix=$INSTALL_DIR -Ddefault_library=static -Dprefer_static=true -Dstrip=true -Dthreaded=false -Dfastfloat=false
+    ninja -C build install
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "shaderc" ]; then
+    find ../src/ -type d -name "shaderc*" | xargs -i cp -r {} ./shaderc
+    cd ./shaderc
+    patch -p1 < $HOME/patches/shaderc_add_shaderc_util.diff
+    mkdir build && cd build
+    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+    CFLAGS="${BUILD_CCFLAGS}" \
+    CPPFLAGS="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include" \
+    LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
+    cmake -GNinja -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DBUILD_SHARED_LIBS=OFF -DSHADERC_SKIP_EXAMPLES=ON -DSHADERC_SKIP_TESTS=ON -DSHADERC_SKIP_COPYRIGHT_CHECK=ON -DINSTALL_GTEST=OFF ..
+    ninja
+    ninja install
+    mv -f ${INSTALL_DIR}/lib/pkgconfig/shaderc_static.pc ${INSTALL_DIR}/lib/pkgconfig/shaderc.pc
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "SPIRV-Cross" ]; then
+    find ../src/ -type d -name "SPIRV-Cross*" | xargs -i cp -r {} ./SPIRV-Cross
+    cd ./SPIRV-Cross
+    mkdir build && cd build
+    CC=gcc \
+    CXX=g++ \
+    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+    CFLAGS="${BUILD_CCFLAGS}" \
+    CPPFLAGS="${BUILD_CCFLAGS}" \
+    LDFLAGS="${BUILD_LDFLAGS}" \
+    cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DSPIRV_CROSS_ENABLE_TESTS=OFF -DSPIRV_CROSS_SHARED=OFF -DSPIRV_CROSS_CLI=OFF ..
+    make -j$NJOBS && make install
+    sed -i -e 's/-lspirv-cross-c/-lspirv-cross-c -lspirv-cross-msl -lspirv-cross-hlsl -lspirv-cross-cpp -lspirv-cross-glsl -lspirv-cross-util -lspirv-cross-core -lspirv-cross-reflect/g' ${INSTALL_DIR}/lib/pkgconfig/spirv-cross-c.pc
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "Vulkan-Loader" ]; then
+    find ../src/ -type d -name "Vulkan-Loader*" | xargs -i cp -r {} ./Vulkan-Loader
+    cd ./Vulkan-Loader
+    patch -p1 < $HOME/patches/vulkan_loader_static.diff
+    mkdir build && cd build
+    python ../scripts/update_deps.py --no-build
+    cd Vulkan-Headers
+    cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DVULKAN_HEADERS_ENABLE_MODULE=OFF
+    make -j$NJOBS && make install
+    cd ..
+    CC=gcc \
+    CXX=g++ \
+    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+    CFLAGS="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include -DUNIX=OFF -DSTRSAFE_NO_DEPRECATE" \
+    CPPFLAGS="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include -DUNIX=OFF -DSTRSAFE_NO_DEPRECATE" \
+    LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
+    cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DUNIX=OFF -DVULKAN_HEADERS_INSTALL_DIR=${INSTALL_DIR} ..
+    make -j$NJOBS && make install
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "libplacebo" ]; then
+    find ../src/ -type d -name "libplacebo*" | xargs -i cp -r {} ./libplacebo
+    cd ./libplacebo
+    patch -p1 < $HOME/patches/libplacebo_use_shaderc_combined.diff
+    patch -p1 < $HOME/patches/libplacebo_d3d11_build.diff
+    CC=gcc \
+    CXX=g++ \
+    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+    CFLAGS="${BUILD_CCFLAGS}" \
+    CPPFLAGS="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include" \
+    LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
+    meson build --buildtype release --prefix=$INSTALL_DIR -Dd3d11=enabled -Ddefault_library=static -Dprefer_static=true -Dstrip=true
+    ninja -C build install
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "libplacebo_dll" ]; then
+    find ../src/ -type d -name "libplacebo*" | xargs -i cp -r {} ./libplacebo_dll
+    cd ./libplacebo_dll
+    patch -p1 < $HOME/patches/libplacebo_use_shaderc_combined.diff
+    patch -p1 < $HOME/patches/libplacebo_d3d11_build.diff
+    CC=gcc \
+    CXX=g++ \
+    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+    CFLAGS="${BUILD_CCFLAGS}" \
+    CPPFLAGS="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include" \
+    LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
+    meson build --buildtype release --prefix=$INSTALL_DIR -Dd3d11=enabled -Ddefault_library=shared -Dprefer_static=false -Dstrip=true
+    ninja -C build
+
+    #dllからlib,defファイルを作成
+    cd build/src
+    LIBPLACEBO_DLL_FILENAME=$(basename `find ./libplacebo-*.dll`)
+    LIBPLACEBO_DEF_FILENAME=${LIBPLACEBO_DLL_FILENAME}.def
+    LIBPLACEBO_DEF_FILENAME=${LIBPLACEBO_DEF_FILENAME/.dll.def/.def}
+    echo "dumpbin.exe /exports ${LIBPLACEBO_DLL_FILENAME} > ${LIBPLACEBO_DEF_FILENAME}.tmp" > dumpbin.bat
+    eval "./dumpbin.bat"
+    echo "LIBRARY libplacebo" > ${LIBPLACEBO_DEF_FILENAME}
+    echo "EXPORTS" >> ${LIBPLACEBO_DEF_FILENAME}
+    sed -n '/ordinal hint/,/Summary/p' ${LIBPLACEBO_DEF_FILENAME}.tmp | sed '/ordinal hint\|^$\|Summary/d' | awk '{print " "$4}' >> ${LIBPLACEBO_DEF_FILENAME}
+    LIBPLACEBO_LIB_FILENAME=$(basename $LIBPLACEBO_DEF_FILENAME .def).lib
+    lib.exe -machine:$TARGET_ARCH -def:$LIBPLACEBO_DEF_FILENAME -out:$LIBPLACEBO_LIB_FILENAME
+    #cp `find ./.libs/libass-*.dll` .
+fi
+
+if [ $BUILD_EXE = "TRUE" ]; then
+    cd $BUILD_DIR/$TARGET_ARCH
+    if [ ! -d "vvenc" ]; then
+        find ../src/ -type d -name "vvenc*" | xargs -i cp -r {} ./vvenc
+        cd vvenc
+        mkdir build && cd build
+        CC=gcc \
+        CXX=g++ \
+        PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+        CFLAGS="${BUILD_CCFLAGS}" \
+        CPPFLAGS="${BUILD_CCFLAGS}" \
+        LDFLAGS="${BUILD_LDFLAGS}" \
+        cmake -G "MSYS Makefiles" -B build/release-static -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DVVENC_INSTALL_FULLFEATURE_APP=ON -DVVENC_ENABLE_THIRDPARTY_JSON=OFF ..
+        cmake --build build/release-static -j$NJOBS && cmake --build build/release-static --target install
+    fi
+fi
+
 if [ $ENABLE_GPL = "TRUE" ]; then
     cd $BUILD_DIR/$TARGET_ARCH
     if [ ! -d "x264" ]; then
@@ -921,7 +1180,6 @@ if [ $ENABLE_GPL = "TRUE" ]; then
         cd x265
         patch -p 1 < $HOME/patches/x265_version.diff
         patch -p 1 < $HOME/patches/x265_zone_param.diff
-        patch -p 1 < $HOME/patches/x265_fix_unknown_frame.diff
         mkdir build/msys2 && cd build/msys2
         mkdir 8bit
         mkdir 12bit && cd 12bit
@@ -1284,6 +1542,8 @@ $FFMPEG5_CUDA_DISABLE_FLAGS \
 --enable-libdav1d \
 --enable-libvpl \
 --enable-libvpx \
+--enable-libvvenc \
+--enable-libplacebo \
 --enable-ffnvcodec \
 --enable-nvdec \
 --enable-cuvid \
@@ -1361,9 +1621,18 @@ cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.def $BUILD_DIR/$FFMP
 cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.lib $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
 cp -f -r $INSTALL_DIR/include/ass $BUILD_DIR/$FFMPEG_DIR_NAME/include
 
+cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.dll $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
+cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.def $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
+cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.lib $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
+cp -f -r $INSTALL_DIR/include/libplacebo $BUILD_DIR/$FFMPEG_DIR_NAME/include
+
 cd $BUILD_DIR/src
 SRC_7Z_FILENAME=ffmpeg_lgpl_src.7z
 SRC_GPL_LIBS=
+SRC_EXE_LIBS=
+if [ $BUILD_EXE = "TRUE" ]; then
+    SRC_EXE_LIBS="$BUILD_DIR/src/vvenc*"
+fi
 if [ ${ENABLE_GPL} != "FALSE" ]; then
   SRC_7Z_FILENAME=ffmpeg_gpl_src.7z
   SRC_GPL_LIBS="$BUILD_DIR/src/x264* $BUILD_DIR/src/x265* $BUILD_DIR/src/svt-av1*"
@@ -1377,7 +1646,8 @@ echo "compressing src file..."
  $BUILD_DIR/src/libpng* $BUILD_DIR/src/libass* $BUILD_DIR/src/bzip2* $BUILD_DIR/src/libbluray* \
  $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libaribcaption* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* \
  $BUILD_DIR/src/libvpl* $BUILD_DIR/src/libvpx* $BUILD_DIR/src/nv-codec-headers* \
- $SRC_GPL_LIBS \
+ $BUILD_DIR/src/libxxhash* $BUILD_DIR/src/shaderc* $BUILD_DIR/src/SPIRV-Cross* \
+ $BUILD_DIR/src/dovi_tool* $BUILD_DIR/src/libjpeg-* $BUILD_DIR/src/lcms2* $BUILD_DIR/src/libplacebo* \
+ $SRC_GPL_LIBS $SRC_EXE_LIBS \
  $PATCHES_DIR/* \
   > /dev/null
-

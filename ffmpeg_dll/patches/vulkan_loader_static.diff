@@ -1,0 +1,137 @@
+--- a/loader/CMakeLists.txt
++++ b/loader/CMakeLists.txt
+@@ -378,31 +378,26 @@
+     if (NOT "$CACHE{BUILD_DLL_VERSIONINFO}" STREQUAL "")
+         set(RC_FILE_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/loader.rc)
+     endif()
+-
++    set(LOADER_UNKNOWN_CHAIN_LIBRARY $<$<TARGET_EXISTS:loader-unknown-chain>:$<TARGET_OBJECTS:loader-unknown-chain>>)
+     add_library(vulkan
+-                SHARED
++                STATIC
+                 ${NORMAL_LOADER_SRCS}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/${API_TYPE}-1.def
+-                ${RC_FILE_LOCATION})
+-
+-    target_link_libraries(vulkan PRIVATE loader_specific_options)
+-
+-    if(UNKNOWN_FUNCTIONS_SUPPORTED AND TARGET loader-unknown-chain)
+-        target_link_libraries(vulkan PRIVATE loader-unknown-chain)
+-    endif()
++                ${RC_FILE_LOCATION}
++                ${LOADER_UNKNOWN_CHAIN_LIBRARY})
+ 
+     # when adding the suffix the import and runtime library names must be consistent
+     # mingw: libvulkan-1.dll.a / vulkan-1.dll
+     # msvc: vulkan-1.lib / vulkan-1.dll
+-    set_target_properties(vulkan
+-                          PROPERTIES
+-                          OUTPUT_NAME ${API_TYPE}-1)
+-    if(MINGW)
+-        # generate the same DLL with mingw
+-        set_target_properties(vulkan
+-                              PROPERTIES
+-                              PREFIX "")
+-    endif()
++    #set_target_properties(vulkan
++    #                      PROPERTIES
++    #                      OUTPUT_NAME ${API_TYPE})
++    #if(MINGW)
++    #    # generate the same DLL with mingw
++    #    set_target_properties(vulkan
++    #                          PROPERTIES
++    #                          PREFIX "")
++    #endif()
+ 
+     if(MSVC AND ENABLE_WIN10_ONECORE)
+         target_link_libraries(vulkan PRIVATE OneCoreUAP.lib LIBCMT.LIB LIBCMTD.LIB LIBVCRUNTIME.LIB LIBUCRT.LIB)
+@@ -516,7 +511,7 @@
+ endif()
+ 
+ # common attributes of the vulkan library
+-target_link_libraries(vulkan PRIVATE loader_specific_options)
++target_link_libraries(vulkan PRIVATE $<BUILD_INTERFACE:loader_specific_options>)
+ 
+ target_link_libraries(vulkan PRIVATE Vulkan::Headers)
+ add_library(Vulkan::Loader ALIAS vulkan)
+@@ -549,14 +544,26 @@
+ # https://gitlab.kitware.com/cmake/cmake/-/issues/22621
+ find_package(PkgConfig)
+ if (PKG_CONFIG_FOUND)
+-    if(WIN32)
+-        if(MINGW)
+-            set(VULKAN_LIB_SUFFIX "-1.dll")
+-        else()
+-            set(VULKAN_LIB_SUFFIX "-1")
++    set(PRIVATE_LIBS "")
++    get_target_property(vulkan_privates vulkan LINK_LIBRARIES) # get the list of private libraries
++    foreach(LIB IN LISTS vulkan_privates)
++        if (NOT LIB MATCHES "<" AND NOT LIB MATCHES "::") # Don't include generator expressions and targets
++            list(APPEND PRIVATE_LIBS "-l${LIB}")
+         endif()
++    endforeach()
++    list(REMOVE_DUPLICATES PRIVATE_LIBS)
++    string(REPLACE ";" " " PRIVATE_LIBS "${PRIVATE_LIBS}")
++    if(PRIVATE_LIBS)
++        message(NOTICE "${PRIVATE_LIBS}")
+     endif()
+ 
++    #if(WIN32)
++    #    if(MINGW)
++    #        set(VULKAN_LIB_SUFFIX "-1.dll")
++    #    else()
++    #        set(VULKAN_LIB_SUFFIX "-1")
++    #    endif()
++    #endif()
+     # BUG: The following code will NOT work well with `cmake --install ... --prefix <dir>`
+     # due to this code relying on CMAKE_INSTALL_PREFIX being defined at configure time.
+     #
+--- a/loader/vulkan.pc.in
++++ b/loader/vulkan.pc.in
+@@ -7,4 +7,4 @@
+ Description: Vulkan Loader
+ Version: @VULKAN_LOADER_VERSION@
+-Libs: -L${libdir} -lvulkan@VULKAN_LIB_SUFFIX@
++Libs: -L${libdir} -lvulkan@VULKAN_LIB_SUFFIX@ @PRIVATE_LIBS@
+ Cflags: -I${includedir}
+--- a/loader/loader_windows.c
++++ b/loader/loader_windows.c
+@@ -95,6 +95,7 @@
+ #endif
+ }
+ 
++#if 0
+ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, LPVOID reserved) {
+     (void)hinst;
+     switch (reason) {
+@@ -112,6 +113,7 @@
+     }
+     return TRUE;
+ }
++#endif
+ 
+ bool windows_add_json_entry(const struct loader_instance *inst,
+                             char **reg_data,    // list of JSON files
+--- a/loader/vk_loader_platform.h
++++ b/loader/vk_loader_platform.h
+@@ -242,6 +242,20 @@
+ #define LOADER_PLATFORM_THREAD_ONCE_DECLARATION(var) pthread_once_t var = PTHREAD_ONCE_INIT;
+ #define LOADER_PLATFORM_THREAD_ONCE_EXTERN_DEFINITION(var) extern pthread_once_t var;
+ #define LOADER_PLATFORM_THREAD_ONCE(ctl, func) loader_platform_thread_once_fn(ctl, func);
++#elif defined(_WIN32)
++static BOOL CALLBACK loader_init_func(PINIT_ONCE InitOnce, PVOID Parameter, PVOID *Context) {
++    void (*func)(void) = (void (*)(void))Parameter;
++    func();
++    return TRUE;
++}
++static void loader_platform_thread_once_fn(void *ctl, void (*func)(void)) {
++    assert(func != NULL);
++    assert(ctl != NULL);
++    InitOnceExecuteOnce((PINIT_ONCE)ctl, loader_init_func, (void *)func, NULL);
++}
++#define LOADER_PLATFORM_THREAD_ONCE_DECLARATION(var) INIT_ONCE var = INIT_ONCE_STATIC_INIT;
++#define LOADER_PLATFORM_THREAD_ONCE_EXTERN_DEFINITION(var) extern INIT_ONCE var;
++#define LOADER_PLATFORM_THREAD_ONCE(ctl, func) loader_platform_thread_once_fn(ctl, func)
+ #else
+ #define LOADER_PLATFORM_THREAD_ONCE_DECLARATION(var)
+ #define LOADER_PLATFORM_THREAD_ONCE_EXTERN_DEFINITION(var)

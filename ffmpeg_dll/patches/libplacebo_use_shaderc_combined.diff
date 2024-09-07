@@ -1,0 +1,9 @@
+--- a/src/glsl/meson.build
++++ b/src/glsl/meson.build
+@@ -1,5 +1,5 @@
+ # shaderc
+-shaderc = dependency('shaderc', version: '>=2019.1', required: get_option('shaderc'))
++shaderc = dependency('shaderc_combined', version: '>=2019.1', required: get_option('shaderc'))
+ components.set('shaderc', shaderc.found())
+ if shaderc.found()
+   build_deps += shaderc

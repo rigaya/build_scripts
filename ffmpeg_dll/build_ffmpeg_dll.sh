@@ -831,7 +831,8 @@ if [ ! -d "libaribcaption" ]; then
     cmake --install .
     #sed -i -e 's/-lC:\//-l\/c\//g' ${INSTALL_DIR}/lib/pkgconfig/libaribcaption.pc
     #下記のように変更しないと適切にリンクできない
-    sed -i -e "s/-lC:\/ProgramAnother\/msys64\/${MINGWDIR}\/lib\/libstdc++.a/-lstdc++/g" ${INSTALL_DIR}/lib/pkgconfig/libaribcaption.pc
+    # -lC:/mingw64/mingw64/lib/libstdc+++.a -> -lstdc++
+    sed -i -e "s/-l[A-Z]:\/.\+\/lib\/libstdc++\.a/-lstdc++/g" ${INSTALL_DIR}/lib/pkgconfig/libaribcaption.pc
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH

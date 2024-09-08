@@ -1388,7 +1388,7 @@ fi
 # sed -i.orig -e "/Libs.private:/s/$/ -lcrypt32/" lib/gnutls.pc
 # make install -j$NJOBS
 
-if [ $BUILD_EXE != "TRUE" ]; then
+if [ $BUILD_EXE != "TRUE" ] || [ $FOR_AUDENC = "TRUE" ]; then
   cd $BUILD_DIR/$TARGET_ARCH/ffmpeg_test
   if [ ! -e ./ffmpeg.exe ]; then
       PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
@@ -1483,7 +1483,7 @@ $FFMPEG5_CUDA_DISABLE_FLAGS \
 --disable-bsfs \
 --enable-swresample \
 --disable-protocols \
---enable-protocol="file,pipe" \
+--enable-protocol="file,pipe,fd" \
 --disable-decoders \
 --enable-decoder="pcm*,adpcm*" \
 --disable-demuxers \

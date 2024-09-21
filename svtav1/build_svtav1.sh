@@ -31,8 +31,8 @@ else
 fi
 
 if [ $MSYSTEM == "CLANG64" ]; then
-	export CC=clang
-	export CXX=clang++
+    export CC=clang
+    export CXX=clang++
 fi
 
 INSTALL_DIR=$BUILD_DIR/$TARGET_ARCH/build
@@ -75,80 +75,37 @@ cmake -G "MSYS Makefiles" \
 make SvtAv1EncApp -j${NUMBER_OF_PROCESSORS}
 
 prof_files=()
+prof_idx=0
 
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx512
-for file in default_*_0.profraw; do
-  new_file="${file%.profraw}_1.${file##*.}"
-  mv "$file" "$new_file"
-  prof_files+=( ${new_file} )
-done
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 5 -n 30 --asm avx512
-for file in default_*_0.profraw; do
-  new_file="${file%.profraw}_2.${file##*.}"
-  mv "$file" "$new_file"
-  prof_files+=( ${new_file} )
-done
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 7 -n 60 --asm avx512
-for file in default_*_0.profraw; do
-  new_file="${file%.profraw}_3.${file##*.}"
-  mv "$file" "$new_file"
-  prof_files+=( ${new_file} )
-done
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx2
-for file in default_*_0.profraw; do
-  new_file="${file%.profraw}_4.${file##*.}"
-  mv "$file" "$new_file"
-  prof_files+=( ${new_file} )
-done
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 5 -n 30 --asm avx2
-for file in default_*_0.profraw; do
-  new_file="${file%.profraw}_5.${file##*.}"
-  mv "$file" "$new_file"
-  prof_files+=( ${new_file} )
-done
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 7 -n 60 --asm avx2
-for file in default_*_0.profraw; do
-  new_file="${file%.profraw}_6.${file##*.}"
-  mv "$file" "$new_file"
-  prof_files+=( ${new_file} )
-done
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx512
-for file in default_*_0.profraw; do
-  new_file="${file%.profraw}_7.${file##*.}"
-  mv "$file" "$new_file"
-  prof_files+=( ${new_file} )
-done
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 5 -n 30 --input-depth 10 --asm avx512
-for file in default_*_0.profraw; do
-  new_file="${file%.profraw}_8.${file##*.}"
-  mv "$file" "$new_file"
-  prof_files+=( ${new_file} )
-done
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 7 -n 60 --input-depth 10 --asm avx512
-for file in default_*_0.profraw; do
-  new_file="${file%.profraw}_9.${file##*.}"
-  mv "$file" "$new_file"
-  prof_files+=( ${new_file} )
-done
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx2
-for file in default_*_0.profraw; do
-  new_file="${file%.profraw}_10.${file##*.}"
-  mv "$file" "$new_file"
-  prof_files+=( ${new_file} )
-done
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 5 -n 30 --input-depth 10 --asm avx2
-for file in default_*_0.profraw; do
-  new_file="${file%.profraw}_11.${file##*.}"
-  mv "$file" "$new_file"
-  prof_files+=( ${new_file} )
-done
-../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 7 -n 60 --input-depth 10 --asm avx2
-for file in default_*_0.profraw; do
-  new_file="${file%.profraw}_12.${file##*.}"
-  mv "$file" "$new_file"
-  prof_files+=( ${new_file} )
-done
+function run_prof() {
+	../../Bin/Release/SvtAv1EncApp.exe $@
+	prof_idx=$((prof_idx + 1))
+	for file in default_*_0.profraw; do
+	  new_file="${file%.profraw}_${prof_idx}.${file##*.}"
+	  mv "$file" "$new_file"
+	  echo ${new_file}
+	  prof_files+=( ${new_file} )
+	done
+}
 
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset  4 -n 30 --asm avx512
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset  6 -n 30 --asm avx512
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset  8 -n 60 --asm avx512
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 12 -n 60 --asm avx512
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset  4 -n 30 --asm avx2
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset  6 -n 30 --asm avx2
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset  8 -n 60 --asm avx2
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 12 -n 60 --asm avx2
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset  4 -n 30 --input-depth 10 --asm avx512
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset  6 -n 30 --input-depth 10 --asm avx512
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset  8 -n 60 --input-depth 10 --asm avx512
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 12 -n 60 --input-depth 10 --asm avx512
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset  4 -n 30 --input-depth 10 --asm avx2
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset  6 -n 30 --input-depth 10 --asm avx2
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset  8 -n 60 --input-depth 10 --asm avx2
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 12 -n 60 --input-depth 10 --asm avx2
+
+echo ${prof_files[@]}
 llvm-profdata merge -output=default.profdata "${prof_files[@]}"
 
 PROFILE_USE_CC=${PROFILE_USE_CC}=`pwd`/default.profdata

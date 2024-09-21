@@ -1662,7 +1662,7 @@ echo "compressing src file..."
  $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libaribcaption* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* \
  $BUILD_DIR/src/libvpl* $BUILD_DIR/src/libvpx* $BUILD_DIR/src/nv-codec-headers* \
  $BUILD_DIR/src/libxxhash* $BUILD_DIR/src/shaderc* $BUILD_DIR/src/SPIRV-Cross* \
- $BUILD_DIR/src/dovi_tool* $BUILD_DIR/src/libjpeg-* $BUILD_DIR/src/lcms2* $BUILD_DIR/src/libplacebo* \
+ $BUILD_DIR/src/dovi_tool* $BUILD_DIR/src/libjpeg-* $BUILD_DIR/src/lcms2* $BUILD_DIR/src/libplacebo* $BUILD_DIR/src/Vulkan-Loader* \
  $SRC_GPL_LIBS $SRC_EXE_LIBS \
  $PATCHES_DIR/* \
   > /dev/null

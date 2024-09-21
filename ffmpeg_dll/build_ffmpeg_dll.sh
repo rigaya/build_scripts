@@ -39,6 +39,7 @@ FOR_AUDENC="FALSE"
 ADD_TLVMMT="FALSE"
 BUILD_EXE="FALSE"
 ENABLE_GPL="FALSE"
+ENABLE_LTO="FALSE"
 
 # [ bitrate, swscale, exe ]
 TARGET_BUILD=""
@@ -55,6 +56,9 @@ while getopts ":-:at:ur" key; do
       ;;
     enable-gpl )
       ENABLE_GPL="TRUE"
+      ;;
+    lto )
+      ENABLE_LTO="TRUE"
       ;;
     a | all )
       BUILD_ALL="TRUE"
@@ -80,19 +84,15 @@ while getopts ":-:at:ur" key; do
   done
 done
 
-
+BUILD_DIR=$HOME/build_ffmpeg
 if [ "$FOR_FFMPEG4" = "TRUE" ]; then
-    BUILD_DIR=$HOME/build_ffmpeg4_dll
-else
-    BUILD_DIR=$HOME/build_ffmpeg_dll
+    BUILD_DIR=${BUILD_DIR}4
 fi
 
-echo FOR_FFMPEG4=$FOR_FFMPEG4
-echo BUILD_DIR=$BUILD_DIR
+if [ $ENABLE_LTO = "TRUE" ]; then
+    BUILD_DIR=${BUILD_DIR}_lto
+fi
 
-mkdir -p $BUILD_DIR
-mkdir -p $BUILD_DIR/src
-cd $BUILD_DIR/src
 
 if [ "$TARGET_BUILD" = "swscale" ]; then
     ENABLE_SWSCALE="TRUE"
@@ -101,7 +101,19 @@ elif [ "$TARGET_BUILD" = "audenc" ]; then
     BUILD_EXE="TRUE"
 elif [ "$TARGET_BUILD" = "exe" ]; then
     BUILD_EXE="TRUE"
+    ENABLE_SWSCALE="TRUE"
 fi
+
+if [ $BUILD_EXE != "TRUE" ]; then
+    BUILD_DIR=${BUILD_DIR}_dll
+fi
+
+echo FOR_FFMPEG4=$FOR_FFMPEG4
+echo BUILD_DIR=$BUILD_DIR
+
+mkdir -p $BUILD_DIR
+mkdir -p $BUILD_DIR/src
+cd $BUILD_DIR/src
 
 if [ "$ENABLE_GPL" != "FALSE" ]; then
   if [ "$BUILD_EXE" = "FALSE" ]; then
@@ -126,19 +138,21 @@ fi
 INSTALL_DIR=$BUILD_DIR/$TARGET_ARCH/build
 
 FFMPEG_DISABLE_ASM=""
-if [ $TARGET_ARCH = "x64" ]; then
-    #BUILD_CCFLAGS="-mtune=alderlake -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
-    BUILD_CCFLAGS="-mtune=alderlake -msse2 -mfpmath=sse -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
-    BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
-elif [ $TARGET_ARCH = "x86" ]; then
-    #BUILD_CCFLAGS="-m32 -mtune=alderlake -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -mstackrealign -I${INSTALL_DIR}/include"
-    BUILD_CCFLAGS="-m32 -mtune=alderlake -msse2 -mfpmath=sse -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -mstackrealign -I${INSTALL_DIR}/include"
-    BUILD_LDFLAGS="-Wl,--gc-sections -Wl,--strip-all -static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
+#BUILD_CCFLAGS="-mtune=alderlake -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
+BUILD_CCFLAGS="-mtune=alderlake -msse2 -mfpmath=sse -fomit-frame-pointer -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
+BUILD_LDFLAGS="-Wl,--strip-all -static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
+if [ $TARGET_ARCH = "x86" ]; then
+    BUILD_CCFLAGS="${BUILD_CCFLAGS} -m32 -mstackrealign"
     #  libavcodec/h264_cabac.c: In function 'ff_h264_decode_mb_cabac': libavcodec/x86/cabac.h:192:5: error: 'asm' operand has impossible 対策
     FFMPEG_DISABLE_ASM="--disable-inline-asm"
+fi
+
+if [ $ENABLE_LTO = "TRUE" ]; then
+    BUILD_CCFLAGS="-flto -ffat-lto-objects ${BUILD_CCFLAGS}"
+    BUILD_LDFLAGS="-flto=auto ${BUILD_LDFLAGS}"
 else
-    echo "invalid TARGET_ARCH: ${TARGET_ARCH}"
-    exit
+    BUILD_CCFLAGS="-ffunction-sections ${BUILD_CCFLAGS}"
+    BUILD_LDFLAGS="-Wl,--gc-sections ${BUILD_LDFLAGS}"
 fi
 
 PROFILE_GEN_CC="-fprofile-generate -fprofile-partial-training"
@@ -192,6 +206,7 @@ echo FOR_AUDENC=$FOR_AUDENC
 echo ENABLE_SWSCALE=$ENABLE_SWSCALE
 echo FFMPEG_DIR_NAME=$FFMPEG_DIR_NAME
 echo BUILD_EXE=$BUILD_EXE
+echo ENABLE_LTO=$ENABLE_LTO
 
 #--- ソースのダウンロード ---------------------------------------
 if [ "$FOR_FFMPEG4" = "TRUE" ]; then
@@ -1173,6 +1188,10 @@ if [ $ENABLE_GPL = "TRUE" ]; then
     if [ ! -d "x264" ]; then
         find ../src/ -type d -name "x264*" | xargs -i cp -r {} ./x264
         cd x264
+        X264_ENABLE_LTO=
+        if [ $ENABLE_LTO = "TRUE" ]; then
+            X264_ENABLE_LTO=--enable-lto
+        fi
         patch < $HOME/patches/x264_makefile.diff
         PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
         ./configure \
@@ -1183,6 +1202,7 @@ if [ $ENABLE_GPL = "TRUE" ]; then
          --disable-lavf \
          --enable-static \
          --disable-shared \
+         $X264_ENABLE_LTO \
          --bit-depth=all \
          --extra-cflags="${BUILD_CCFLAGS}" \
          --extra-ldflags="${BUILD_LDFLAGS}"
@@ -1316,12 +1336,16 @@ if [ $ENABLE_GPL = "TRUE" ]; then
         find ../src/ -type d -name "svt-av1*" | xargs -i cp -r {} ./svt-av1
         cd svt-av1
         mkdir build/msys2 && cd build/msys2
+        SVTAV1_ENABLE_LTO=OFF
+        if [ $ENABLE_LTO = "TRUE" ]; then
+            SVTAV1_ENABLE_LTO=ON
+        fi
         cmake -G "MSYS Makefiles" \
           -DCMAKE_BUILD_TYPE=Release \
           -DBUILD_SHARED_LIBS=OFF \
           -DBUILD_TESTING=OFF \
           -DNATIVE=OFF \
-          -DSVT_AV1_LTO=ON \
+          -DSVT_AV1_LTO=$SVTAV1_ENABLE_LTO \
           -DENABLE_NASM=ON \
           -DENABLE_AVX512=ON \
           -DCMAKE_ASM_NASM_COMPILER=nasm \
@@ -1346,7 +1370,7 @@ if [ $ENABLE_GPL = "TRUE" ]; then
           -DBUILD_SHARED_LIBS=OFF \
           -DBUILD_TESTING=OFF \
           -DNATIVE=OFF \
-          -DSVT_AV1_LTO=ON \
+          -DSVT_AV1_LTO=$SVTAV1_ENABLE_LTO \
           -DENABLE_NASM=ON \
           -DENABLE_AVX512=ON \
           -DCMAKE_ASM_NASM_COMPILER=nasm \
@@ -1403,7 +1427,7 @@ fi
 # sed -i.orig -e "/Libs.private:/s/$/ -lcrypt32/" lib/gnutls.pc
 # make install -j$NJOBS
 
-if [ $BUILD_EXE != "TRUE" ] || [ $FOR_AUDENC = "TRUE" ]; then
+if [ $BUILD_EXE != "TRUE" ]; then
   cd $BUILD_DIR/$TARGET_ARCH/ffmpeg_test
   if [ ! -e ./ffmpeg.exe ]; then
       PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \

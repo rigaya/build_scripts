@@ -994,6 +994,13 @@ if [ ! -d "dovi_tool" ]; then
     find ../src/ -type d -name "dovi_tool-*" | xargs -i cp -r {} ./dovi_tool
     cd ./dovi_tool/dolby_vision
     cargo cinstall --release --prefix=$INSTALL_DIR
+    # dllを削除し、staticライブラリのみを残す
+    rm $INSTALL_DIR/lib/dovi.dll.a
+    rm $INSTALL_DIR/lib/dovi.def
+    rm $INSTALL_DIR/bin/dovi.dll
+    # static link向けにdovi.pcを編集
+    LIBDOVI_STATIC_LIBS=`awk -F':' '/^Libs.private:/{print $2}' ${INSTALL_DIR}/lib/pkgconfig/dovi.pc`
+    sed -i -e "s/-ldovi/-ldovi ${LIBDOVI_STATIC_LIBS}/g" ${INSTALL_DIR}/lib/pkgconfig/dovi.pc
 fi
 
 #cd $BUILD_DIR/$TARGET_ARCH

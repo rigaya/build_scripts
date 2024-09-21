@@ -1073,7 +1073,7 @@ if [ ! -d "SPIRV-Cross" ]; then
     LDFLAGS="${BUILD_LDFLAGS}" \
     cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DSPIRV_CROSS_ENABLE_TESTS=OFF -DSPIRV_CROSS_SHARED=OFF -DSPIRV_CROSS_CLI=OFF ..
     make -j$NJOBS && make install
-    sed -i -e 's/-lspirv-cross-c/-lspirv-cross-c -lspirv-cross-msl -lspirv-cross-hlsl -lspirv-cross-cpp -lspirv-cross-glsl -lspirv-cross-util -lspirv-cross-core -lspirv-cross-reflect/g' ${INSTALL_DIR}/lib/pkgconfig/spirv-cross-c.pc
+    sed -i -e 's/-lspirv-cross-c/-lspirv-cross-c -lspirv-cross-msl -lspirv-cross-hlsl -lspirv-cross-cpp -lspirv-cross-glsl -lspirv-cross-util -lspirv-cross-core -lspirv-cross-reflect -lstdc++/g' ${INSTALL_DIR}/lib/pkgconfig/spirv-cross-c.pc
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
@@ -1111,6 +1111,10 @@ if [ ! -d "libplacebo" ]; then
     LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
     meson build --buildtype release --prefix=$INSTALL_DIR -Dd3d11=enabled -Ddefault_library=static -Dprefer_static=true -Dstrip=true
     ninja -C build install
+    #下記のように変更しないと適切にリンクできない
+    # C:/mingw64/mingw64/lib/libshlwapi.a -> -llibshlwapi
+    sed -i -e "s/[A-Z]:\/.\+\/lib\/libshlwapi\.a/-lshlwapi/g" ${INSTALL_DIR}/lib/pkgconfig/libplacebo.pc
+    sed -i -e "s/[A-Z]:\/.\+\/lib\/libversion\.a/-lversion/g" ${INSTALL_DIR}/lib/pkgconfig/libplacebo.pc
 fi
 
 if [ $BUILD_EXE != "TRUE" ]; then

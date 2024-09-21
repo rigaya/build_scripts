@@ -1113,34 +1113,38 @@ if [ ! -d "libplacebo" ]; then
     ninja -C build install
 fi
 
-cd $BUILD_DIR/$TARGET_ARCH
-if [ ! -d "libplacebo_dll" ]; then
-    find ../src/ -type d -name "libplacebo*" | xargs -i cp -r {} ./libplacebo_dll
-    cd ./libplacebo_dll
-    patch -p1 < $HOME/patches/libplacebo_use_shaderc_combined.diff
-    patch -p1 < $HOME/patches/libplacebo_d3d11_build.diff
-    CC=gcc \
-    CXX=g++ \
-    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-    CFLAGS="${BUILD_CCFLAGS}" \
-    CPPFLAGS="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include" \
-    LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
-    meson build --buildtype release --prefix=$INSTALL_DIR -Dd3d11=enabled -Ddefault_library=shared -Dprefer_static=false -Dstrip=true
-    ninja -C build
+if [ $BUILD_EXE != "TRUE" ]; then
+    cd $BUILD_DIR/$TARGET_ARCH
+    if [ ! -d "libplacebo_dll" ]; then
+        find ../src/ -type d -name "libplacebo*" | xargs -i cp -r {} ./libplacebo_dll
+        cd ./libplacebo_dll
+        patch -p1 < $HOME/patches/libplacebo_use_shaderc_combined.diff
+        patch -p1 < $HOME/patches/libplacebo_d3d11_build.diff
+        CC=gcc \
+        CXX=g++ \
+        PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+        CFLAGS="${BUILD_CCFLAGS}" \
+        CPPFLAGS="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include" \
+        LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
+        meson build --buildtype release --prefix=$INSTALL_DIR -Dd3d11=enabled -Ddefault_library=shared -Dprefer_static=false -Dstrip=true
+        ninja -C build
 
-    #dllからlib,defファイルを作成
-    cd build/src
-    LIBPLACEBO_DLL_FILENAME=$(basename `find ./libplacebo-*.dll`)
-    LIBPLACEBO_DEF_FILENAME=${LIBPLACEBO_DLL_FILENAME}.def
-    LIBPLACEBO_DEF_FILENAME=${LIBPLACEBO_DEF_FILENAME/.dll.def/.def}
-    echo "dumpbin.exe /exports ${LIBPLACEBO_DLL_FILENAME} > ${LIBPLACEBO_DEF_FILENAME}.tmp" > dumpbin.bat
-    eval "./dumpbin.bat"
-    echo "LIBRARY libplacebo" > ${LIBPLACEBO_DEF_FILENAME}
-    echo "EXPORTS" >> ${LIBPLACEBO_DEF_FILENAME}
-    sed -n '/ordinal hint/,/Summary/p' ${LIBPLACEBO_DEF_FILENAME}.tmp | sed '/ordinal hint\|^$\|Summary/d' | awk '{print " "$4}' >> ${LIBPLACEBO_DEF_FILENAME}
-    LIBPLACEBO_LIB_FILENAME=$(basename $LIBPLACEBO_DEF_FILENAME .def).lib
-    lib.exe -machine:$TARGET_ARCH -def:$LIBPLACEBO_DEF_FILENAME -out:$LIBPLACEBO_LIB_FILENAME
-    #cp `find ./.libs/libass-*.dll` .
+        #dllからlib,defファイルを作成
+        cd build/src
+        LIBPLACEBO_DLL_FILENAME=$(basename `find ./libplacebo-*.dll`)
+        LIBPLACEBO_DLL_FILENAME_WITHOUT_EXT=${LIBPLACEBO_DLL_FILENAME/.dll/}
+        LIBPLACEBO_DEF_FILENAME=${LIBPLACEBO_DLL_FILENAME}.def
+        LIBPLACEBO_DEF_FILENAME=${LIBPLACEBO_DEF_FILENAME/.dll.def/.def}
+        echo ${LIBPLACEBO_DLL_FILENAME_WITHOUT_EXT}
+        echo "dumpbin.exe /exports ${LIBPLACEBO_DLL_FILENAME} > ${LIBPLACEBO_DEF_FILENAME}.tmp" > dumpbin.bat
+        eval "./dumpbin.bat"
+        echo "LIBRARY ${LIBPLACEBO_DLL_FILENAME_WITHOUT_EXT}" > ${LIBPLACEBO_DEF_FILENAME}
+        echo "EXPORTS" >> ${LIBPLACEBO_DEF_FILENAME}
+        sed -n '/ordinal hint/,/Summary/p' ${LIBPLACEBO_DEF_FILENAME}.tmp | sed '/ordinal hint\|^$\|Summary/d' | awk '{print " "$4}' >> ${LIBPLACEBO_DEF_FILENAME}
+        LIBPLACEBO_LIB_FILENAME=$(basename $LIBPLACEBO_DEF_FILENAME .def).lib
+        lib.exe -machine:$TARGET_ARCH -def:$LIBPLACEBO_DEF_FILENAME -out:$LIBPLACEBO_LIB_FILENAME
+        #cp `find ./.libs/libass-*.dll` .
+    fi
 fi
 
 if [ $BUILD_EXE = "TRUE" ]; then

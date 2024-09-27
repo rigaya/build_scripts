@@ -31,8 +31,8 @@ else
 fi
 
 if [ $MSYSTEM == "CLANG64" ]; then
-    export CC=clang
-    export CXX=clang++
+	export CC=clang
+	export CXX=clang++
 fi
 
 INSTALL_DIR=$BUILD_DIR/$TARGET_ARCH/build
@@ -74,6 +74,7 @@ cmake -G "MSYS Makefiles" \
 
 make SvtAv1EncApp -j${NUMBER_OF_PROCESSORS}
 
+
 prof_files=()
 prof_idx=0
 
@@ -88,18 +89,22 @@ function run_prof() {
 	done
 }
 
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset  2 -n 30 --asm avx512
 run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset  4 -n 30 --asm avx512
 run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset  6 -n 30 --asm avx512
 run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset  8 -n 60 --asm avx512
 run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 12 -n 60 --asm avx512
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset  2 -n 30 --asm avx2
 run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset  4 -n 30 --asm avx2
 run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset  6 -n 30 --asm avx2
 run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset  8 -n 60 --asm avx2
 run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 12 -n 60 --asm avx2
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset  2 -n 30 --input-depth 10 --asm avx512
 run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset  4 -n 30 --input-depth 10 --asm avx512
 run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset  6 -n 30 --input-depth 10 --asm avx512
 run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset  8 -n 60 --input-depth 10 --asm avx512
 run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 12 -n 60 --input-depth 10 --asm avx512
+run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset  2 -n 30 --input-depth 10 --asm avx2
 run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset  4 -n 30 --input-depth 10 --asm avx2
 run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset  6 -n 30 --input-depth 10 --asm avx2
 run_prof -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset  8 -n 60 --input-depth 10 --asm avx2

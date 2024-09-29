@@ -1016,6 +1016,13 @@ if [ ! -d "dovi_tool" ]; then
     # static link向けにdovi.pcを編集
     LIBDOVI_STATIC_LIBS=`awk -F':' '/^Libs.private:/{print $2}' ${INSTALL_DIR}/lib/pkgconfig/dovi.pc`
     sed -i -e "s/-ldovi/-ldovi ${LIBDOVI_STATIC_LIBS}/g" ${INSTALL_DIR}/lib/pkgconfig/dovi.pc
+
+    #dllからlibファイルを作成
+    cd target/x86_64-pc-windows-gnu/release
+    DOVI_DLL_FILENAME=dovi.dll
+    DOVI_DEF_FILENAME=dovi.def
+    DOVI_LIB_FILENAME=$(basename $DOVI_DEF_FILENAME .def).lib
+    lib.exe -machine:$TARGET_ARCH -def:$DOVI_DEF_FILENAME -out:$DOVI_LIB_FILENAME
 fi
 
 #cd $BUILD_DIR/$TARGET_ARCH
@@ -1664,6 +1671,11 @@ cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.dll $BUIL
 cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.def $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
 cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.lib $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
 cp -f -r $INSTALL_DIR/include/libplacebo $BUILD_DIR/$FFMPEG_DIR_NAME/include
+
+cp -f -r $BUILD_DIR/$TARGET_ARCH/dovi_tool/dolby_vision/target/x86_64-pc-windows-gnu/release/dovi.dll $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
+cp -f -r $BUILD_DIR/$TARGET_ARCH/dovi_tool/dolby_vision/target/x86_64-pc-windows-gnu/release/dovi.def $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
+cp -f -r $BUILD_DIR/$TARGET_ARCH/dovi_tool/dolby_vision/target/x86_64-pc-windows-gnu/release/dovi.lib $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
+cp -f -r $INSTALL_DIR/include/libdovi $BUILD_DIR/$FFMPEG_DIR_NAME/include
 
 cd $BUILD_DIR/src
 SRC_7Z_FILENAME=ffmpeg_lgpl_src.7z

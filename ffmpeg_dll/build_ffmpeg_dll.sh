@@ -454,6 +454,10 @@ if [ $BUILD_EXE = "TRUE" ]; then
 fi
 
 if [ $ENABLE_GPL = "TRUE" ]; then
+    if [ ! -d "xvidcore" ]; then
+        wget https://downloads.xvid.com/downloads/xvidcore-1.3.7.tar.gz
+        tar xf xvidcore-1.3.7.tar.gz
+    fi
     if [ ! -d "x264" ]; then
         git clone https://code.videolan.org/videolan/x264.git
     fi
@@ -1388,6 +1392,21 @@ if [ $ENABLE_GPL = "TRUE" ]; then
           ../..
         make -j${NUMBER_OF_PROCESSORS} && make install
     fi
+    
+    cd $BUILD_DIR/$TARGET_ARCH
+    if [ ! -d "xvidcore" ]; then
+        find ../src/ -type d -name "xvidcore*" | xargs -i cp -r {} ./xvidcore
+        cd xvidcore/build/generic
+        ./configure --help
+        ./bootstrap.sh
+        CFLAGS=${BUILD_CCFLAGS} \
+        CPPFLAGS=${BUILD_CCFLAGS} \
+        LDFLAGS=${BUILD_LDFLAGS} \
+        ./configure --prefix=$INSTALL_DIR
+        make -j${NUMBER_OF_PROCESSORS}
+        cp ../../src/xvid.h $INSTALL_DIR/include/
+        cp '=build/xvidcore.a' $INSTALL_DIR/lib/libxvidcore.a
+    fi
 fi
 
 # cd $BUILD_DIR/$TARGET_ARCH
@@ -1494,7 +1513,7 @@ else
 fi
 
 if [ $ENABLE_GPL = "TRUE" ]; then
-  GPL_LIBS="--enable-gpl --enable-libx264 --enable-libx265 --enable-libsvtav1"
+  GPL_LIBS="--enable-gpl --enable-libx264 --enable-libx265 --enable-libsvtav1 --enable-libxvid"
 else
   GPL_LIBS=""
 fi
@@ -1686,7 +1705,7 @@ if [ $BUILD_EXE = "TRUE" ]; then
 fi
 if [ ${ENABLE_GPL} != "FALSE" ]; then
   SRC_7Z_FILENAME=ffmpeg_gpl_src.7z
-  SRC_GPL_LIBS="$BUILD_DIR/src/x264* $BUILD_DIR/src/x265* $BUILD_DIR/src/svt-av1*"
+  SRC_GPL_LIBS="$BUILD_DIR/src/x264* $BUILD_DIR/src/x265* $BUILD_DIR/src/svt-av1* $BUILD_DIR/src/xvidcore*"
 fi
 rm -f ${SRC_7Z_FILENAME}
 echo "compressing src file..."

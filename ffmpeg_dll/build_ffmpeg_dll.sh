@@ -597,6 +597,8 @@ if [ ! -d "freetype" ]; then
     #Ç†ÇÈÇ¢ÇÕconfigureå„Ç…ÅAbuild/unix/unix-cc.mkì‡ÇÃ
     #CFLAGSÇ©ÇÁ-IC:/.../MSYS/includeÇ∆LDFLAGSÇÃ-LC:/.../MSYS/libÇè¡Ç∑
     cd ./freetype
+    ZLIB_CFLAGS=" -I${INSTALL_DIR}/include" \
+    ZLIB_LIBS="-L${INSTALL_DIR}/lib -lz" \
     BZIP2_CFLAGS=" -I${INSTALL_DIR}/include" \
     BZIP2_LIBS="-L${INSTALL_DIR}/lib -lbz2" \
     LIBPNG_CFLAGS=" -I${INSTALL_DIR}/include" \
@@ -609,7 +611,7 @@ if [ ! -d "freetype" ]; then
     --enable-static \
     --disable-shared \
     --with-png=yes \
-    --with-zlib=no \
+    --with-zlib=yes \
     --with-bzip2=yes \
     --with-brotli=no
     make -j$NJOBS && make install

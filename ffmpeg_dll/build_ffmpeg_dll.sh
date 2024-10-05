@@ -223,24 +223,24 @@ else
         UPDATE_FFMPEG="TRUE"
     fi
     if [ $UPDATE_FFMPEG != "FALSE" ]; then
-        if [ ! -d "ffmpeg" ] || [ ! -d "ffmpeg/.git" ]; then
-            if [ -d "ffmpeg" ]; then
-                rm -rf ffmpeg
-            fi
-            git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
-        else
-            cd ffmpeg
-            make uninstall && make distclean &> /dev/null
-            cd ..
-        fi
-        cd ffmpeg
-        git fetch
-        git reset --hard
-        git checkout -b build 9d15fe77e33b757c75a4186fa049857462737713
-        cd ..
-        #wget https://ffmpeg.org/releases/ffmpeg-7.0.tar.xz
-        #tar xf ffmpeg-7.0.tar.xz
-        #mv ffmpeg-7.0 ffmpeg
+        #if [ ! -d "ffmpeg" ] || [ ! -d "ffmpeg/.git" ]; then
+        #    if [ -d "ffmpeg" ]; then
+        #        rm -rf ffmpeg
+        #    fi
+        #    git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
+        #else
+        #    cd ffmpeg
+        #    make uninstall && make distclean &> /dev/null
+        #    cd ..
+        #fi
+        #cd ffmpeg
+        #git fetch
+        #git reset --hard
+        #git checkout -b build 9d15fe77e33b757c75a4186fa049857462737713
+        #cd ..
+        wget https://ffmpeg.org/releases/ffmpeg-7.1.tar.xz
+        tar xf ffmpeg-7.1.tar.xz
+        mv ffmpeg-7.1 ffmpeg
         #wget https://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2
         #tar xf ffmpeg-snapshot.tar.bz2
     fi
@@ -251,9 +251,9 @@ if [ ! -d "zlib-1.3.1" ]; then
     tar xf zlib-1.3.1.tar.xz
 fi
 
-if [ ! -d "libpng-1.6.43" ]; then
-    wget https://download.sourceforge.net/libpng/libpng-1.6.43.tar.xz
-    tar xf libpng-1.6.43.tar.xz
+if [ ! -d "libpng-1.6.44" ]; then
+    wget https://download.sourceforge.net/libpng/libpng-1.6.44.tar.xz
+    tar xf libpng-1.6.44.tar.xz
 fi
 
 if [ ! -d "bzip2-1.0.8" ]; then
@@ -365,9 +365,9 @@ if [ ! -d "libaribcaption-1.1.1" ]; then
     tar xf libaribcaption-1.1.1.tar.gz
 fi
 
-if [ ! -d "libvpl-2.12.0" ]; then
-    wget -O libvpl-2.12.0.tar.gz https://github.com/intel/libvpl/archive/refs/tags/v2.12.0.tar.gz
-    tar xf libvpl-2.12.0.tar.gz
+if [ ! -d "libvpl-2.13.0" ]; then
+    wget -O libvpl-2.13.0.tar.gz https://github.com/intel/libvpl/archive/refs/tags/v2.13.0.tar.gz
+    tar xf libvpl-2.13.0.tar.gz
 fi
 
 if [ ! -d "nv-codec-headers-12.2.72.0" ]; then
@@ -475,8 +475,9 @@ if [ $ENABLE_GPL = "TRUE" ]; then
     if [ ! -d "x264" ]; then
         git clone https://code.videolan.org/videolan/x264.git
     fi
-    if [ ! -d "x265" ]; then
-        git clone https://bitbucket.org/multicoreware/x265_git.git x265
+    if [ ! -d "x265_4.0" ]; then
+        wget https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.0.tar.gz
+        tar xf x265_4.0.tar.gz
     fi
     if [ ! -d "svt-av1" ]; then
         git clone https://gitlab.com/AOMediaCodec/SVT-AV1.git svt-av1

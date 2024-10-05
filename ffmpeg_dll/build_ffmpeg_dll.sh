@@ -411,6 +411,11 @@ if [ ! -d "libxxhash-0.8.2" ]; then
     mv xxHash-0.8.2 libxxhash-0.8.2
 fi
 
+if [ ! -d "glslang-15.0.0" ]; then
+    wget -O glslang-15.0.0.tar.gz https://github.com/KhronosGroup/glslang/archive/refs/tags/15.0.0.tar.gz
+    tar xf glslang-15.0.0.tar.gz
+fi
+
 if [ ! -d "shaderc" ]; then
     git clone https://github.com/google/shaderc shaderc
     cd shaderc && git checkout tags/v2024.1 && python ./utils/git-sync-deps && cd ..
@@ -439,6 +444,12 @@ fi
 if [ ! -d "Vulkan-Loader-1.3.295" ]; then
     wget -O Vulkan-Loader-v1.3.295.tar.gz https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/v1.3.295.tar.gz
     tar xf Vulkan-Loader-v1.3.295.tar.gz
+fi
+
+if [ ! -d "zimg-3.0.5" ]; then
+    wget -O zimg-3.0.5.tar.gz https://github.com/sekrit-twc/zimg/archive/refs/tags/release-3.0.5.tar.gz
+    tar xf zimg-3.0.5.tar.gz
+    mv zimg-release-3.0.5 zimg-3.0.5
 fi
 
 # ˆË‘¶ŠÖŒW‚ÍˆÈ‰º‚Ì’Ê‚è
@@ -1034,19 +1045,21 @@ if [ ! -d "dovi_tool" ]; then
     #lib.exe -machine:$TARGET_ARCH -def:$DOVI_DEF_FILENAME -out:$DOVI_LIB_FILENAME
 fi
 
-#cd $BUILD_DIR/$TARGET_ARCH
-#if [ ! -d "glslang" ]; then
-#    find ../src/ -type d -name "glslang-*" | xargs -i cp -r {} ./glslang
-#    cd ./glslang
-#    ./update_glslang_sources.py
-#    mkdir -p build && cd build
-#    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-#    CFLAGS="${BUILD_CCFLAGS}" \
-#    CPPFLAGS="${BUILD_CCFLAGS}" \
-#    LDFLAGS="${BUILD_LDFLAGS}" \
-#    cmake ../ -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DINSTALL_GTEST=OFF -DGLSLANG_TESTS=OFF
-#    make -j$NJOBS && make install
-#fi
+if [ $BUILD_EXE = "TRUE" ]; then
+  cd $BUILD_DIR/$TARGET_ARCH
+  if [ ! -d "glslang" ]; then
+      find ../src/ -type d -name "glslang-*" | xargs -i cp -r {} ./glslang
+      cd ./glslang
+      ./update_glslang_sources.py
+      mkdir -p build && cd build
+      PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+      CFLAGS="${BUILD_CCFLAGS}" \
+      CPPFLAGS="${BUILD_CCFLAGS}" \
+      LDFLAGS="${BUILD_LDFLAGS}" \
+      cmake ../ -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DINSTALL_GTEST=OFF -DGLSLANG_TESTS=OFF
+      make -j$NJOBS && make install
+  fi
+fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "libjpeg-turbo" ]; then
@@ -1184,6 +1197,22 @@ if [ $BUILD_EXE != "TRUE" ]; then
 fi
 
 if [ $BUILD_EXE = "TRUE" ]; then
+    cd $BUILD_DIR/$TARGET_ARCH
+    if [ ! -d "zimg" ]; then
+        find ../src/ -type d -name "zimg*" | xargs -i cp -r {} ./zimg
+        cd zimg
+        ./autogen.sh
+        
+        CFLAGS="${BUILD_CCFLAGS}" \
+        CXXFLAGS="${BUILD_CCFLAGS}" \
+        LDFLAGS="${BUILD_LDFLAGS}" \
+         ./configure \
+         --prefix=$INSTALL_DIR \
+         --disable-shared \
+         --enable-static
+        make -j$NJOBS && make install
+    fi
+
     cd $BUILD_DIR/$TARGET_ARCH
     if [ ! -d "vvenc" ]; then
         find ../src/ -type d -name "vvenc*" | xargs -i cp -r {} ./vvenc
@@ -1614,6 +1643,8 @@ $FFMPEG5_CUDA_DISABLE_FLAGS \
 --enable-libvpl \
 --enable-libvpx \
 --enable-libvvenc \
+--enable-libglslang \
+--enable-libzimg \
 --enable-libplacebo \
 --enable-ffnvcodec \
 --enable-nvdec \
@@ -1702,7 +1733,7 @@ SRC_7Z_FILENAME=ffmpeg_lgpl_src.7z
 SRC_GPL_LIBS=
 SRC_EXE_LIBS=
 if [ $BUILD_EXE = "TRUE" ]; then
-    SRC_EXE_LIBS="$BUILD_DIR/src/vvenc*"
+    SRC_EXE_LIBS="$BUILD_DIR/src/vvenc* $BUILD_DIR/src/glslang* $BUILD_DIR/src/zimg*"
 fi
 if [ ${ENABLE_GPL} != "FALSE" ]; then
   SRC_7Z_FILENAME=ffmpeg_gpl_src.7z

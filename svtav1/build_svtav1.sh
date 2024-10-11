@@ -13,6 +13,11 @@ PROFILE_USE_CC="-fprofile-use"
 PROFILE_USE_LD="-fprofile-use"
 YUVFILE="/y/Encoders/sakura_op_short_720p.yuv"
 YUVFILE_10="/y/Encoders/sakura_op_short_720p_10.yuv"
+BUILD_PSY="FALSE"
+if [ $1 = "-psy" ]; then
+    BUILD_PSY="TRUE"
+    BUILD_DIR=`pwd`/build_svtav1_psy
+fi
 
 export CC=gcc
 export CXX=g++
@@ -31,8 +36,8 @@ else
 fi
 
 if [ $MSYSTEM == "CLANG64" ]; then
-	export CC=clang
-	export CXX=clang++
+    export CC=clang
+    export CXX=clang++
 fi
 
 INSTALL_DIR=$BUILD_DIR/$TARGET_ARCH/build
@@ -43,7 +48,11 @@ if [ -d "SVT-AV1" ]; then
     git pull
     cd ..
 else
-    git clone https://gitlab.com/AOMediaCodec/SVT-AV1.git
+    if [ $BUILD_PSY = "TRUE" ]; then
+        git clone https://github.com/gianni-rosato/svt-av1-psy.git SVT-AV1
+    else
+        git clone https://gitlab.com/AOMediaCodec/SVT-AV1.git
+    fi
 fi
 
 

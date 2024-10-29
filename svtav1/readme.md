@@ -21,7 +21,6 @@ Build_svtav1.bat
 # Build by MSYS2
 
 ## Install tools
-- Cmake (64bit)
 - MSYS2
 
 ## Update msys2
@@ -31,7 +30,7 @@ pacman -Syuu
 
 ## Install tools required to MSYS2
 ```
-pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain p7zip git nasm
+pacman -S base-devel mingw-w64-clang-x86_64-toolchain clang64/mingw-w64-clang-x86_64-cmake p7zip git nasm
 ```
 
 ## Copy scripts to $HOME dir

@@ -4,7 +4,7 @@ BUILD_DIR=`pwd`/build_svtav1
 BUILD_CCFLAGS="-Ofast -ffast-math -fomit-frame-pointer -flto"
 BUILD_LDFLAGS="-static -static-libgcc -flto -Wl,--gc-sections -Wl,--strip-all"
 MAKE_PROCESS=$NUMBER_OF_PROCESSORS
-#cmake.exe‚Ì‚ ‚éêŠ
+#cmake.exeï¿½Ì‚ï¿½ï¿½ï¿½êŠ
 CMAKE_DIR="/C/Program Files/CMake/bin"
 #PROFILE_GEN_CC="-fprofile-generate -fprofile-update=atomic"
 #PROFILE_GEN_LD="-fprofile-generate -fprofile-update=atomic"
@@ -15,7 +15,7 @@ PROFILE_USE_LD="-fprofile-use"
 YUVFILE="/y/Encoders/sakura_op_short_720p.yuv"
 YUVFILE_10="/y/Encoders/sakura_op_short_720p_10.yuv"
 BUILD_PSY="FALSE"
-if [ $1 = "-psy" ]; then
+if [ $# -gt 0 ] && [ $1 = "-psy" ]; then
     BUILD_PSY="TRUE"
     BUILD_DIR=`pwd`/build_svtav1_psy
 fi
@@ -62,14 +62,16 @@ else
 fi
 
 
-if [ ! -d "dovi_tool-2.1.2" ]; then
-    wget -O dovi_tool-2.1.2.tar.gz https://github.com/quietvoid/dovi_tool/archive/refs/tags/2.1.2.tar.gz
-    tar xf dovi_tool-2.1.2.tar.gz
-fi
-
-if [ ! -d "hdr10plus_tool-1.6.1" ]; then
-    wget -O hdr10plus_tool-1.6.1.tar.gz https://github.com/quietvoid/hdr10plus_tool/archive/refs/tags/1.6.1.tar.gz
-    tar xf hdr10plus_tool-1.6.1.tar.gz
+if [ $BUILD_PSY = "TRUE" ]; then
+    if [ ! -d "dovi_tool-2.1.2" ]; then
+        wget -O dovi_tool-2.1.2.tar.gz https://github.com/quietvoid/dovi_tool/archive/refs/tags/2.1.2.tar.gz
+        tar xf dovi_tool-2.1.2.tar.gz
+    fi
+    
+    if [ ! -d "hdr10plus_tool-1.6.1" ]; then
+        wget -O hdr10plus_tool-1.6.1.tar.gz https://github.com/quietvoid/hdr10plus_tool/archive/refs/tags/1.6.1.tar.gz
+        tar xf hdr10plus_tool-1.6.1.tar.gz
+    fi
 fi
 
 mkdir -p $BUILD_DIR/$TARGET_ARCH
@@ -79,22 +81,22 @@ if [ -d "SVT-AV1" ]; then
 fi
 cp -r ../src/SVT-AV1 SVT-AV1
 
-
+SVTAV1_CMAKE_OPT=
 if [ $BUILD_PSY = "TRUE" ]; then
     cd $BUILD_DIR/$TARGET_ARCH
     if [ ! -d "dovi_tool" ]; then
         find ../src/ -type d -name "dovi_tool-*" | xargs -i cp -r {} ./dovi_tool
         cd ./dovi_tool/dolby_vision
         cargo cinstall --target ${FFMPEG_ARCH}-pc-windows-gnu --release --prefix=$INSTALL_DIR
-        # dll‚ğíœ‚µAstaticƒ‰ƒCƒuƒ‰ƒŠ‚Ì‚İ‚ğc‚·
+        # dllï¿½ï¿½ï¿½íœï¿½ï¿½ï¿½Astaticï¿½ï¿½ï¿½Cï¿½uï¿½ï¿½ï¿½ï¿½ï¿½Ì‚İ‚ï¿½ï¿½cï¿½ï¿½
         rm $INSTALL_DIR/lib/dovi.dll.a
         rm $INSTALL_DIR/lib/dovi.def
         rm $INSTALL_DIR/bin/dovi.dll
-        # static linkŒü‚¯‚Édovi.pc‚ğ•ÒW
+        # static linkï¿½ï¿½ï¿½ï¿½ï¿½ï¿½dovi.pcï¿½ï¿½ÒW
         LIBDOVI_STATIC_LIBS=`awk -F':' '/^Libs.private:/{print $2}' ${INSTALL_DIR}/lib/pkgconfig/dovi.pc`
         sed -i -e "s/-ldovi/-ldovi ${LIBDOVI_STATIC_LIBS}/g" ${INSTALL_DIR}/lib/pkgconfig/dovi.pc
 
-        #dll‚©‚çlibƒtƒ@ƒCƒ‹‚ğì¬
+        #dllï¿½ï¿½ï¿½ï¿½libï¿½tï¿½@ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½ì¬
         #cd target/x86_64-pc-windows-gnu/release
         #DOVI_DLL_FILENAME=dovi.dll
         #DOVI_DEF_FILENAME=dovi.def
@@ -107,11 +109,11 @@ if [ $BUILD_PSY = "TRUE" ]; then
         find ../src/ -type d -name "hdr10plus_tool-*" | xargs -i cp -r {} ./hdr10plus_tool
         cd ./hdr10plus_tool/hdr10plus
         cargo cinstall --target ${FFMPEG_ARCH}-pc-windows-gnu --release --prefix=$INSTALL_DIR
-        # dll‚ğíœ‚µAstaticƒ‰ƒCƒuƒ‰ƒŠ‚Ì‚İ‚ğc‚·
+        # dllï¿½ï¿½ï¿½íœï¿½ï¿½ï¿½Astaticï¿½ï¿½ï¿½Cï¿½uï¿½ï¿½ï¿½ï¿½ï¿½Ì‚İ‚ï¿½ï¿½cï¿½ï¿½
         rm $INSTALL_DIR/lib/hdr10plus-rs.dll.a
         rm $INSTALL_DIR/lib/hdr10plus-rs.def
         rm $INSTALL_DIR/bin/hdr10plus-rs.dll
-        # static linkŒü‚¯‚Édovi.pc‚ğ•ÒW
+        # static linkï¿½ï¿½ï¿½ï¿½ï¿½ï¿½dovi.pcï¿½ï¿½ÒW
         LIBHDR10PLUS_STATIC_LIBS=`awk -F':' '/^Libs.private:/{print $2}' ${INSTALL_DIR}/lib/pkgconfig/hdr10plus-rs.pc`
         sed -i -e "s/-ldovi/-ldovi ${LIBHDR10PLUS_STATIC_LIBS}/g" ${INSTALL_DIR}/lib/pkgconfig/hdr10plus-rs.pc
     fi
@@ -123,6 +125,7 @@ if [ $BUILD_PSY = "TRUE" ]; then
     LIBHDR10PLUS_CFLAGS=`${PKGCONFIG} --cflags ${CHECK_LIBHDR10PLUS_NAMES}`
     BUILD_CCFLAGS="${BUILD_CCFLAGS} ${LIBDOVI_CFLAGS} ${LIBHDR10PLUS_CFLAGS}"
     BUILD_LDFLAGS="${BUILD_LDFLAGS} ${LIBDOVI_LIBS} ${LIBHDR10PLUS_LIBS}"
+    SVTAV1_CMAKE_OPT="-DLIBDOVI_FOUND=ON -DLIBHDR10PLUS_RS_FOUND=ON"
 fi
 
 
@@ -137,6 +140,7 @@ cmake -G "MSYS Makefiles" \
   -DSVT_AV1_LTO=ON \
   -DENABLE_NASM=ON \
   -DENABLE_AVX512=ON \
+  $SVTAV1_CMAKE_OPT \
   -DCMAKE_ASM_NASM_COMPILER=nasm \
   -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
   -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \

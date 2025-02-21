@@ -1,0 +1,35 @@
+diff --git a/cmake/cpuinfo.cmake b/cmake/cpuinfo.cmake
+index acb728f7..29b62310 100644
+--- a/cmake/cpuinfo.cmake
++++ b/cmake/cpuinfo.cmake
+@@ -61,23 +61,13 @@ endif()
+ if(REQUESTED_CPUINFO STREQUAL "LOCAL" OR (REQUESTED_CPUINFO STREQUAL "AUTO" AND NOT HAVE_CPUINFO))
+     include(FetchContent)
+     find_package(Git QUIET)
+-    if(GIT_EXECUTABLE)
+-        FetchContent_Declare(
+-            cpuinfo
+-            GIT_REPOSITORY https://github.com/1480c1/cpuinfo.git
+-            GIT_TAG e649baaa95efeb61517c06cc783287d4942ffe0e # Based on aaac07ee499895770c89163ce0920ef8bb41ed23, latest as of 2025-11-02
+-            SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/cpuinfo
+-            EXCLUDE_FROM_ALL
+-        )
+-    else()
+-        FetchContent_Declare(
+-            cpuinfo
+-            URL https://github.com/1480c1/cpuinfo/archive/e649baaa95efeb61517c06cc783287d4942ffe0e.zip
+-            URL_HASH SHA256=d2cfc3b4120ad2f17a7c6cc43d0547ecfb9f375b7918d723d234100822aa490e
+-            SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/cpuinfo
+-            EXCLUDE_FROM_ALL
+-        )
+-    endif()
++    FetchContent_Declare(
++        cpuinfo
++        URL https://github.com/1480c1/cpuinfo/archive/e649baaa95efeb61517c06cc783287d4942ffe0e.zip
++        URL_HASH SHA256=d2cfc3b4120ad2f17a7c6cc43d0547ecfb9f375b7918d723d234100822aa490e
++        SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/cpuinfo
++        EXCLUDE_FROM_ALL
++    )
+ 
+     set(CPUINFO_LIBRARY_TYPE object CACHE STRING "")
+     option(CPUINFO_BUILD_TOOLS "" OFF)

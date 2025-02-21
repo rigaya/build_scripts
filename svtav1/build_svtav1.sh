@@ -4,7 +4,7 @@ BUILD_DIR=`pwd`/build_svtav1
 BUILD_CCFLAGS="-Ofast -ffast-math -fomit-frame-pointer -flto"
 BUILD_LDFLAGS="-static -static-libgcc -flto -Wl,--gc-sections -Wl,--strip-all"
 MAKE_PROCESS=$NUMBER_OF_PROCESSORS
-#cmake.exeï¿½Ì‚ï¿½ï¿½ï¿½êŠ
+#cmake.exe‚Ì‚ ‚éêŠ
 CMAKE_DIR="/C/Program Files/CMake/bin"
 #PROFILE_GEN_CC="-fprofile-generate -fprofile-update=atomic"
 #PROFILE_GEN_LD="-fprofile-generate -fprofile-update=atomic"
@@ -14,6 +14,7 @@ PROFILE_USE_CC="-fprofile-use"
 PROFILE_USE_LD="-fprofile-use"
 YUVFILE="/y/Encoders/sakura_op_short_720p.yuv"
 YUVFILE_10="/y/Encoders/sakura_op_short_720p_10.yuv"
+CPUINFO_DIFF=$HOME/patch/svtav1_cpuinfo.diff
 BUILD_PSY="FALSE"
 if [ $# -gt 0 ] && [ $1 = "-psy" ]; then
     BUILD_PSY="TRUE"
@@ -88,15 +89,15 @@ if [ $BUILD_PSY = "TRUE" ]; then
         find ../src/ -type d -name "dovi_tool-*" | xargs -i cp -r {} ./dovi_tool
         cd ./dovi_tool/dolby_vision
         cargo cinstall --target ${FFMPEG_ARCH}-pc-windows-gnu --release --prefix=$INSTALL_DIR
-        # dllï¿½ï¿½ï¿½íœï¿½ï¿½ï¿½Astaticï¿½ï¿½ï¿½Cï¿½uï¿½ï¿½ï¿½ï¿½ï¿½Ì‚İ‚ï¿½ï¿½cï¿½ï¿½
+        # dll‚ğíœ‚µAstaticƒ‰ƒCƒuƒ‰ƒŠ‚Ì‚İ‚ğc‚·
         rm $INSTALL_DIR/lib/dovi.dll.a
         rm $INSTALL_DIR/lib/dovi.def
         rm $INSTALL_DIR/bin/dovi.dll
-        # static linkï¿½ï¿½ï¿½ï¿½ï¿½ï¿½dovi.pcï¿½ï¿½ÒW
+        # static linkŒü‚¯‚Édovi.pc‚ğ•ÒW
         LIBDOVI_STATIC_LIBS=`awk -F':' '/^Libs.private:/{print $2}' ${INSTALL_DIR}/lib/pkgconfig/dovi.pc`
         sed -i -e "s/-ldovi/-ldovi ${LIBDOVI_STATIC_LIBS}/g" ${INSTALL_DIR}/lib/pkgconfig/dovi.pc
 
-        #dllï¿½ï¿½ï¿½ï¿½libï¿½tï¿½@ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½ì¬
+        #dll‚©‚çlibƒtƒ@ƒCƒ‹‚ğì¬
         #cd target/x86_64-pc-windows-gnu/release
         #DOVI_DLL_FILENAME=dovi.dll
         #DOVI_DEF_FILENAME=dovi.def
@@ -109,11 +110,11 @@ if [ $BUILD_PSY = "TRUE" ]; then
         find ../src/ -type d -name "hdr10plus_tool-*" | xargs -i cp -r {} ./hdr10plus_tool
         cd ./hdr10plus_tool/hdr10plus
         cargo cinstall --target ${FFMPEG_ARCH}-pc-windows-gnu --release --prefix=$INSTALL_DIR
-        # dllï¿½ï¿½ï¿½íœï¿½ï¿½ï¿½Astaticï¿½ï¿½ï¿½Cï¿½uï¿½ï¿½ï¿½ï¿½ï¿½Ì‚İ‚ï¿½ï¿½cï¿½ï¿½
+        # dll‚ğíœ‚µAstaticƒ‰ƒCƒuƒ‰ƒŠ‚Ì‚İ‚ğc‚·
         rm $INSTALL_DIR/lib/hdr10plus-rs.dll.a
         rm $INSTALL_DIR/lib/hdr10plus-rs.def
         rm $INSTALL_DIR/bin/hdr10plus-rs.dll
-        # static linkï¿½ï¿½ï¿½ï¿½ï¿½ï¿½dovi.pcï¿½ï¿½ÒW
+        # static linkŒü‚¯‚Édovi.pc‚ğ•ÒW
         LIBHDR10PLUS_STATIC_LIBS=`awk -F':' '/^Libs.private:/{print $2}' ${INSTALL_DIR}/lib/pkgconfig/hdr10plus-rs.pc`
         sed -i -e "s/-ldovi/-ldovi ${LIBHDR10PLUS_STATIC_LIBS}/g" ${INSTALL_DIR}/lib/pkgconfig/hdr10plus-rs.pc
     fi
@@ -130,6 +131,9 @@ fi
 
 
 cd $BUILD_DIR/$TARGET_ARCH/SVT-AV1
+if [ $BUILD_PSY != "TRUE" ]; then
+    patch -p1 < $CPUINFO_DIFF
+fi
 mkdir build/msys2
 cd build/msys2
 cmake -G "MSYS Makefiles" \
@@ -199,8 +203,7 @@ cmake -G "MSYS Makefiles" \
   -DNATIVE=OFF \
   -DENABLE_NASM=ON \
   -DENABLE_AVX512=ON \
-  -DLIBDOVI_FOUND=ON \
-  -DLIBHDR10PLUS_RS_FOUND=ON \
+  $SVTAV1_CMAKE_OPT \
   -DCMAKE_ASM_NASM_COMPILER=nasm \
   -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
   -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \

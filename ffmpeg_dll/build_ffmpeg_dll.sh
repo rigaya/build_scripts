@@ -1,20 +1,22 @@
 #!/bin/bash
-#MSYS2ópffmpeg dllÉrÉãÉhÉXÉNÉäÉvÉg
-# â∫ãLÉCÉìÉXÉgÅ[ÉãÇ≈gcc13ånÇéùÇ¬msys2Çì±ì¸Ç∑ÇÈ (updateÇµÇƒgcc14Ç…ÇµÇ»Ç¢Ç±Ç∆ÅAÇ»Ç∫Ç©ìÆçÏÇµÇ»Ç¢ÉoÉCÉiÉäÇ™Ç≈Ç´ÇÈ)
+#MSYS2Áî®ffmpeg dll„Éì„É´„Éâ„Çπ„ÇØ„É™„Éó„Éà
+# ‰∏ãË®ò„Ç§„É≥„Çπ„Éà„Éº„É´„Åßgcc13Á≥ª„ÇíÊåÅ„Å§msys2„ÇíÂ∞éÂÖ•„Åô„Çã (update„Åó„Å¶gcc14„Å´„Åó„Å™„ÅÑ„Åì„Å®„ÄÅ„Å™„Åú„ÅãÂãï‰Ωú„Åó„Å™„ÅÑ„Éê„Ç§„Éä„É™„Åå„Åß„Åç„Çã)
 # https://repo.msys2.org/distrib/x86_64/msys2-x86_64-20230526.exe
-#Visual StudioÇ÷ÇÃä¬ã´ïœêîÇí ÇµÇƒãNìÆÇ∑ÇÈ
+#Visual Studio„Å∏„ÅÆÁí∞Â¢ÉÂ§âÊï∞„ÇíÈÄö„Åó„Å¶Ëµ∑Âãï„Åô„Çã
 #pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain autotools autogen
 #pacman -S p7zip git nasm yasm python unzip
-# cmakeä÷òA
+# cmakeÈñ¢ÈÄ£
 #pacman -S mingw32/mingw-w64-i686-cmake mingw64/mingw-w64-x86_64-cmake
-# í èÌÇÃ pacman -S cmakeÇ≈ì±ì¸ÇµÇ»Ç¢Ç±Ç∆
-#ïÅí Ç…pacman -S mesonÇ∆Ç‚ÇÈÇ∆Ç§Ç‹Ç≠dav1dÇ™ÉrÉãÉhÇ≈Ç´Ç»Ç¢ÇÃÇ≈íçà”
+# ÈÄöÂ∏∏„ÅÆ pacman -S cmake„ÅßÂ∞éÂÖ•„Åó„Å™„ÅÑ„Åì„Å®
+#ÊôÆÈÄö„Å´pacman -S meson„Å®„ÇÑ„Çã„Å®„ÅÜ„Åæ„Åèdav1d„Åå„Éì„É´„Éâ„Åß„Åç„Å™„ÅÑ„ÅÆ„ÅßÊ≥®ÊÑè
 #pacman -S mingw32/mingw-w64-i686-meson mingw64/mingw-w64-x86_64-meson
-# harfbuzzÇ…ïKóv
+# harfbuzz„Å´ÂøÖË¶Å
 #pacman -S gtk-doc mingw64/mingw-w64-x86_64-ragel mingw32/mingw-w64-i686-ragel
-#fontconfigÇ…ïKóv
+#fontconfig„Å´ÂøÖË¶Å
 #pacman -S gperf mingw32/mingw-w64-i686-python-lxml mingw64/mingw-w64-x86_64-python-lxml
-#libdoviÇ…ïKóv
+#pacman -S mingw-w64-i686-python mingw-w64-i686-python-six
+#pacman -S mingw-w64-x86_64-python mingw-w64-x86_64-python-six
+#libdovi„Å´ÂøÖË¶Å
 # curl -o rustup-init.exe -sSL https://win.rustup.rs/
 # ./rustup-init.exe -y --default-host=x86_64-pc-windows-gnu
 # rustup install stable --profile minimal
@@ -23,6 +25,8 @@
 # rustup target add x86_64-pc-windows-msvc
 # rustup target add i686-pc-windows-gnu
 # rustup target add i686-pc-windows-msvc
+# „Éá„Éï„Ç©„É´„Éà„Çígnu„ÅÆ„Åª„ÅÜ„Å´„Åó„Å¶„Åä„Åã„Å™„ÅÑ„Å®link„Ç®„É©„Éº„ÅåÂá∫„Çã
+# rustup default stable-x86_64-pc-windows-gnu
 # cargo install cargo-c
 # Vulkan
 # pacman -S mingw-w64-i686-uasm mingw-w64-x86_64-uasm
@@ -59,6 +63,9 @@ while getopts ":-:at:ur" key; do
       ;;
     enable-gpl )
       ENABLE_GPL="TRUE"
+      ;;
+    enable-swscale )
+      ENABLE_SWSCALE="TRUE"
       ;;
     lto )
       ENABLE_LTO="TRUE"
@@ -97,9 +104,7 @@ if [ $ENABLE_LTO = "TRUE" ]; then
 fi
 
 
-if [ "$TARGET_BUILD" = "swscale" ]; then
-    ENABLE_SWSCALE="TRUE"
-elif [ "$TARGET_BUILD" = "audenc" ]; then
+if [ "$TARGET_BUILD" = "audenc" ]; then
     FOR_AUDENC="TRUE"
     BUILD_EXE="TRUE"
 elif [ "$TARGET_BUILD" = "exe" ]; then
@@ -146,7 +151,7 @@ BUILD_CCFLAGS="-mtune=alderlake -msse2 -mfpmath=sse -fomit-frame-pointer -fno-id
 BUILD_LDFLAGS="-Wl,--strip-all -static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
 if [ $TARGET_ARCH = "x86" ]; then
     BUILD_CCFLAGS="${BUILD_CCFLAGS} -m32 -mstackrealign"
-    #  libavcodec/h264_cabac.c: In function 'ff_h264_decode_mb_cabac': libavcodec/x86/cabac.h:192:5: error: 'asm' operand has impossible ëŒçÙ
+    #  libavcodec/h264_cabac.c: In function 'ff_h264_decode_mb_cabac': libavcodec/x86/cabac.h:192:5: error: 'asm' operand has impossible ÂØæÁ≠ñ
     FFMPEG_DISABLE_ASM="--disable-inline-asm"
 fi
 
@@ -175,13 +180,13 @@ if [ $SSE4_2 = "TRUE" ]; then
     FFMPEG_SSE="-msse4.2 -mpopcnt"
 fi
 
-# static linkópÇÃÉtÉâÉO (Ç±ÇÍÇÁÇ™Ç»Ç¢Ç∆undefined referenceÇ™èoÇÈ)
+# static linkÁî®„ÅÆ„Éï„É©„Ç∞ („Åì„Çå„Çâ„Åå„Å™„ÅÑ„Å®undefined reference„ÅåÂá∫„Çã)
 BUILD_CCFLAGS="${BUILD_CCFLAGS} -DLIBXML_STATIC -DFRIBIDI_LIB_STATIC"
 
-# lameÇÃstaticÉrÉãÉhÇ…ïKóv
+# lame„ÅÆstatic„Éì„É´„Éâ„Å´ÂøÖË¶Å
 BUILD_CCFLAGS="${BUILD_CCFLAGS} -DNCURSES_STATIC"
 
-# small buildópÇÃÉtÉâÉOÇ∆í èÌópÇÃÉtÉâÉO
+# small buildÁî®„ÅÆ„Éï„É©„Ç∞„Å®ÈÄöÂ∏∏Áî®„ÅÆ„Éï„É©„Ç∞
 BUILD_CCFLAGS_SMALL="-Os -fno-unroll-loops ${BUILD_CCFLAGS}"
 BUILD_CCFLAGS="-O3 ${BUILD_CCFLAGS}"
 
@@ -211,7 +216,7 @@ echo FFMPEG_DIR_NAME=$FFMPEG_DIR_NAME
 echo BUILD_EXE=$BUILD_EXE
 echo ENABLE_LTO=$ENABLE_LTO
 
-#--- É\Å[ÉXÇÃÉ_ÉEÉìÉçÅ[Éh ---------------------------------------
+#--- „ÇΩ„Éº„Çπ„ÅÆ„ÉÄ„Ç¶„É≥„É≠„Éº„Éâ ---------------------------------------
 if [ "$FOR_FFMPEG4" = "TRUE" ]; then
     if [ ! -d "ffmpeg" ]; then
         wget https://ffmpeg.org/releases/ffmpeg-4.4.3.tar.xz
@@ -238,9 +243,9 @@ else
         #git reset --hard
         #git checkout -b build 9d15fe77e33b757c75a4186fa049857462737713
         #cd ..
-        wget https://ffmpeg.org/releases/ffmpeg-7.1.tar.xz
-        tar xf ffmpeg-7.1.tar.xz
-        mv ffmpeg-7.1 ffmpeg
+        wget https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz
+        tar xf ffmpeg-8.0.tar.xz
+        mv ffmpeg-8.0 ffmpeg
         #wget https://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2
         #tar xf ffmpeg-snapshot.tar.bz2
     fi
@@ -251,9 +256,9 @@ if [ ! -d "zlib-1.3.1" ]; then
     tar xf zlib-1.3.1.tar.xz
 fi
 
-if [ ! -d "libpng-1.6.44" ]; then
-    wget https://download.sourceforge.net/libpng/libpng-1.6.44.tar.xz
-    tar xf libpng-1.6.44.tar.xz
+if [ ! -d "libpng-1.6.50" ]; then
+    wget https://download.sourceforge.net/libpng/libpng-1.6.50.tar.xz
+    tar xf libpng-1.6.50.tar.xz
 fi
 
 if [ ! -d "bzip2-1.0.8" ]; then
@@ -261,31 +266,31 @@ if [ ! -d "bzip2-1.0.8" ]; then
     tar xf bzip2-1.0.8.tar.gz
 fi
 
-if [ ! -d "expat-2.6.2" ]; then
-    wget https://github.com/libexpat/libexpat/releases/download/R_2_6_2/expat-2.6.2.tar.xz
-    tar xf expat-2.6.2.tar.xz
+if [ ! -d "expat-2.7.1" ]; then
+    wget https://github.com/libexpat/libexpat/releases/download/R_2_7_1/expat-2.7.1.tar.xz
+    tar xf expat-2.7.1.tar.xz
 fi
 
-# freetype-2.12.1ÇÕÉ_ÉÅ
+# freetype-2.12.1„ÅØ„ÉÄ„É°
 if [ ! -d "freetype-2.11.0" ]; then
     wget https://download.savannah.gnu.org/releases/freetype/freetype-2.11.0.tar.xz
     tar xf freetype-2.11.0.tar.xz
 fi
 
-if [ ! -d "libiconv-1.16" ]; then
-    wget https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.16.tar.gz
-    tar xf libiconv-1.16.tar.gz
+if [ ! -d "libiconv-1.18" ]; then
+    wget https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.18.tar.gz
+    tar xf libiconv-1.18.tar.gz
 fi
 
-#2.12.6Ç≈Ç»Ç¢Ç∆Ç¢ÇÎÇ¢ÇÎñ ì| -> 2.12.1Ç‡ÇæÇﬂ, 2.13.0Ç‡ÇæÇﬂ
+#2.12.6„Åß„Å™„ÅÑ„Å®„ÅÑ„Çç„ÅÑ„ÇçÈù¢ÂÄí -> 2.12.1„ÇÇ„Å†„ÇÅ, 2.13.0„ÇÇ„Å†„ÇÅ
 if [ ! -d "fontconfig-2.12.6" ]; then
     wget https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.12.6.tar.gz
     tar xf fontconfig-2.12.6.tar.gz
 fi
 
-if [ ! -d "fribidi-1.0.11" ]; then
-    wget https://github.com/fribidi/fribidi/releases/download/v1.0.11/fribidi-1.0.11.tar.xz
-    tar xf fribidi-1.0.11.tar.xz
+if [ ! -d "fribidi-1.0.16" ]; then
+    wget https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz
+    tar xf fribidi-1.0.16.tar.xz
 fi
 
 #if [ ! -d "harfbuzz-3.3.1" ]; then
@@ -293,15 +298,15 @@ fi
 #    tar xf harfbuzz-3.3.1.tar.xz
 #fi
 
-#0.14.0Ç≈Ç»Ç¢Ç∆ÉoÉCÉiÉäÇ™àŸèÌÇ…ëÂÇ´Ç≠Ç»ÇÈ
+#0.14.0„Åß„Å™„ÅÑ„Å®„Éê„Ç§„Éä„É™„ÅåÁï∞Â∏∏„Å´Â§ß„Åç„Åè„Å™„Çã
 if [ ! -d "libass-0.14.0" ]; then
     wget https://github.com/libass/libass/releases/download/0.14.0/libass-0.14.0.tar.xz
     tar xf libass-0.14.0.tar.xz
 fi
 
-if [ ! -d "libogg-1.3.5" ]; then
-    wget https://downloads.xiph.org/releases/ogg/libogg-1.3.5.tar.xz
-    tar xf libogg-1.3.5.tar.xz
+if [ ! -d "libogg-1.3.6" ]; then
+    wget https://downloads.xiph.org/releases/ogg/libogg-1.3.6.tar.xz
+    tar xf libogg-1.3.6.tar.xz
 fi
 
 if [ ! -d "libvorbis-1.3.7" ]; then
@@ -339,9 +344,9 @@ if [ ! -d "soxr-0.1.3-Source" ]; then
     tar xf soxr-0.1.3-Source.tar.xz
 fi
 
-if [ ! -d "libxml2-2.12.6" ]; then
-    wget -O libxml2-2.12.6.tar.gz https://github.com/GNOME/libxml2/archive/refs/tags/v2.12.6.tar.gz
-    tar xf libxml2-2.12.6.tar.gz
+if [ ! -d "libxml2-2.14.5" ]; then
+    wget -O libxml2-2.14.5.tar.gz https://github.com/GNOME/libxml2/archive/refs/tags/v2.14.5.tar.gz
+    tar xf libxml2-2.14.5.tar.gz
 fi
 
 #if [ ! -d "apache-ant-1.10.6-src.tar.xz" ]; then
@@ -365,9 +370,9 @@ if [ ! -d "libaribcaption-1.1.1" ]; then
     tar xf libaribcaption-1.1.1.tar.gz
 fi
 
-if [ ! -d "libvpl-2.13.0" ]; then
-    wget -O libvpl-2.13.0.tar.gz https://github.com/intel/libvpl/archive/refs/tags/v2.13.0.tar.gz
-    tar xf libvpl-2.13.0.tar.gz
+if [ ! -d "libvpl-2.15.0" ]; then
+    wget -O libvpl-2.15.0.tar.gz https://github.com/intel/libvpl/archive/refs/tags/v2.15.0.tar.gz
+    tar xf libvpl-2.15.0.tar.gz
 fi
 
 if [ ! -d "nv-codec-headers-12.2.72.0" ]; then
@@ -375,9 +380,9 @@ if [ ! -d "nv-codec-headers-12.2.72.0" ]; then
     tar xf nv-codec-headers-12.2.72.0.tar.gz
 fi
 
-if [ ! -d "libvpx-1.14.1" ]; then
-    wget -O libvpx-1.14.1.tar.gz https://github.com/webmproject/libvpx/archive/refs/tags/v1.14.1.tar.gz
-    tar xf libvpx-1.14.1.tar.gz
+if [ ! -d "libvpx-1.15.2" ]; then
+    wget -O libvpx-1.15.2.tar.gz https://github.com/webmproject/libvpx/archive/refs/tags/v1.15.2.tar.gz
+    tar xf libvpx-1.15.2.tar.gz
 fi
 
 # if [ ! -d "gperf-3.0.4" ]; then
@@ -400,20 +405,20 @@ fi
     # tar xf gnutls-3.3.19.tar.xz
 # fi
 
-if [ ! -d "dav1d-1.4.3" ]; then
-    wget https://code.videolan.org/videolan/dav1d/-/archive/1.4.3/dav1d-1.4.3.tar.gz
-    tar xf dav1d-1.4.3.tar.gz
+if [ ! -d "dav1d-1.5.1" ]; then
+    wget https://code.videolan.org/videolan/dav1d/-/archive/1.5.1/dav1d-1.5.1.tar.gz
+    tar xf dav1d-1.5.1.tar.gz
 fi
 
-if [ ! -d "libxxhash-0.8.2" ]; then
-    wget -O libxxhash-0.8.2.tar.gz https://github.com/Cyan4973/xxHash/archive/refs/tags/v0.8.2.tar.gz
-    tar xf libxxhash-0.8.2.tar.gz
-    mv xxHash-0.8.2 libxxhash-0.8.2
+if [ ! -d "libxxhash-0.8.3" ]; then
+    wget -O libxxhash-0.8.3.tar.gz https://github.com/Cyan4973/xxHash/archive/refs/tags/v0.8.3.tar.gz
+    tar xf libxxhash-0.8.3.tar.gz
+    mv xxHash-0.8.3 libxxhash-0.8.3
 fi
 
-if [ ! -d "glslang-15.0.0" ]; then
-    wget -O glslang-15.0.0.tar.gz https://github.com/KhronosGroup/glslang/archive/refs/tags/15.0.0.tar.gz
-    tar xf glslang-15.0.0.tar.gz
+if [ ! -d "glslang-15.4.0" ]; then
+    wget -O glslang-15.4.0.tar.gz https://github.com/KhronosGroup/glslang/archive/refs/tags/15.4.0.tar.gz
+    tar xf glslang-15.4.0.tar.gz
 fi
 
 if [ ! -d "shaderc" ]; then
@@ -425,20 +430,19 @@ if [ ! -d "SPIRV-Cross" ]; then
     git clone https://github.com/KhronosGroup/SPIRV-Cross.git
 fi
 
-if [ ! -d "dovi_tool-2.1.2" ]; then
-    wget -O dovi_tool-2.1.2.tar.gz https://github.com/quietvoid/dovi_tool/archive/refs/tags/2.1.2.tar.gz
-    tar xf dovi_tool-2.1.2.tar.gz
+if [ ! -d "dovi_tool-2.3.1" ]; then
+    wget -O dovi_tool-2.3.1.tar.gz https://github.com/quietvoid/dovi_tool/archive/refs/tags/2.3.1.tar.gz
+    tar xf dovi_tool-2.3.1.tar.gz
 fi
 
-if [ ! -d "libjpeg-turbo-2.1.0" ]; then
-    wget https://github.com/winlibs/libjpeg/archive/refs/tags/libjpeg-turbo-2.1.0.tar.gz
-    tar xf libjpeg-turbo-2.1.0.tar.gz
-    mv libjpeg-libjpeg-turbo-2.1.0 libjpeg-turbo-2.1.0
+if [ ! -d "libjpeg-turbo-3.1.1" ]; then
+    wget https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.1.1/libjpeg-turbo-3.1.1.tar.gz
+    tar xf libjpeg-turbo-3.1.1.tar.gz
 fi
 
-if [ ! -d "lcms2-2.16" ]; then
-    wget https://github.com/mm2/Little-CMS/releases/download/lcms2.16/lcms2-2.16.tar.gz
-    tar xf lcms2-2.16.tar.gz
+if [ ! -d "lcms2-2.17" ]; then
+    wget https://github.com/mm2/Little-CMS/releases/download/lcms2.17/lcms2-2.17.tar.gz
+    tar xf lcms2-2.17.tar.gz
 fi
 
 if [ ! -d "Vulkan-Loader-1.3.295" ]; then
@@ -446,25 +450,29 @@ if [ ! -d "Vulkan-Loader-1.3.295" ]; then
     tar xf Vulkan-Loader-v1.3.295.tar.gz
 fi
 
-if [ ! -d "zimg-3.0.5" ]; then
-    wget -O zimg-3.0.5.tar.gz https://github.com/sekrit-twc/zimg/archive/refs/tags/release-3.0.5.tar.gz
-    tar xf zimg-3.0.5.tar.gz
-    mv zimg-release-3.0.5 zimg-3.0.5
+if [ ! -d "zimg-3.0.6" ]; then
+    wget -O zimg-3.0.6.tar.gz https://github.com/sekrit-twc/zimg/archive/refs/tags/release-3.0.6.tar.gz
+    tar xf zimg-3.0.6.tar.gz
+    mv zimg-release-3.0.6 zimg-3.0.6
 fi
 
-# àÀë∂ä÷åWÇÕà»â∫ÇÃí ÇË
+# ‰æùÂ≠òÈñ¢‰øÇ„ÅØ‰ª•‰∏ã„ÅÆÈÄö„Çä
 # [ libjpeg -> lcms2 ], shaderc, SPIRV-Cross, dovi_tool, libxxhash, vulkan-loader -> libplacebo
-# shadercÇ™Ç†ÇÍÇŒglslangÇÕïsóv
+# shaderc„Åå„ÅÇ„Çå„Å∞glslang„ÅØ‰∏çË¶Å
 if [ ! -d "libplacebo" ]; then
     git clone --recursive https://code.videolan.org/videolan/libplacebo
-    cd libplacebo && git checkout tags/v7.349.0 && cd ..
+    cd libplacebo && git checkout tags/v7.351.0 && cd ..
 fi
 
-if [ $BUILD_EXE = "TRUE" ]; then
-    if [ ! -d "vvenc-1.12.0" ]; then
-        wget -O vvenc-v1.12.0.tar.gz https://github.com/fraunhoferhhi/vvenc/archive/refs/tags/v1.12.0.tar.gz
-        tar xf vvenc-v1.12.0.tar.gz
-    fi
+if [ ! -d "vvenc-1.13.1" ]; then
+    wget -O vvenc-v1.13.1.tar.gz https://github.com/fraunhoferhhi/vvenc/archive/refs/tags/v1.13.1.tar.gz
+    tar xf vvenc-v1.13.1.tar.gz
+fi
+
+if [ ! -d "svt-av1" ]; then
+    wget https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v3.1.0/SVT-AV1-v3.1.0.tar.gz
+    tar xf SVT-AV1-v3.1.0.tar.gz
+    mv SVT-AV1-v3.1.0 svt-av1
 fi
 
 if [ $ENABLE_GPL = "TRUE" ]; then
@@ -475,16 +483,12 @@ if [ $ENABLE_GPL = "TRUE" ]; then
     if [ ! -d "x264" ]; then
         git clone https://code.videolan.org/videolan/x264.git
     fi
-    if [ ! -d "x265_4.0" ]; then
-        wget https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.0.tar.gz
-        tar xf x265_4.0.tar.gz
-    fi
-    if [ ! -d "svt-av1" ]; then
-        git clone https://gitlab.com/AOMediaCodec/SVT-AV1.git svt-av1
+    if [ ! -d "x265" ]; then
+        git clone https://bitbucket.org/multicoreware/x265_git.git x265
     fi
 fi
 
-# --- èoóÕêÊÇèÄîı --------------------------------------
+# --- Âá∫ÂäõÂÖà„ÇíÊ∫ñÂÇô --------------------------------------
 if [ $BUILD_ALL != "FALSE" ]; then
     rm -rf $BUILD_DIR/$TARGET_ARCH
 fi
@@ -493,7 +497,7 @@ if [ ! -d $BUILD_DIR/$TARGET_ARCH ]; then
     mkdir $BUILD_DIR/$TARGET_ARCH
 fi
 cd $BUILD_DIR/$TARGET_ARCH
-# --- èoóÕêÊÇÃå√Ç¢ÉfÅ[É^ÇçÌèú ----------------------
+# --- Âá∫ÂäõÂÖà„ÅÆÂè§„ÅÑ„Éá„Éº„Çø„ÇíÂâäÈô§ ----------------------
 if [ $UPDATE_FFMPEG != "FALSE" ] && [ -d ffmpeg_test ]; then
     rm -rf ffmpeg_test
 fi
@@ -518,7 +522,7 @@ fi
   #$BUILD_DIR/src/soxr* $BUILD_DIR/src/nettle* $BUILD_DIR/src/gnutls*
 
 
-# --- ÉrÉãÉhäJén ëŒè€ÇÃÉtÉHÉãÉ_Ç™Ç»ÇØÇÍÇŒÉrÉãÉhÇçsÇ§ -----------
+# --- „Éì„É´„ÉâÈñãÂßã ÂØæË±°„ÅÆ„Éï„Ç©„É´„ÉÄ„Åå„Å™„Åë„Çå„Å∞„Éì„É´„Éâ„ÇíË°å„ÅÜ -----------
 # if [ ! -d "zlib" ]; then
     # cd $BUILD_DIR/$TARGET_ARCH
     # find ../src/ -type d -name "zlib-*" | xargs -i cp -r {} ./zlib
@@ -572,8 +576,8 @@ fi
 # cd $BUILD_DIR/$TARGET_ARCH
 # if [ ! -d "gperf" ]; then
     # find ../src/ -type d -name "gperf-*" | xargs -i cp -r {} ./gperf
-    #libiconvÇ…gperf.exeÇ™ïKóv
-    #3.0.4ïKê{ (3.1ÇæÇ∆ÅAfontconfigÇ≈ÉGÉâÅ[Ç™èoÇÈèÍçáÇ™Ç†ÇÈ)
+    #libiconv„Å´gperf.exe„ÅåÂøÖË¶Å
+    #3.0.4ÂøÖÈ†à (3.1„Å†„Å®„ÄÅfontconfig„Åß„Ç®„É©„Éº„ÅåÂá∫„ÇãÂ†¥Âêà„Åå„ÅÇ„Çã)
     # cd ./gperf
     # CFLAGS="${BUILD_CCFLAGS}" \
     # CPPFLAGS="${BUILD_CCFLAGS}" \
@@ -583,7 +587,7 @@ fi
     # --enable-static \
     # --disable-shared
     # make -j$NJOBS
-    # texÇ™Ç»Ç¢Ç∆ÇÃÉGÉâÅ[Ç™èoÇÈÇ™ñ≥éãÇ∑ÇÈ
+    # tex„Åå„Å™„ÅÑ„Å®„ÅÆ„Ç®„É©„Éº„ÅåÂá∫„Çã„ÅåÁÑ°Ë¶ñ„Åô„Çã
     # make install
 # fi
 
@@ -598,16 +602,20 @@ if [ ! -d "expat" ]; then
     --prefix=$INSTALL_DIR \
     --enable-static \
     --disable-shared \
-    --without-docbook
+    --without-docbook \
+    --without-xmlwf \
+    --without-examples \
+    --without-tests \
+    --without-getrandom 
     make -j$NJOBS && make install
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "freetype" ]; then
     find ../src/ -type d -name "freetype-*" | xargs -i cp -r {} ./freetype
-    #msysë§ÇÃzlib(zlib.h, zconf.h, libz.a, libz.pcÇè¡Ç≥Ç»Ç¢Ç∆Ç§Ç‹Ç≠Ç¢Ç©Ç»Ç¢)
-    #Ç†ÇÈÇ¢ÇÕconfigureå„Ç…ÅAbuild/unix/unix-cc.mkì‡ÇÃ
-    #CFLAGSÇ©ÇÁ-IC:/.../MSYS/includeÇ∆LDFLAGSÇÃ-LC:/.../MSYS/libÇè¡Ç∑
+    #msysÂÅ¥„ÅÆzlib(zlib.h, zconf.h, libz.a, libz.pc„ÇíÊ∂à„Åï„Å™„ÅÑ„Å®„ÅÜ„Åæ„Åè„ÅÑ„Åã„Å™„ÅÑ)
+    #„ÅÇ„Çã„ÅÑ„ÅØconfigureÂæå„Å´„ÄÅbuild/unix/unix-cc.mkÂÜÖ„ÅÆ
+    #CFLAGS„Åã„Çâ-IC:/.../MSYS/include„Å®LDFLAGS„ÅÆ-LC:/.../MSYS/lib„ÇíÊ∂à„Åô
     cd ./freetype
     ZLIB_CFLAGS=" -I${INSTALL_DIR}/include" \
     ZLIB_LIBS="-L${INSTALL_DIR}/lib -lz" \
@@ -663,7 +671,7 @@ if [ ! -d "fontconfig" ]; then
     --disable-docs \
     --disable-libxml2
     make -j$NJOBS && make install
-    #pkgconfigèÓïÒÇèëÇ´ä∑Ç¶ÇÈ
+    #pkgconfigÊÉÖÂ†±„ÇíÊõ∏„ÅçÊèõ„Åà„Çã
     sed -i -e "s/ -lfontconfig$/ -lfontconfig -lexpat -lpng -lz/g" $INSTALL_DIR/lib/pkgconfig/fontconfig.pc
     sed -i -e "s/ -lfreetype$/ -lfreetype -liconv -lpng -lz/g" $INSTALL_DIR/lib/pkgconfig/fontconfig.pc
     sed -i -e "s/^Requires:[ \f\n\r\t]\+freetype2/Requires: freetype2 libpng/g" $INSTALL_DIR/lib/pkgconfig/fontconfig.pc
@@ -729,7 +737,7 @@ if [ ! -d "libass" ]; then
     --prefix=$INSTALL_DIR \
     --enable-static=no \
     --enable-shared=yes
-    #é¿çsÇµÇΩÉRÉ}ÉìÉhÇèoóÕÇ∑ÇÈÇÊÇ§Ç…
+    #ÂÆüË°å„Åó„Åü„Ç≥„Éû„É≥„Éâ„ÇíÂá∫Âäõ„Åô„Çã„Çà„ÅÜ„Å´
     sed -i -e 's/AM_DEFAULT_VERBOSITY = 0/AM_DEFAULT_VERBOSITY = 1/g' libass/Makefile
     make -j$NJOBS
     cd libass
@@ -872,6 +880,8 @@ cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "soxr" ]; then
     find ../src/ -type d -name "soxr-*" | xargs -i cp -r {} ./soxr
     cd ./soxr
+    which cmake
+    cmake --version
     cmake -G "MSYS Makefiles" \
     -D BUILD_SHARED_LIBS:BOOL=FALSE \
     -D CMAKE_C_FLAGS_RELEASE:STRING="${BUILD_CCFLAGS}" \
@@ -879,6 +889,7 @@ if [ ! -d "soxr" ]; then
     -D WITH_OPENMP:BOOL=NO \
     -D BUILD_TESTS:BOOL=NO \
     -D CMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+    -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
     .
     make install -j$NJOBS
 fi
@@ -946,7 +957,7 @@ if [ ! -d "libaribcaption" ]; then
     cmake --build . -j$NJOBS
     cmake --install .
     #sed -i -e 's/-lC:\//-l\/c\//g' ${INSTALL_DIR}/lib/pkgconfig/libaribcaption.pc
-    #â∫ãLÇÃÇÊÇ§Ç…ïœçXÇµÇ»Ç¢Ç∆ìKêÿÇ…ÉäÉìÉNÇ≈Ç´Ç»Ç¢
+    #‰∏ãË®ò„ÅÆ„Çà„ÅÜ„Å´Â§âÊõ¥„Åó„Å™„ÅÑ„Å®ÈÅ©Âàá„Å´„É™„É≥„ÇØ„Åß„Åç„Å™„ÅÑ
     # -lC:/mingw64/mingw64/lib/libstdc+++.a -> -lstdc++
     sed -i -e "s/-l[A-Z]:\/.\+\/lib\/libstdc++\.a/-lstdc++/g" ${INSTALL_DIR}/lib/pkgconfig/libaribcaption.pc
 fi
@@ -970,17 +981,18 @@ if [ ! -d "libvpl" ]; then
     find ../src/ -type d -name "libvpl-*" | xargs -i cp -r {} ./libvpl
     cd libvpl
     script/bootstrap
-    cmake -G "MSYS Makefiles" -B _build -DBUILD_SHARED_LIBS=OFF -DUSE_MSVC_STATIC_RUNTIME=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
+    cmake -G "MSYS Makefiles" -B _build -DBUILD_SHARED_LIBS=OFF -DUSE_MSVC_STATIC_RUNTIME=ON -DCMAKE_BUILD_TYPE=Release -DINSTALL_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
     cmake --build _build --config Release
     cmake --install _build --config Release
-    # x86î≈ÇÃèÍçáÅA$INSTALL_DIR/libÇ…ì¸ÇÈÇ◊Ç´Ç‡ÇÃÇ™$INSTALL_DIR/lib/x86Ç…ì¸Ç¡ÇƒÇµÇ‹Ç§
-    # Ç†Ç∆Ç©ÇÁã≠êßìIÇ…à⁄ìÆÇ∑ÇÈ
-    # vpl.pcÇÃÉpÉXÇ‡à⁄ìÆÇ…çáÇÌÇπÇÈ
+    # x86Áâà„ÅÆÂ†¥Âêà„ÄÅ$INSTALL_DIR/lib„Å´ÂÖ•„Çã„Åπ„Åç„ÇÇ„ÅÆ„Åå$INSTALL_DIR/lib/x86„Å´ÂÖ•„Å£„Å¶„Åó„Åæ„ÅÜ
+    # „ÅÇ„Å®„Åã„ÇâÂº∑Âà∂ÁöÑ„Å´ÁßªÂãï„Åô„Çã
+    # vpl.pc„ÅÆ„Éë„Çπ„ÇÇÁßªÂãï„Å´Âêà„Çè„Åõ„Çã
     if [ $TARGET_ARCH = "x86" ]; then
         cp -r $INSTALL_DIR/lib/x86/* $INSTALL_DIR/lib/
         rm -rf $INSTALL_DIR/lib/x86
         sed -i -e 's/${pcfiledir}\/../${pcfiledir}/g' $INSTALL_DIR/lib/pkgconfig/vpl.pc
     fi
+    sed -i -e 's/-lvpl/-lvpl -lstdc++/g' $INSTALL_DIR/lib/pkgconfig/vpl.pc
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
@@ -1030,15 +1042,15 @@ if [ ! -d "dovi_tool" ]; then
     find ../src/ -type d -name "dovi_tool-*" | xargs -i cp -r {} ./dovi_tool
     cd ./dovi_tool/dolby_vision
     cargo cinstall --target ${FFMPEG_ARCH}-pc-windows-gnu --release --prefix=$INSTALL_DIR
-    # dllÇçÌèúÇµÅAstaticÉâÉCÉuÉâÉäÇÃÇ›ÇécÇ∑
+    # dll„ÇíÂâäÈô§„Åó„ÄÅstatic„É©„Ç§„Éñ„É©„É™„ÅÆ„Åø„ÇíÊÆã„Åô
     rm $INSTALL_DIR/lib/dovi.dll.a
     rm $INSTALL_DIR/lib/dovi.def
     rm $INSTALL_DIR/bin/dovi.dll
-    # static linkå¸ÇØÇ…dovi.pcÇï“èW
+    # static linkÂêë„Åë„Å´dovi.pc„ÇíÁ∑®ÈõÜ
     LIBDOVI_STATIC_LIBS=`awk -F':' '/^Libs.private:/{print $2}' ${INSTALL_DIR}/lib/pkgconfig/dovi.pc`
     sed -i -e "s/-ldovi/-ldovi ${LIBDOVI_STATIC_LIBS}/g" ${INSTALL_DIR}/lib/pkgconfig/dovi.pc
 
-    #dllÇ©ÇÁlibÉtÉ@ÉCÉãÇçÏê¨
+    #dll„Åã„Çâlib„Éï„Ç°„Ç§„É´„Çí‰ΩúÊàê
     #cd target/x86_64-pc-windows-gnu/release
     #DOVI_DLL_FILENAME=dovi.dll
     #DOVI_DEF_FILENAME=dovi.def
@@ -1156,7 +1168,7 @@ if [ ! -d "libplacebo" ]; then
     LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
     meson build --buildtype release --prefix=$INSTALL_DIR -Dd3d11=enabled -Ddefault_library=static -Dprefer_static=true -Dstrip=true
     ninja -C build install
-    #â∫ãLÇÃÇÊÇ§Ç…ïœçXÇµÇ»Ç¢Ç∆ìKêÿÇ…ÉäÉìÉNÇ≈Ç´Ç»Ç¢
+    #‰∏ãË®ò„ÅÆ„Çà„ÅÜ„Å´Â§âÊõ¥„Åó„Å™„ÅÑ„Å®ÈÅ©Âàá„Å´„É™„É≥„ÇØ„Åß„Åç„Å™„ÅÑ
     # C:/mingw64/mingw64/lib/libshlwapi.a -> -llibshlwapi
     sed -i -e "s/[A-Z]:\/.\+\/lib\/libshlwapi\.a/-lshlwapi/g" ${INSTALL_DIR}/lib/pkgconfig/libplacebo.pc
     sed -i -e "s/[A-Z]:\/.\+\/lib\/libversion\.a/-lversion/g" ${INSTALL_DIR}/lib/pkgconfig/libplacebo.pc
@@ -1179,7 +1191,7 @@ if [ $BUILD_EXE != "TRUE" ]; then
         sed -i 's/libstdc++.dll.a/libstdc++.a/g' build/build.ninja
         ninja -C build
 
-        #dllÇ©ÇÁlib,defÉtÉ@ÉCÉãÇçÏê¨
+        #dll„Åã„Çâlib,def„Éï„Ç°„Ç§„É´„Çí‰ΩúÊàê
         cd build/src
         LIBPLACEBO_DLL_FILENAME=$(basename `find ./libplacebo-*.dll`)
         LIBPLACEBO_DLL_FILENAME_WITHOUT_EXT=${LIBPLACEBO_DLL_FILENAME/.dll/}
@@ -1197,37 +1209,20 @@ if [ $BUILD_EXE != "TRUE" ]; then
     fi
 fi
 
-if [ $BUILD_EXE = "TRUE" ]; then
-    cd $BUILD_DIR/$TARGET_ARCH
-    if [ ! -d "zimg" ]; then
-        find ../src/ -type d -name "zimg*" | xargs -i cp -r {} ./zimg
-        cd zimg
-        ./autogen.sh
-        
-        CFLAGS="${BUILD_CCFLAGS}" \
-        CXXFLAGS="${BUILD_CCFLAGS}" \
-        LDFLAGS="${BUILD_LDFLAGS}" \
-         ./configure \
-         --prefix=$INSTALL_DIR \
-         --disable-shared \
-         --enable-static
-        make -j$NJOBS && make install
-    fi
-
-    cd $BUILD_DIR/$TARGET_ARCH
-    if [ ! -d "vvenc" ]; then
-        find ../src/ -type d -name "vvenc*" | xargs -i cp -r {} ./vvenc
-        cd vvenc
-        mkdir build && cd build
-        CC=gcc \
-        CXX=g++ \
-        PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-        CFLAGS="${BUILD_CCFLAGS}" \
-        CPPFLAGS="${BUILD_CCFLAGS}" \
-        LDFLAGS="${BUILD_LDFLAGS}" \
-        cmake -G "MSYS Makefiles" -B build/release-static -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DVVENC_INSTALL_FULLFEATURE_APP=ON -DVVENC_ENABLE_THIRDPARTY_JSON=OFF ..
-        cmake --build build/release-static -j$NJOBS && cmake --build build/release-static --target install
-    fi
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "zimg" ]; then
+    find ../src/ -type d -name "zimg*" | xargs -i cp -r {} ./zimg
+    cd zimg
+    ./autogen.sh
+    
+    CFLAGS="${BUILD_CCFLAGS}" \
+    CXXFLAGS="${BUILD_CCFLAGS}" \
+    LDFLAGS="${BUILD_LDFLAGS}" \
+        ./configure \
+        --prefix=$INSTALL_DIR \
+        --disable-shared \
+        --enable-static
+    make -j$NJOBS && make install
 fi
 
 if [ $ENABLE_GPL = "TRUE" ]; then
@@ -1262,6 +1257,7 @@ if [ $ENABLE_GPL = "TRUE" ]; then
         cd x265
         patch -p 1 < $HOME/patches/x265_version.diff
         patch -p 1 < $HOME/patches/x265_zone_param.diff
+        patch -p 0 < $HOME/patches/x265_json11.diff
         mkdir build/msys2 && cd build/msys2
         mkdir 8bit
         mkdir 12bit && cd 12bit
@@ -1269,6 +1265,9 @@ if [ $ENABLE_GPL = "TRUE" ]; then
             -DHIGH_BIT_DEPTH=ON \
             -DEXPORT_C_API=OFF \
             -DENABLE_SHARED=OFF \
+            -DENABLE_ALPHA=ON \
+            -DENABLE_MULTIVIEW=ON \
+            -DENABLE_SCC_EXT=ON \
             -DENABLE_HDR10_PLUS=OFF \
             -DENABLE_CLI=OFF \
             -DMAIN12=ON \
@@ -1283,6 +1282,9 @@ if [ $ENABLE_GPL = "TRUE" ]; then
             -DHIGH_BIT_DEPTH=ON \
             -DEXPORT_C_API=OFF \
             -DENABLE_SHARED=OFF \
+            -DENABLE_ALPHA=ON \
+            -DENABLE_MULTIVIEW=ON \
+            -DENABLE_SCC_EXT=ON \
             -DENABLE_HDR10_PLUS=ON \
             -DENABLE_CLI=OFF \
             -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
@@ -1301,6 +1303,9 @@ if [ $ENABLE_GPL = "TRUE" ]; then
             -DLINKED_10BIT=ON \
             -DLINKED_12BIT=ON \
             -DENABLE_SHARED=OFF \
+            -DENABLE_ALPHA=ON \
+            -DENABLE_MULTIVIEW=ON \
+            -DENABLE_SCC_EXT=ON \
             -DENABLE_HDR10_PLUS=OFF \
             -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
             -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
@@ -1308,7 +1313,7 @@ if [ $ENABLE_GPL = "TRUE" ]; then
             -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_GEN_LD}"
         make -j${NJOBS}
 
-        #profileÇÃÇΩÇﬂÇÃé¿çsÇÕÉVÉìÉOÉãÉXÉåÉbÉhÇ≈çsÇ§
+        #profile„ÅÆ„Åü„ÇÅ„ÅÆÂÆüË°å„ÅØ„Ç∑„É≥„Ç∞„É´„Çπ„É¨„ÉÉ„Éâ„ÅßË°å„ÅÜ
         ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --preset faster
         ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --preset fast
         ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}"
@@ -1330,6 +1335,9 @@ if [ $ENABLE_GPL = "TRUE" ]; then
             -DHIGH_BIT_DEPTH=ON \
             -DEXPORT_C_API=OFF \
             -DENABLE_SHARED=OFF \
+            -DENABLE_ALPHA=ON \
+            -DENABLE_MULTIVIEW=ON \
+            -DENABLE_SCC_EXT=ON \
             -DENABLE_HDR10_PLUS=OFF \
             -DSTATIC_LINK_CRT=ON \
             -DENABLE_CLI=OFF \
@@ -1344,6 +1352,9 @@ if [ $ENABLE_GPL = "TRUE" ]; then
             -DHIGH_BIT_DEPTH=ON \
             -DEXPORT_C_API=OFF \
             -DENABLE_SHARED=OFF \
+            -DENABLE_ALPHA=ON \
+            -DENABLE_MULTIVIEW=ON \
+            -DENABLE_SCC_EXT=ON \
             -DENABLE_HDR10_PLUS=ON \
             -DSTATIC_LINK_CRT=ON \
             -DENABLE_CLI=OFF \
@@ -1364,6 +1375,9 @@ if [ $ENABLE_GPL = "TRUE" ]; then
             -DLINKED_12BIT=ON \
             -DSTATIC_LINK_CRT=ON \
             -DENABLE_SHARED=OFF \
+            -DENABLE_ALPHA=ON \
+            -DENABLE_MULTIVIEW=ON \
+            -DENABLE_SCC_EXT=ON \
             -DENABLE_HDR10_PLUS=OFF \
             -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
             -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
@@ -1374,8 +1388,42 @@ if [ $ENABLE_GPL = "TRUE" ]; then
         mv libx265.a libx265_main.a
         echo -n -e "create libx265.a\naddlib libx265_main.a\naddlib libx265_main10.a\naddlib libx265_main12.a\nsave\nend" | ar -M
         make install
-        # static linkÇ™Ç§Ç‹Ç≠Ç¢Ç≠ÇÊÇ§Ç…èëÇ´ä∑Ç¶
+        # static link„Åå„ÅÜ„Åæ„Åè„ÅÑ„Åè„Çà„ÅÜ„Å´Êõ∏„ÅçÊèõ„Åà
         sed -i -e 's/^Libs.private:.*/Libs.private: -lstdc++/g' $INSTALL_DIR/lib/pkgconfig/x265.pc
+    fi
+    
+    cd $BUILD_DIR/$TARGET_ARCH
+    if [ ! -d "xvidcore" ]; then
+        find ../src/ -type d -name "xvidcore*" | xargs -i cp -r {} ./xvidcore
+        cd xvidcore/build/generic
+        ./configure --help
+        ./bootstrap.sh
+        CFLAGS="${BUILD_CCFLAGS} -std=gnu17" \
+        CPPFLAGS=${BUILD_CCFLAGS} \
+        LDFLAGS=${BUILD_LDFLAGS} \
+        ./configure --prefix=$INSTALL_DIR
+        make -j${NUMBER_OF_PROCESSORS}
+        cp ../../src/xvid.h $INSTALL_DIR/include/
+        cp '=build/xvidcore.a' $INSTALL_DIR/lib/libxvidcore.a
+    fi
+fi
+
+if [ $TARGET_ARCH != "x86" ]; then
+    cd $BUILD_DIR/$TARGET_ARCH
+    if [ ! -d "vvenc" ]; then
+        find ../src/ -type d -name "vvenc*" | xargs -i cp -r {} ./vvenc
+        cd vvenc
+        mkdir build && cd build
+        CC=gcc \
+        CXX=g++ \
+        PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+        CFLAGS="${BUILD_CCFLAGS}" \
+        CPPFLAGS="${BUILD_CCFLAGS}" \
+        LDFLAGS="${BUILD_LDFLAGS}" \
+        cmake -G "MSYS Makefiles" -B build/release-static -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DVVENC_INSTALL_FULLFEATURE_APP=ON -DVVENC_ENABLE_THIRDPARTY_JSON=OFF ..
+        cmake --build build/release-static -j$NJOBS && cmake --build build/release-static --target install
+        # static link„Åå„ÅÜ„Åæ„Åè„ÅÑ„Åè„Çà„ÅÜ„Å´Êõ∏„ÅçÊèõ„Åà
+        sed -i -e 's/-lvvenc/-lvvenc -lstdc++/g' $INSTALL_DIR/lib/pkgconfig/libvvenc.pc
     fi
 
     cd $BUILD_DIR/$TARGET_ARCH
@@ -1388,19 +1436,19 @@ if [ $ENABLE_GPL = "TRUE" ]; then
             SVTAV1_ENABLE_LTO=ON
         fi
         cmake -G "MSYS Makefiles" \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DBUILD_SHARED_LIBS=OFF \
-          -DBUILD_TESTING=OFF \
-          -DNATIVE=OFF \
-          -DSVT_AV1_LTO=$SVTAV1_ENABLE_LTO \
-          -DENABLE_NASM=ON \
-          -DENABLE_AVX512=ON \
-          -DCMAKE_ASM_NASM_COMPILER=nasm \
-          -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
-          -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC} ${PROFILE_SVTAV1}" \
-          -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC} ${PROFILE_SVTAV1}" \
-          -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_GEN_LD} ${PROFILE_SVTAV1}" \
-          ../..
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_TESTING=OFF \
+            -DNATIVE=OFF \
+            -DSVT_AV1_LTO=$SVTAV1_ENABLE_LTO \
+            -DENABLE_NASM=ON \
+            -DENABLE_AVX512=ON \
+            -DCMAKE_ASM_NASM_COMPILER=nasm \
+            -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+            -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC} ${PROFILE_SVTAV1}" \
+            -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC} ${PROFILE_SVTAV1}" \
+            -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_GEN_LD} ${PROFILE_SVTAV1}" \
+            ../..
         make -j${NUMBER_OF_PROCESSORS}
 
         ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx512
@@ -1413,35 +1461,20 @@ if [ $ENABLE_GPL = "TRUE" ]; then
         ../../Bin/Release/SvtAv1EncApp.exe -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 8 -n 30 --input-depth 10 --asm avx2
 
         cmake -G "MSYS Makefiles" \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DBUILD_SHARED_LIBS=OFF \
-          -DBUILD_TESTING=OFF \
-          -DNATIVE=OFF \
-          -DSVT_AV1_LTO=$SVTAV1_ENABLE_LTO \
-          -DENABLE_NASM=ON \
-          -DENABLE_AVX512=ON \
-          -DCMAKE_ASM_NASM_COMPILER=nasm \
-          -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
-          -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC} ${PROFILE_SVTAV1}" \
-          -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC} ${PROFILE_SVTAV1}" \
-          -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_USE_LD} ${PROFILE_SVTAV1}" \
-          ../..
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_TESTING=OFF \
+            -DNATIVE=OFF \
+            -DSVT_AV1_LTO=$SVTAV1_ENABLE_LTO \
+            -DENABLE_NASM=ON \
+            -DENABLE_AVX512=ON \
+            -DCMAKE_ASM_NASM_COMPILER=nasm \
+            -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+            -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC} ${PROFILE_SVTAV1}" \
+            -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC} ${PROFILE_SVTAV1}" \
+            -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_USE_LD} ${PROFILE_SVTAV1}" \
+            ../..
         make -j${NUMBER_OF_PROCESSORS} && make install
-    fi
-    
-    cd $BUILD_DIR/$TARGET_ARCH
-    if [ ! -d "xvidcore" ]; then
-        find ../src/ -type d -name "xvidcore*" | xargs -i cp -r {} ./xvidcore
-        cd xvidcore/build/generic
-        ./configure --help
-        ./bootstrap.sh
-        CFLAGS=${BUILD_CCFLAGS} \
-        CPPFLAGS=${BUILD_CCFLAGS} \
-        LDFLAGS=${BUILD_LDFLAGS} \
-        ./configure --prefix=$INSTALL_DIR
-        make -j${NUMBER_OF_PROCESSORS}
-        cp ../../src/xvid.h $INSTALL_DIR/include/
-        cp '=build/xvidcore.a' $INSTALL_DIR/lib/libxvidcore.a
     fi
 fi
 
@@ -1489,51 +1522,6 @@ fi
 # sed -i.orig -e "/Libs.private:/s/$/ -lcrypt32/" lib/gnutls.pc
 # make install -j$NJOBS
 
-if [ $BUILD_EXE != "TRUE" ]; then
-  cd $BUILD_DIR/$TARGET_ARCH/ffmpeg_test
-  if [ ! -e ./ffmpeg.exe ]; then
-      PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-      ./configure \
-      --prefix=${INSTALL_DIR}/$FFMPEG_DIR_NAME \
-      --arch="${FFMPEG_ARCH}" \
-      --target-os="mingw32" \
-      $FFMPEG_DISABLE_ASM \
-      --disable-doc \
-      --disable-avdevice \
-      --disable-hwaccels \
-      --disable-devices \
-      --disable-debug \
-      --disable-network \
-      --disable-amd3dnow \
-      --disable-amd3dnowext \
-      --disable-xop \
-      --disable-fma4 \
-      --disable-bsfs \
-      --disable-aesni \
-      --enable-libvorbis \
-      --enable-libspeex \
-      --enable-libmp3lame \
-      --enable-libtwolame \
-      --enable-libsoxr \
-      --enable-libopus \
-      --extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
-      --extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib"
-      make -j$NJOBS
-  fi
-  
-  ./ffmpeg.exe -encoders | grep '^ A.\{5\} ' | cut -d' ' -f3 > ffmpeg_audenc_list.txt
-  ./ffmpeg.exe -encoders | grep '^ S.\{5\} ' | cut -d' ' -f3 >> ffmpeg_audenc_list.txt
-  ./configure --list-encoders | tr '\t' '\n' | grep -v '^\s*$' | sort > ./configure_enc_list.txt
-  CONFIGURE_AUDENC_LIST=`python $HOME/build_get_audlist.py ffmpeg_audenc_list.txt ./configure_enc_list.txt`
-  
-  ./ffmpeg.exe -filters | grep -v 'V->' | grep -v '\->V' | cut -d' ' -f3 > ffmpeg_audfilter_list.txt
-  ./configure --list-filters | tr '\t' '\n' | grep -v '^\s*$' | sort > ./configure_filter_list.txt
-  CONFIGURE_AUDFILTER_LIST=`python $HOME/build_get_audlist.py ffmpeg_audfilter_list.txt ./configure_filter_list.txt`
-else
-  CONFIGURE_AUDENC_LIST=
-  CONFIGURE_AUDFILTER_LIST=
-fi
-
 if [ $ENABLE_SWSCALE = "TRUE" ]; then
     SWSCALE_ARG="--enable-swscale"
 else
@@ -1548,8 +1536,14 @@ else
     FFMPEG5_CUDA_DISABLE_FLAGS=" --disable-cuda-nvcc --disable-cuda-llvm"
 fi
 
+if [ $TARGET_ARCH != "x86" ]; then
+    ENCODER_LIBS="--enable-libvvenc --enable-libsvtav1"
+else
+    ENCODER_LIBS=""
+fi
+
 if [ $ENABLE_GPL = "TRUE" ]; then
-  GPL_LIBS="--enable-gpl --enable-libx264 --enable-libx265 --enable-libsvtav1 --enable-libxvid"
+  GPL_LIBS="--enable-gpl --enable-libx264 --enable-libx265 --enable-libxvid"
 else
   GPL_LIBS=""
 fi
@@ -1567,7 +1561,6 @@ $PKG_CONFIG_FLAGS \
 $SWSCALE_ARG \
 $FFMPEG_DISABLE_ASM \
 $GPL_LIBS \
---disable-postproc \
 --disable-avdevice \
 --disable-hwaccels \
 --disable-devices \
@@ -1600,6 +1593,7 @@ $FFMPEG5_CUDA_DISABLE_FLAGS \
 --disable-filters \
 --enable-filter=$CONFIGURE_AUDFILTER_LIST \
 --enable-small \
+--disable-mediafoundation \
 --pkg-config-flags="--static" \
 --extra-cflags="${BUILD_CCFLAGS} -Os -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
 --extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib"
@@ -1616,8 +1610,8 @@ $PKG_CONFIG_FLAGS \
 --disable-doc \
 $SWSCALE_ARG \
 $FFMPEG_DISABLE_ASM \
+$ENCODER_LIBS \
 $GPL_LIBS \
---disable-postproc \
 --disable-outdevs \
 --disable-amd3dnow \
 --disable-amd3dnowext \
@@ -1643,13 +1637,13 @@ $FFMPEG5_CUDA_DISABLE_FLAGS \
 --enable-libdav1d \
 --enable-libvpl \
 --enable-libvpx \
---enable-libvvenc \
 --enable-libglslang \
 --enable-libzimg \
 --enable-libplacebo \
 --enable-ffnvcodec \
 --enable-nvdec \
 --enable-cuvid \
+--disable-mediafoundation \
 --pkg-config-flags="--static" \
 --enable-libaribcaption \
 --enable-libaribb24 \
@@ -1667,7 +1661,7 @@ $PKG_CONFIG_FLAGS \
 $SWSCALE_ARG \
 $FFMPEG_DISABLE_ASM \
 $GPL_LIBS \
---disable-postproc \
+$ENCODER_LIBS \
 --disable-outdevs \
 --disable-debug \
 --disable-static \
@@ -1702,8 +1696,7 @@ $FFMPEG5_CUDA_DISABLE_FLAGS \
 --enable-ffnvcodec \
 --enable-nvdec \
 --enable-cuvid \
---disable-filters \
---enable-filter=$CONFIGURE_AUDFILTER_LIST \
+--disable-mediafoundation \
 --pkg-config-flags="--static" \
 --enable-libaribcaption \
 --enable-libaribb24 \
@@ -1733,12 +1726,13 @@ cd $BUILD_DIR/src
 SRC_7Z_FILENAME=ffmpeg_lgpl_src.7z
 SRC_GPL_LIBS=
 SRC_EXE_LIBS=
-if [ $BUILD_EXE = "TRUE" ]; then
-    SRC_EXE_LIBS="$BUILD_DIR/src/vvenc* $BUILD_DIR/src/glslang* $BUILD_DIR/src/zimg*"
-fi
+SRC_ENCODER_LIBS=
 if [ ${ENABLE_GPL} != "FALSE" ]; then
   SRC_7Z_FILENAME=ffmpeg_gpl_src.7z
-  SRC_GPL_LIBS="$BUILD_DIR/src/x264* $BUILD_DIR/src/x265* $BUILD_DIR/src/svt-av1* $BUILD_DIR/src/xvidcore*"
+  SRC_GPL_LIBS="$BUILD_DIR/src/x264* $BUILD_DIR/src/x265* $BUILD_DIR/src/xvidcore*"
+fi
+if [ $TARGET_ARCH != "x86" ]; then
+    SRC_ENCODER_LIBS="$BUILD_DIR/src/svt-av1* $BUILD_DIR/src/vvenc*"
 fi
 rm -f ${SRC_7Z_FILENAME}
 echo "compressing src file..."
@@ -1747,10 +1741,11 @@ echo "compressing src file..."
  $BUILD_DIR/src/lame* $BUILD_DIR/src/libsndfile* $BUILD_DIR/src/twolame* $BUILD_DIR/src/soxr* $BUILD_DIR/src/speex* \
  $BUILD_DIR/src/expat* $BUILD_DIR/src/freetype* $BUILD_DIR/src/libiconv* $BUILD_DIR/src/fontconfig* \
  $BUILD_DIR/src/libpng* $BUILD_DIR/src/libass* $BUILD_DIR/src/bzip2* $BUILD_DIR/src/libbluray* \
+ $BUILD_DIR/src/glslang* $BUILD_DIR/src/zimg* \
  $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libaribcaption* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* \
  $BUILD_DIR/src/libvpl* $BUILD_DIR/src/libvpx* $BUILD_DIR/src/nv-codec-headers* \
  $BUILD_DIR/src/libxxhash* $BUILD_DIR/src/shaderc* $BUILD_DIR/src/SPIRV-Cross* \
  $BUILD_DIR/src/dovi_tool* $BUILD_DIR/src/libjpeg-* $BUILD_DIR/src/lcms2* $BUILD_DIR/src/libplacebo* $BUILD_DIR/src/Vulkan-Loader* \
- $SRC_GPL_LIBS $SRC_EXE_LIBS \
+ $SRC_GPL_LIBS $SRC_EXE_LIBS $SRC_ENCODER_LIBS \
  $PATCHES_DIR/* \
   > /dev/null

@@ -1,0 +1,10 @@
+--- source/dynamicHDR10/json11/json11.cpp.org	2025-08-23 20:58:06.908128400 +0900
++++ source/dynamicHDR10/json11/json11.cpp	2025-08-23 20:59:31.654086800 +0900
+@@ -23,6 +23,7 @@
+ #include <cassert>
+ #include <cmath>
+ #include <cstdlib>
++#include <cstdint>
+ #include <cstdio>
+ #include <limits>
+ 

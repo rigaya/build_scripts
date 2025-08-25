@@ -1,7 +1,5 @@
 #!/bin/bash
 #MSYS2用ffmpeg dllビルドスクリプト
-# 下記インストールでgcc13系を持つmsys2を導入する (updateしてgcc14にしないこと、なぜか動作しないバイナリができる)
-# https://repo.msys2.org/distrib/x86_64/msys2-x86_64-20230526.exe
 #Visual Studioへの環境変数を通して起動する
 #pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain autotools autogen
 #pacman -S p7zip git nasm yasm python unzip

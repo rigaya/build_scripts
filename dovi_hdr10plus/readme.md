@@ -5,7 +5,7 @@ Create dovi.lib, hdr10plus-rs.lib for MSVC static link (/MT).
 ## Install tools
 - MSYS2
 
-## Install rust
+## Install rust on cmd
 
 ```bat
 curl -o rustup-init.exe -sSL https://win.rustup.rs/

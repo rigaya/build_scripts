@@ -275,9 +275,9 @@ if [ ! -d "freetype-2.11.0" ]; then
     tar xf freetype-2.11.0.tar.xz
 fi
 
-if [ ! -d "libiconv-1.18" ]; then
-    wget https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.18.tar.gz
-    tar xf libiconv-1.18.tar.gz
+if [ ! -d "libiconv-1.16" ]; then
+    wget https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.16.tar.gz
+    tar xf libiconv-1.16.tar.gz
 fi
 
 #2.12.6でないといろいろ面倒 -> 2.12.1もだめ, 2.13.0もだめ

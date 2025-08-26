@@ -3,7 +3,8 @@
 Create dovi.lib, hdr10plus-rs.lib for MSVC static link (/MT).
 
 ## Install tools
-- MSYS2
+- Visual Studio 2022
+- [MSYS2](https://www.msys2.org/)
 
 ## Install rust on cmd
 
@@ -17,29 +18,18 @@ rustup target add i686-pc-windows-msvc
 ```
 
 ## Update msys2
-```
+```sh
 pacman -Syuu
 ```
 
-## Run mingw64 / mingw32 with Visual Studio environment
+#### Copy Launcher scripts and launch mingw32 / mingw64
+Copy scripts below to the directory where mingw64.exe exists
+- mingw32_vsvar.cmd
+- mingw64_vsvar.cmd
 
-### x64
+Launch msys2 by mingw32_vsvar.cmd / mingw64_vsvar.cmd and the run build scipt.
 
-```bat
-call "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
-call "%VS170COMNTOOLS%\..\..\VC\Auxiliary\Build\vcvarsall.bat" x64
-
-"%~dp0msys2_shell.cmd" -mingw64 -use-full-path
-```
-
-### x86
-
-```bat
-call "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"
-call "%VS170COMNTOOLS%\..\..\VC\Auxiliary\Build\vcvarsall.bat" x86
-
-"%~dp0msys2_shell.cmd" -mingw32 -use-full-path
-```
+This will launch with Visual Studio 2022 environment enabled.
 
 ## Install cargo-c on mingw64 / mingw32
 

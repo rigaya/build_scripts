@@ -252,7 +252,7 @@ if [ ! -d "libiconv" ]; then
     cd ./libiconv
     gzip -dc $PATCHES_DIR/libiconv-1.16-ja-1.patch.gz | patch -p1
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CFLAGS="${BUILD_CCFLAGS_SMALL} -std=gnu17" \
     CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
     ./configure \
     --prefix=$INSTALL_DIR \

@@ -9,7 +9,6 @@ PATCHES_DIR=$HOME/patches
 
 BUILD_DIR=$HOME/build_lsmashworks
 
-ADD_TLVMMT="FALSE"
 BUILD_ALL="FALSE"
 UPDATE_FFMPEG="FALSE"
 UPDATE_LSMASHWORKS="FALSE"
@@ -22,9 +21,6 @@ while getopts ":-:d" key; do
   fi
 
   case $key in
-    mmttlv )
-      ADD_TLVMMT="TRUE"
-      ;;
     d | enable-debug )
       ENABLE_DEBUG="TRUE"
       ;;
@@ -63,7 +59,7 @@ if [ $TARGET_ARCH = "x64" ]; then
 elif [ $TARGET_ARCH = "x86" ]; then
     BUILD_CCFLAGS="-m32 -D_FORTIFY_SOURCE=0 -mstackrealign -I${INSTALL_DIR}/include"
     BUILD_LDFLAGS="-static -static-libgcc -static-libstdc++ -L${INSTALL_DIR}/lib"
-    #  libavcodec/h264_cabac.c: In function 'ff_h264_decode_mb_cabac': libavcodec/x86/cabac.h:192:5: error: 'asm' operand has impossible ëŒçÙ
+    #  libavcodec/h264_cabac.c: In function 'ff_h264_decode_mb_cabac': libavcodec/x86/cabac.h:192:5: error: 'asm' operand has impossible ÂØæÁ≠ñ
     # FFMPEG_DISABLE_ASM="--disable-inline-asm"
 else
     echo "invalid TARGET_ARCH: ${TARGET_ARCH}"
@@ -82,9 +78,6 @@ else
 fi
 
 FFMPEG_DIR_NAME="ffmpeg"
-if [ $ADD_TLVMMT = "TRUE" ]; then
-    FFMPEG_DIR_NAME="${FFMPEG_DIR_NAME}_tlvmmt"
-fi
 
 echo BUILD_DIR=$BUILD_DIR
 echo INSTALL_DIR=$INSTALL_DIR
@@ -96,11 +89,12 @@ mkdir -p $BUILD_DIR
 mkdir -p $BUILD_DIR/src
 cd $BUILD_DIR/src
 
-#--- É\Å[ÉXÇÃÉ_ÉEÉìÉçÅ[Éh ---------------------------------------
+#--- „ÇΩ„Éº„Çπ„ÅÆ„ÉÄ„Ç¶„É≥„É≠„Éº„Éâ ---------------------------------------
 if [ ! -d "L-SMASH-Works" ]; then
     UPDATE_LSMASHWORKS="TRUE"
     #git clone https://github.com/HomeOfAviSynthPlusEvolution/L-SMASH-Works.git L-SMASH-Works
-    git clone https://github.com/rigaya/L-SMASH-Works.git L-SMASH-Works
+    #git clone https://github.com/rigaya/L-SMASH-Works.git L-SMASH-Works
+    git clone https://github.com/Mr-Ojii/L-SMASH-Works.git L-SMASH-Works
 elif [ $UPDATE_LSMASHWORKS = "TRUE" ]; then
     cd L-SMASH-Works
     git fetch
@@ -115,7 +109,7 @@ if [ $UPDATE_FFMPEG = "TRUE" ]; then
     if [ -d "ffmpeg" ]; then
         rm -rf ffmpeg
     fi
-    FFMPEG_ARCHIEVE_VER=ffmpeg-7.0.2
+    FFMPEG_ARCHIEVE_VER=ffmpeg-8.0
     if [ ! -e ${FFMPEG_ARCHIEVE_VER}.tar.xz ]; then
         wget https://ffmpeg.org/releases/${FFMPEG_ARCHIEVE_VER}.tar.xz
     fi
@@ -149,9 +143,9 @@ if [ ! -d "libiconv-1.16" ]; then
     tar xf libiconv-1.16.tar.gz
 fi
 
-if [ ! -d "libogg-1.3.5" ]; then
-    wget https://downloads.xiph.org/releases/ogg/libogg-1.3.5.tar.xz
-    tar xf libogg-1.3.5.tar.xz
+if [ ! -d "libogg-1.3.6" ]; then
+    wget https://downloads.xiph.org/releases/ogg/libogg-1.3.6.tar.xz
+    tar xf libogg-1.3.6.tar.xz
 fi
 
 if [ ! -d "libvorbis-1.3.7" ]; then
@@ -164,9 +158,9 @@ if [ ! -d "opus-1.5.2" ]; then
     tar xf opus-1.5.2.tar.gz
 fi
 
-if [ ! -d "libvpl-2.12.0" ]; then
-    wget -O libvpl-2.12.0.tar.gz https://github.com/intel/libvpl/archive/refs/tags/v2.12.0.tar.gz
-    tar xf libvpl-2.12.0.tar.gz
+if [ ! -d "libvpl-2.15.0" ]; then
+    wget -O libvpl-2.15.0.tar.gz https://github.com/intel/libvpl/archive/refs/tags/v2.15.0.tar.gz
+    tar xf libvpl-2.15.0.tar.gz
 fi
 
 if [ ! -d "nv-codec-headers-12.2.72.0" ]; then
@@ -174,19 +168,14 @@ if [ ! -d "nv-codec-headers-12.2.72.0" ]; then
     tar xf nv-codec-headers-12.2.72.0.tar.gz
 fi
 
-if [ ! -d "libvpx-1.14.1" ]; then
-    wget -O libvpx-1.14.1.tar.gz https://github.com/webmproject/libvpx/archive/refs/tags/v1.14.1.tar.gz
-    tar xf libvpx-1.14.1.tar.gz
+if [ ! -d "libvpx-1.15.2" ]; then
+    wget -O libvpx-1.15.2.tar.gz https://github.com/webmproject/libvpx/archive/refs/tags/v1.15.2.tar.gz
+    tar xf libvpx-1.15.2.tar.gz
 fi
 
-if [ ! -d "libvpx-1.14.1" ]; then
-    wget -O libvpx-1.14.1.tar.gz https://github.com/webmproject/libvpx/archive/refs/tags/v1.14.1.tar.gz
-    tar xf libvpx-1.14.1.tar.gz
-fi
-
-if [ ! -d "dav1d-1.4.3" ]; then
-    wget https://code.videolan.org/videolan/dav1d/-/archive/1.4.3/dav1d-1.4.3.tar.gz
-    tar xf dav1d-1.4.3.tar.gz
+if [ ! -d "dav1d-1.5.1" ]; then
+    wget https://code.videolan.org/videolan/dav1d/-/archive/1.5.1/dav1d-1.5.1.tar.gz
+    tar xf dav1d-1.5.1.tar.gz
 fi
 
 if [ ! -d "AviSynthPlus-3.7.3" ]; then
@@ -194,9 +183,10 @@ if [ ! -d "AviSynthPlus-3.7.3" ]; then
     tar xf AviSynthPlus-v3.7.3.tar.gz
 fi
 
-if [ ! -d "zimg-release-3.0.5" ]; then
-    wget -O zimg-release-3.0.5.tar.gz https://github.com/sekrit-twc/zimg/archive/refs/tags/release-3.0.5.tar.gz
-    tar xf zimg-release-3.0.5.tar.gz
+if [ ! -d "zimg-3.0.6" ]; then
+    wget -O zimg-release-3.0.6.tar.gz https://github.com/sekrit-twc/zimg/archive/refs/tags/release-3.0.6.tar.gz
+    tar xf zimg-release-3.0.6.tar.gz
+    mv zimg-release-3.0.6 zimg-3.0.6
 fi
 
 if [ ! -d "vapoursynth-R69" ]; then
@@ -204,7 +194,7 @@ if [ ! -d "vapoursynth-R69" ]; then
     tar xf vapoursynth-R69.tar.gz
 fi
 
-# --- èoóÕêÊÇèÄîı --------------------------------------
+# --- Âá∫ÂäõÂÖà„ÇíÊ∫ñÂÇô --------------------------------------
 if [ $BUILD_ALL != "FALSE" ]; then
     rm -rf $BUILD_DIR/$TARGET_ARCH
 fi
@@ -213,7 +203,7 @@ if [ ! -d $BUILD_DIR/$TARGET_ARCH ]; then
     mkdir $BUILD_DIR/$TARGET_ARCH
 fi
 cd $BUILD_DIR/$TARGET_ARCH
-# --- èoóÕêÊÇÃå√Ç¢ÉfÅ[É^ÇçÌèú ----------------------
+# --- Âá∫ÂäõÂÖà„ÅÆÂè§„ÅÑ„Éá„Éº„Çø„ÇíÂâäÈô§ ----------------------
 if [ ! -d L-SMASH-Works ]; then
     UPDATE_LSMASHWORKS="TRUE"
 fi
@@ -222,9 +212,6 @@ if [ $UPDATE_LSMASHWORKS = "TRUE" ]; then
         rm -rf L-SMASH-Works
     fi
     cp -r ../src/L-SMASH-Works .
-    cd L-SMASH-Works
-    patch -p1 < $HOME/patches/lwindex-ffmpeg7.0.diff
-    cd ..
 fi
 
 if [ ! -d $FFMPEG_DIR_NAME ]; then
@@ -235,12 +222,6 @@ if [ $UPDATE_FFMPEG != "FALSE" ]; then
         rm -rf $FFMPEG_DIR_NAME
     fi
     cp -r ../src/ffmpeg $FFMPEG_DIR_NAME
-    if [ $ADD_TLVMMT = "TRUE" ]; then
-        cd $FFMPEG_DIR_NAME
-        patch -p1 < $PATCHES_DIR/ffmpeg_tlvmmt.diff
-        patch -p1 < $PATCHES_DIR/ffmpeg_tlvmmt_asset_group_desc.diff
-        read -p "Check patch and hit enter: "
-    fi
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
@@ -350,14 +331,15 @@ if [ ! -d "libvpl" ]; then
     cmake -G "MSYS Makefiles" -B _build -DBUILD_SHARED_LIBS=OFF -DUSE_MSVC_STATIC_RUNTIME=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
     cmake --build _build --config Release
     cmake --install _build --config Release
-    # x86î≈ÇÃèÍçáÅA$INSTALL_DIR/libÇ…ì¸ÇÈÇ◊Ç´Ç‡ÇÃÇ™$INSTALL_DIR/lib/x86Ç…ì¸Ç¡ÇƒÇµÇ‹Ç§
-    # Ç†Ç∆Ç©ÇÁã≠êßìIÇ…à⁄ìÆÇ∑ÇÈ
-    # vpl.pcÇÃÉpÉXÇ‡à⁄ìÆÇ…çáÇÌÇπÇÈ
+    # x86Áâà„ÅÆÂ†¥Âêà„ÄÅ$INSTALL_DIR/lib„Å´ÂÖ•„Çã„Åπ„Åç„ÇÇ„ÅÆ„Åå$INSTALL_DIR/lib/x86„Å´ÂÖ•„Å£„Å¶„Åó„Åæ„ÅÜ
+    # „ÅÇ„Å®„Åã„ÇâÂº∑Âà∂ÁöÑ„Å´ÁßªÂãï„Åô„Çã
+    # vpl.pc„ÅÆ„Éë„Çπ„ÇÇÁßªÂãï„Å´Âêà„Çè„Åõ„Çã
     if [ $TARGET_ARCH = "x86" ]; then
         cp -r $INSTALL_DIR/lib/x86/* $INSTALL_DIR/lib/
         rm -rf $INSTALL_DIR/lib/x86
         sed -i -e 's/${pcfiledir}\/../${pcfiledir}/g' $INSTALL_DIR/lib/pkgconfig/vpl.pc
     fi
+    sed -i -e 's/-lvpl/-lvpl -lstdc++/g' $INSTALL_DIR/lib/pkgconfig/vpl.pc
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
@@ -404,7 +386,7 @@ if [ ! -d "l-smash" ]; then
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
-if [ $UPDATE_FFMPEG != "FALSE" ]; then
+if [ $UPDATE_FFMPEG != "FALSE" ] || [ ! -d $FFMPEG_DIR_NAME ]; then
     if [ $ENABLE_DEBUG = "TRUE" ]; then
         FFMPEG_DEBUG_OPT="--enable-debug --disable-optimizations --disable-stripping"
     else
@@ -422,7 +404,6 @@ if [ $UPDATE_FFMPEG != "FALSE" ]; then
     --disable-doc \
     $FFMPEG_DISABLE_ASM \
     $FFMPEG_DEBUG_OPT \
-    --disable-postproc \
     --disable-outdevs \
     --disable-indevs \
     --disable-avfilter \
@@ -524,7 +505,13 @@ sed -i -e 's/libstdc++.dll.a/libstdc++.a/g' build/build.ninja
 sed -i -e 's/libatomic.dll.a/libatomic.a/g' build/build.ninja
 ninja --verbose -C build
 
-cd $BUILD_DIR/$TARGET_ARCH/L-SMASH-Works/Aviutl
+if [ $TARGET_ARCH = "x86" ]; then
+    AVIUTL_DIR_NAME="AviUtl"
+else
+    AVIUTL_DIR_NAME="AviUtl2"
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH/L-SMASH-Works/${AVIUTL_DIR_NAME}
 PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
 ./configure \
 --extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include" \

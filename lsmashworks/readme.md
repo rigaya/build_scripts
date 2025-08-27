@@ -25,6 +25,7 @@ pacman -S mingw32/mingw-w64-i686-ragel mingw64/mingw-w64-x86_64-ragel
 ```
 $HOME
 |- build_lsmashworks.sh
+|- [patches]
 ```
 
 ## Run build

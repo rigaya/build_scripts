@@ -291,10 +291,15 @@ if [ ! -d "fribidi-1.0.16" ]; then
     tar xf fribidi-1.0.16.tar.xz
 fi
 
-#if [ ! -d "harfbuzz-3.3.1" ]; then
-#    wget https://github.com/harfbuzz/harfbuzz/releases/download/3.3.1/harfbuzz-3.3.1.tar.xz
-#    tar xf harfbuzz-3.3.1.tar.xz
+#if [ ! -d "graphite2-1.3.14" ]; then
+#    wget https://github.com/silnrsi/graphite/releases/download/1.3.14/graphite2-1.3.14.tgz
+#    tar xf graphite2-1.3.14.tgz
 #fi
+
+if [ ! -d "harfbuzz-11.4.4" ]; then
+    wget https://github.com/harfbuzz/harfbuzz/releases/download/11.4.4/harfbuzz-11.4.4.tar.xz
+    tar xf harfbuzz-11.4.4.tar.xz
+fi
 
 #0.14.0でないとバイナリが異常に大きくなる
 if [ ! -d "libass-0.14.0" ]; then
@@ -691,20 +696,34 @@ if [ ! -d "fribidi" ]; then
 fi
 
 # cd $BUILD_DIR/$TARGET_ARCH
-# if [ ! -d "harfbuzz" ]; then
-    # find ../src/ -type d -name "harfbuzz-*" | xargs -i cp -r {} ./harfbuzz
-    # cd ./harfbuzz
-    # autoreconf -fvi
-    # PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-    # CFLAGS="${BUILD_CCFLAGS_SMALL}" \
-    # CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
-    # ./configure \
-    # --prefix=$INSTALL_DIR \
-    # --enable-static \
-    # --enable-shared=no \
-    # --enable-gtk-doc-html=no
-    # make -j$NJOBS && make install
+# if [ ! -d "graphite2" ]; then
+#     find ../src/ -type d -name "graphite2-*" | xargs -i cp -r {} ./graphite2
+#     cd ./graphite2
+#     sed -i '/cmptest/d' tests/CMakeLists.txt
+#     sed -i '/cmake_policy(SET CMP0012 NEW)/d' CMakeLists.txt
+#     sed -i 's/PythonInterp/Python3/' CMakeLists.txt
+#     find . -name CMakeLists.txt | xargs sed -i 's/VERSION 2.8.0 FATAL_ERROR/VERSION 4.0.0/'
+#     sed -i '/Font.h/i #include <cstdint>' tests/featuremap/featuremaptest.cpp
+#     mkdir build && cd build
+#     cmake -G "MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DENABLE_SHARED=OFF -DENABLE_STATIC=ON ..
+#     make -j$NJOBS && make install
+#     read -p "Check install and hit enter: "
 # fi
+
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "harfbuzz" ]; then
+    find ../src/ -type d -name "harfbuzz-*" | xargs -i cp -r {} ./harfbuzz
+    cd ./harfbuzz
+    CC=gcc \
+    CXX=g++ \
+    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+    CFLAGS="${BUILD_CCFLAGS_SMALL} -I${INSTALL_DIR}/include" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL} -L${INSTALL_DIR}/lib" \
+    LDFLAGS="${BUILD_LDFLAGS}" \
+    meson build --buildtype release
+    meson configure build/ --prefix=$INSTALL_DIR -Dbuildtype=release -Ddefault_library=static -Dglib=disabled -Dcairo=disabled -Dfreetype=enabled -Ddocs=disabled -Dtests=disabled -Dc_args="${BUILD_CCFLAGS_SMALL}"
+    ninja -C build install
+fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "libass" ]; then
@@ -723,7 +742,10 @@ if [ ! -d "libass" ]; then
     --enable-static \
     --enable-shared=no
     make -j$NJOBS && make install
+fi
 
+if [ ! -d "libass_dll" ]; then
+    find ../src/ -type d -name "libass-*" | xargs -i cp -r {} ./libass_dll
     cd $BUILD_DIR/$TARGET_ARCH/libass_dll
     autoreconf -fvi
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
@@ -1737,7 +1759,8 @@ echo "compressing src file..."
 7z a -y -t7z -mx=9 -mmt=off -x\!'*.tar.gz' -x\!'*.tar.bz2' -x\!'*.zip' -x\!'*.tar.xz' -xr\!'.git' ${SRC_7Z_FILENAME} \
  $BUILD_DIR/src/ffmpeg* $BUILD_DIR/src/opus* $BUILD_DIR/src/libogg* $BUILD_DIR/src/libvorbis* \
  $BUILD_DIR/src/lame* $BUILD_DIR/src/libsndfile* $BUILD_DIR/src/twolame* $BUILD_DIR/src/soxr* $BUILD_DIR/src/speex* \
- $BUILD_DIR/src/expat* $BUILD_DIR/src/freetype* $BUILD_DIR/src/libiconv* $BUILD_DIR/src/fontconfig* \
+ $BUILD_DIR/src/expat* $BUILD_DIR/src/freetype* $BUILD_DIR/src/harfbuzz* \
+ $BUILD_DIR/src/libiconv* $BUILD_DIR/src/fontconfig* \
  $BUILD_DIR/src/libpng* $BUILD_DIR/src/libass* $BUILD_DIR/src/bzip2* $BUILD_DIR/src/libbluray* \
  $BUILD_DIR/src/glslang* $BUILD_DIR/src/zimg* \
  $BUILD_DIR/src/aribb24* $BUILD_DIR/src/libaribcaption* $BUILD_DIR/src/libxml2* $BUILD_DIR/src/dav1d* \

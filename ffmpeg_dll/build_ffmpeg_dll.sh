@@ -301,10 +301,14 @@ if [ ! -d "harfbuzz-11.4.4" ]; then
     tar xf harfbuzz-11.4.4.tar.xz
 fi
 
-#0.14.0でないとバイナリが異常に大きくなる
-if [ ! -d "libass-0.14.0" ]; then
-    wget https://github.com/libass/libass/releases/download/0.14.0/libass-0.14.0.tar.xz
-    tar xf libass-0.14.0.tar.xz
+if [ ! -d "libunibreak-6.1" ]; then
+    wget https://github.com/adah1972/libunibreak/releases/download/libunibreak_6_1/libunibreak-6.1.tar.gz
+    tar xf libunibreak-6.1.tar.gz
+fi
+
+if [ ! -d "libass-0.17.4" ]; then
+    wget https://github.com/libass/libass/releases/download/0.17.4/libass-0.17.4.tar.xz
+    tar xf libass-0.17.4.tar.xz
 fi
 
 if [ ! -d "libogg-1.3.6" ]; then
@@ -723,6 +727,20 @@ if [ ! -d "harfbuzz" ]; then
     meson build --buildtype release
     meson configure build/ --prefix=$INSTALL_DIR -Dbuildtype=release -Ddefault_library=static -Dglib=disabled -Dcairo=disabled -Dfreetype=enabled -Ddocs=disabled -Dtests=disabled -Dc_args="${BUILD_CCFLAGS_SMALL}"
     ninja -C build install
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH
+if [ ! -d "libunibreak" ]; then
+    find ../src/ -type d -name "libunibreak-*" | xargs -i cp -r {} ./libunibreak
+    cd ./libunibreak
+    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    LDFLAGS="${BUILD_LDFLAGS}" \
+    ./configure \
+    --prefix=$INSTALL_DIR \
+    --enable-static \
+    --enable-shared=no
+    make -j$NJOBS && make install
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
@@ -1759,7 +1777,7 @@ echo "compressing src file..."
 7z a -y -t7z -mx=9 -mmt=off -x\!'*.tar.gz' -x\!'*.tar.bz2' -x\!'*.zip' -x\!'*.tar.xz' -xr\!'.git' ${SRC_7Z_FILENAME} \
  $BUILD_DIR/src/ffmpeg* $BUILD_DIR/src/opus* $BUILD_DIR/src/libogg* $BUILD_DIR/src/libvorbis* \
  $BUILD_DIR/src/lame* $BUILD_DIR/src/libsndfile* $BUILD_DIR/src/twolame* $BUILD_DIR/src/soxr* $BUILD_DIR/src/speex* \
- $BUILD_DIR/src/expat* $BUILD_DIR/src/freetype* $BUILD_DIR/src/harfbuzz* \
+ $BUILD_DIR/src/expat* $BUILD_DIR/src/freetype* $BUILD_DIR/src/harfbuzz* $BUILD_DIR/src/libunibreak* \
  $BUILD_DIR/src/libiconv* $BUILD_DIR/src/fontconfig* \
  $BUILD_DIR/src/libpng* $BUILD_DIR/src/libass* $BUILD_DIR/src/bzip2* $BUILD_DIR/src/libbluray* \
  $BUILD_DIR/src/glslang* $BUILD_DIR/src/zimg* \

@@ -306,9 +306,13 @@ if [ ! -d "libunibreak-6.1" ]; then
     tar xf libunibreak-6.1.tar.gz
 fi
 
-if [ ! -d "libass-0.17.4" ]; then
-    wget https://github.com/libass/libass/releases/download/0.17.4/libass-0.17.4.tar.xz
-    tar xf libass-0.17.4.tar.xz
+LIBASS_VERSION="0.17.4"
+if [ $TARGET_ARCH = "x86" ]; then
+    LIBASS_VERSION="0.14.0"
+fi  
+if [ ! -d "libass-${LIBASS_VERSION}" ]; then
+    wget https://github.com/libass/libass/releases/download/${LIBASS_VERSION}/libass-${LIBASS_VERSION}.tar.xz
+    tar xf libass-${LIBASS_VERSION}.tar.xz
 fi
 
 if [ ! -d "libogg-1.3.6" ]; then
@@ -714,42 +718,40 @@ fi
 #     read -p "Check install and hit enter: "
 # fi
 
-cd $BUILD_DIR/$TARGET_ARCH
-if [ ! -d "harfbuzz" ]; then
-    find ../src/ -type d -name "harfbuzz-*" | xargs -i cp -r {} ./harfbuzz
-    cd ./harfbuzz
-    CC=gcc \
-    CXX=g++ \
-    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-    CFLAGS="${BUILD_CCFLAGS_SMALL} -I${INSTALL_DIR}/include" \
-    CPPFLAGS="${BUILD_CCFLAGS_SMALL} -L${INSTALL_DIR}/lib" \
-    LDFLAGS="${BUILD_LDFLAGS}" \
-    meson build --buildtype release
-    meson configure build/ --prefix=$INSTALL_DIR -Dbuildtype=release -Ddefault_library=static -Dglib=disabled -Dcairo=disabled -Dfreetype=enabled -Ddocs=disabled -Dtests=disabled -Dc_args="${BUILD_CCFLAGS_SMALL}"
-    ninja -C build install
-fi
-
-cd $BUILD_DIR/$TARGET_ARCH
-if [ ! -d "libunibreak" ]; then
-    find ../src/ -type d -name "libunibreak-*" | xargs -i cp -r {} ./libunibreak
-    cd ./libunibreak
-    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
-    CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
-    LDFLAGS="${BUILD_LDFLAGS}" \
-    ./configure \
-    --prefix=$INSTALL_DIR \
-    --enable-static \
-    --enable-shared=no
-    make -j$NJOBS && make install
+# x86では、libass.dllのビルド(リンク)に失敗するため、x64でのみビルドする
+if [ $TARGET_ARCH = "x64" ]; then
+    cd $BUILD_DIR/$TARGET_ARCH
+    if [ ! -d "harfbuzz" ]; then
+        find ../src/ -type d -name "harfbuzz-*" | xargs -i cp -r {} ./harfbuzz
+        cd ./harfbuzz
+        CC=gcc \
+        CXX=g++ \
+        PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
+        CFLAGS="${BUILD_CCFLAGS_SMALL} -I${INSTALL_DIR}/include" \
+        CPPFLAGS="${BUILD_CCFLAGS_SMALL} -I${INSTALL_DIR}/include" \
+        LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
+        meson build --buildtype release
+        meson configure build/ --prefix=$INSTALL_DIR -Dbuildtype=release -Ddefault_library=static -Dglib=disabled -Dcairo=disabled -Dfreetype=enabled -Ddocs=disabled -Dtests=disabled -Dc_args="${BUILD_CCFLAGS_SMALL}" -Dc_link_args="${BUILD_LDFLAGS}"
+        ninja -C build install
+    fi
+    cd $BUILD_DIR/$TARGET_ARCH
+    if [ ! -d "libunibreak" ]; then
+        find ../src/ -type d -name "libunibreak-*" | xargs -i cp -r {} ./libunibreak
+        cd ./libunibreak
+        CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+        CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
+        LDFLAGS="${BUILD_LDFLAGS}" \
+        ./configure \
+        --prefix=$INSTALL_DIR \
+        --enable-static \
+        --enable-shared=no
+        make -j$NJOBS && make install
+    fi
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if [ ! -d "libass" ]; then
-    find ../src/ -type d -name "libass-*" | xargs -i cp -r {} ./libass
-    if [ -d "libass_dll" ]; then
-        rm -rf libass_dll
-    fi
-    cp -r ./libass ./libass_dll
+    find ../src/ -type d -name "libass-${LIBASS_VERSION}" | xargs -i cp -r {} ./libass
     cd ./libass
     autoreconf -fvi
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
@@ -763,7 +765,7 @@ if [ ! -d "libass" ]; then
 fi
 
 if [ ! -d "libass_dll" ]; then
-    find ../src/ -type d -name "libass-*" | xargs -i cp -r {} ./libass_dll
+    find ../src/ -type d -name "libass-${LIBASS_VERSION}" | xargs -i cp -r {} ./libass_dll
     cd $BUILD_DIR/$TARGET_ARCH/libass_dll
     autoreconf -fvi
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \

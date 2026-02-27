@@ -1231,7 +1231,7 @@ if should_build LIBXML2 && [ ! -d "libxml2" ]; then
     if [ -e configure ]; then
         echo "configure already exists, skip autoreconf"
     else
-        ./autogen.sh
+        ./autogen.sh --without-python
     fi
     CFLAGS="${BUILD_CCFLAGS_SMALL}" \
     CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \

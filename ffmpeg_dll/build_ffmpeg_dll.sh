@@ -1299,7 +1299,13 @@ if should_build LIBBLURAY && [ ! -d "libbluray" ]; then
      --disable-bdjava-jar \
      --disable-doxygen-doc \
      --disable-examples
-    make install -j$NJOBS
+    make -j$NJOBS
+    make install
+    if [ ! -f "${INSTALL_DIR}/lib/pkgconfig/libbluray.pc" ]; then
+        echo "libbluray.pc is missing after install."
+        find "${INSTALL_DIR}" -maxdepth 5 -name "libbluray.pc" -print || true
+        exit 1
+    fi
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH

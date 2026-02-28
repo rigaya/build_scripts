@@ -706,7 +706,7 @@ fi
 
 if should_build SHADERC; then
     if [ ! -d "shaderc" ]; then
-        git clone https://github.com/google/shaderc shaderc
+        git clone --depth 1 https://github.com/google/shaderc shaderc
         cd shaderc && git checkout tags/v2024.1 && "${PYTHON_BIN}" ./utils/git-sync-deps && cd ..
     elif [ ! -d "shaderc/third_party/spirv-tools" ] || [ ! -d "shaderc/third_party/spirv-headers" ]; then
         cd shaderc && "${PYTHON_BIN}" ./utils/git-sync-deps && cd ..
@@ -714,7 +714,7 @@ if should_build SHADERC; then
 fi
 
 if should_build SPIRV_CROSS && [ ! -d "SPIRV-Cross" ]; then
-    git clone https://github.com/KhronosGroup/SPIRV-Cross.git
+    git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Cross.git
 fi
 
 if should_build DOVI_TOOL && [ ! -d "dovi_tool-2.3.1" ]; then
@@ -747,7 +747,7 @@ fi
 # [ libjpeg -> lcms2 ], shaderc, SPIRV-Cross, dovi_tool, libxxhash, vulkan-loader -> libplacebo
 # shadercがあればglslangは不要
 if should_build LIBPLACEBO && [ ! -d "libplacebo" ]; then
-    git clone --recursive https://code.videolan.org/videolan/libplacebo
+    git clone --depth 1 --recursive https://code.videolan.org/videolan/libplacebo
     cd libplacebo && git checkout tags/v7.351.0 && cd ..
 fi
 
@@ -767,10 +767,10 @@ if should_build XVIDCORE && [ ! -d "xvidcore" ]; then
     tar xf xvidcore-1.3.7.tar.gz
 fi
 if should_build X264 && [ ! -d "x264" ]; then
-    git clone https://code.videolan.org/videolan/x264.git
+    git clone --depth 1 https://code.videolan.org/videolan/x264.git
 fi
 if should_build X265 && [ ! -d "x265" ]; then
-    git clone https://bitbucket.org/multicoreware/x265_git.git x265
+    git clone --depth 1 https://bitbucket.org/multicoreware/x265_git.git x265
 fi
 
 # --- 出力先を準備 --------------------------------------

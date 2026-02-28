@@ -825,9 +825,11 @@ if should_build LIBPNG && [ ! -d "libpng" ]; then
     find ../src/ -type d -name "libpng-*" | xargs -i cp -r {} ./libpng
     start_build "libpng"
     cd ./libpng
+    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
     CFLAGS="${BUILD_CCFLAGS_SMALL}" \
     CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
     CXXFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    LDFLAGS="${BUILD_LDFLAGS}" \
     ./configure \
     --prefix=$INSTALL_DIR \
     --enable-static \

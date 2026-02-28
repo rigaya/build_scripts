@@ -30,10 +30,10 @@
 # pacman -S mingw-w64-i686-uasm mingw-w64-x86_64-uasm
 NJOBS=$NUMBER_OF_PROCESSORS
 PATCHES_DIR=`pwd`/patches
-Y4M_PATH=`pwd`/sakura_op_cut.y4m
-Y4M_10_PATH=`pwd`/sakura_op_cut_10bit.y4m
-YUVFILE=`pwd`/sakura_op_cut.yuv
-YUVFILE_10=`pwd`/sakura_op_cut_10bit.yuv
+YUVFILE=`pwd`/test.yuv
+YUVFILE_10=`pwd`/test_10.yuv
+TEST_YUV_8_URL="https://github.com/rigaya/ffmpeg_dlls_for_hwenc/releases/download/20250825/test_8.7z"
+TEST_YUV_10_URL="https://github.com/rigaya/ffmpeg_dlls_for_hwenc/releases/download/20250825/test_10.7z"
 
 BUILD_ALL="FALSE"
 SSE4_2="FALSE"
@@ -304,6 +304,34 @@ normalize_static_libstdcxx_pc_dir() {
 
 start_build() {
     echo "=== Building $1 ======================================="
+}
+
+ensure_test_yuv_files() {
+    local work_dir
+    work_dir="$(dirname "${YUVFILE}")"
+
+    if ! command -v 7z >/dev/null 2>&1; then
+        echo "7z is required to extract test_8.7z/test_10.7z."
+        exit 1
+    fi
+
+    if [ ! -f "${YUVFILE}" ]; then
+        wget -O "${work_dir}/test_8.7z" "${TEST_YUV_8_URL}"
+        7z x -y "${work_dir}/test_8.7z" -o"${work_dir}"
+    fi
+    if [ ! -f "${YUVFILE}" ]; then
+        echo "test.yuv not found after extracting test_8.7z."
+        exit 1
+    fi
+
+    if [ ! -f "${YUVFILE_10}" ]; then
+        wget -O "${work_dir}/test_10.7z" "${TEST_YUV_10_URL}"
+        7z x -y "${work_dir}/test_10.7z" -o"${work_dir}"
+    fi
+    if [ ! -f "${YUVFILE_10}" ]; then
+        echo "test_10.yuv not found after extracting test_10.7z."
+        exit 1
+    fi
 }
 
 # --- 全ライブラリのビルドフラグを初期化 (FALSE = ビルドしない) ---
@@ -934,11 +962,15 @@ if should_build FONTCONFIG && [ ! -d "fontconfig" ]; then
     start_build "fontconfig"
     cd ./fontconfig
     autoreconf -fvi
+    PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
     FREETYPE_CFLAGS=-I$INSTALL_DIR/include/freetype2 \
     FREETYPE_LIBS="-L$INSTALL_DIR/lib -lfreetype" \
+    EXPAT_CFLAGS="-I$INSTALL_DIR/include" \
+    EXPAT_LIBS="-L$INSTALL_DIR/lib -lexpat" \
     CFLAGS="${BUILD_CCFLAGS_SMALL}" \
     CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
     CXXFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    LDFLAGS="${BUILD_LDFLAGS}" \
     ./configure \
     --prefix=$INSTALL_DIR \
     --disable-shared \
@@ -1002,7 +1034,7 @@ if should_build HARFBUZZ; then
         CPPFLAGS="${BUILD_CCFLAGS_SMALL} -I${INSTALL_DIR}/include" \
         LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
         meson build --buildtype release
-        meson configure build/ --prefix=$INSTALL_DIR -Dbuildtype=release -Ddefault_library=static -Dglib=disabled -Dcairo=disabled -Dfreetype=enabled -Ddocs=disabled -Dtests=disabled -Dc_args="${BUILD_CCFLAGS_SMALL}" -Dc_link_args="${BUILD_LDFLAGS}"
+        meson configure build/ --prefix=$INSTALL_DIR --libdir=lib -Dbuildtype=release -Ddefault_library=static -Dglib=disabled -Dcairo=disabled -Dfreetype=enabled -Ddocs=disabled -Dtests=disabled -Dc_args="${BUILD_CCFLAGS_SMALL}" -Dc_link_args="${BUILD_LDFLAGS}"
         ninja -C build install
     fi
 fi
@@ -1574,7 +1606,7 @@ if should_build LIBPLACEBO && [ ! -d "libplacebo" ]; then
     CFLAGS="${BUILD_CCFLAGS}" \
     CPPFLAGS="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include" \
     LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
-    meson build --buildtype release --prefix=$INSTALL_DIR --libdir=lib ${LIBPLACEBO_D3D11_OPT} -Ddefault_library=static -Dprefer_static=true -Dstrip=true
+    meson build --buildtype release --prefix=$INSTALL_DIR --libdir=lib ${LIBPLACEBO_D3D11_OPT} -Ddefault_library=static -Dprefer_static=true -Dstrip=true -Ddemos=false -Dtests=false
     ninja -C build install
     #下記のように変更しないと適切にリンクできない
     # C:/mingw64/mingw64/lib/libshlwapi.a -> -llibshlwapi
@@ -1598,7 +1630,7 @@ if should_build LIBPLACEBO_DLL; then
         CFLAGS="${BUILD_CCFLAGS}" \
         CPPFLAGS="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include" \
         LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
-        meson build --buildtype release --prefix=$INSTALL_DIR -Dd3d11=enabled -Ddefault_library=shared -Dprefer_static=false -Dstrip=true
+        meson build --buildtype release --prefix=$INSTALL_DIR -Dd3d11=enabled -Ddefault_library=shared -Dprefer_static=false -Dstrip=true -Ddemos=false -Dtests=false
         sed -i 's/libstdc++.dll.a/libstdc++.a/g' build/build.ninja
         ninja -C build
 
@@ -1640,6 +1672,7 @@ fi
 if should_build X264; then
     cd $BUILD_DIR/$TARGET_ARCH
     if [ ! -d "x264" ]; then
+        ensure_test_yuv_files
         find ../src/ -type d -name "x264*" | xargs -i cp -r {} ./x264
         start_build "x264"
         cd x264
@@ -1661,13 +1694,14 @@ if should_build X264; then
          --bit-depth=all \
          --extra-cflags="${BUILD_CCFLAGS}" \
          --extra-ldflags="${BUILD_LDFLAGS}"
-        make fprofiled VIDS="${Y4M_PATH}" -j$NJOBS && make install
+        make fprofiled VIDS="${YUVFILE}" -j$NJOBS && make install
     fi
 fi
 
 if should_build X265; then
     cd $BUILD_DIR/$TARGET_ARCH
     if [ ! -d "x265" ]; then
+        ensure_test_yuv_files
         find ../src/ -type d -name "x265*" | xargs -i cp -r {} ./x265
         start_build "x265"
         cd x265
@@ -1730,21 +1764,21 @@ if should_build X265; then
         make -j${NJOBS}
 
         #profileのための実行はシングルスレッドで行う
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --preset faster
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --preset fast
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}"
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --preset slow
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --preset slower
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 10 --preset faster
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 10 --preset fast
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 10
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 10 --preset slow
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 10 --preset slower
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 12 --preset faster
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 12 --preset fast
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 12
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 12 --preset slow
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --y4m -o /dev/null --input "${Y4M_PATH}" --output-depth 12 --preset slower
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE}" --preset faster
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE}" --preset fast
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE}"
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE}" --preset slow
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE}" --preset slower
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset faster
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset fast
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 10
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset slow
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset slower
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset faster
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset fast
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 12
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset slow
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset slower
         
         cd ../12bit
         cmake -G "${CMAKE_GENERATOR}" ../../../source \
@@ -1840,14 +1874,22 @@ if should_build VVENC; then
         CFLAGS="${BUILD_CCFLAGS}" \
         CPPFLAGS="${BUILD_CCFLAGS}" \
         LDFLAGS="${BUILD_LDFLAGS}" \
-        cmake -G "${CMAKE_GENERATOR}" -B build/release-static -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DVVENC_INSTALL_FULLFEATURE_APP=ON -DVVENC_ENABLE_THIRDPARTY_JSON=OFF ..
+        cmake -G "${CMAKE_GENERATOR}" -B build/release-static -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DVVENC_INSTALL_FULLFEATURE_APP=OFF -DVVENC_ENABLE_THIRDPARTY_JSON=OFF -DVVENC_LIBRARY_ONLY=ON -DVVENC_ENABLE_WERROR=OFF -DBUILD_TESTING=OFF ..
         cmake --build build/release-static -j$NJOBS && cmake --build build/release-static --target install
+        VVENC_PC_FILE="$INSTALL_DIR/lib/pkgconfig/libvvenc.pc"
+        if [ ! -f "$VVENC_PC_FILE" ] && [ -f "$INSTALL_DIR/lib/pkgconfig/vvenc.pc" ]; then
+            VVENC_PC_FILE="$INSTALL_DIR/lib/pkgconfig/vvenc.pc"
+        fi
+        if [ ! -f "$VVENC_PC_FILE" ]; then
+            echo "vvenc pkg-config file not found."
+            exit 1
+        fi
         # static linkがうまくいくように書き換え
         if [ "$MINGWDIR" = "" ] && [ -f "$LIBSTDCXX_A" ]; then
-            sed -i -e "s#^Libs:.*#Libs: -L\${libdir} -lvvenc ${LIBSTDCXX_STATIC_FLAGS}#g" $INSTALL_DIR/lib/pkgconfig/libvvenc.pc
-            sed -i -e 's#^Libs.private:.*#Libs.private: -lm -lgcc -lgcc#g' $INSTALL_DIR/lib/pkgconfig/libvvenc.pc
+            sed -i -e "s#^Libs:.*#Libs: -L\${libdir} -lvvenc ${LIBSTDCXX_STATIC_FLAGS}#g" "$VVENC_PC_FILE"
+            sed -i -e 's#^Libs.private:.*#Libs.private: -lm -lgcc -lgcc#g' "$VVENC_PC_FILE"
         else
-            sed -i -e 's/-lvvenc/-lvvenc -lstdc++/g' $INSTALL_DIR/lib/pkgconfig/libvvenc.pc
+            sed -i -e 's/-lvvenc/-lvvenc -lstdc++/g' "$VVENC_PC_FILE"
         fi
     fi
 fi
@@ -1855,6 +1897,7 @@ fi
 if should_build SVT_AV1; then
     cd $BUILD_DIR/$TARGET_ARCH
     if [ ! -d "svt-av1" ]; then
+        ensure_test_yuv_files
         find ../src/ -type d -name "svt-av1*" | xargs -i cp -r {} ./svt-av1
         start_build "svt-av1"
         cd svt-av1

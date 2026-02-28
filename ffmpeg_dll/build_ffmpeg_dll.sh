@@ -1526,6 +1526,13 @@ if should_build SHADERC && [ ! -d "shaderc" ]; then
     find ../src/ -type d -name "shaderc*" | xargs -i cp -r {} ./shaderc
     start_build "shaderc"
     cd ./shaderc
+    if [ ! -d "third_party/spirv-tools" ] || [ ! -d "third_party/spirv-headers" ]; then
+        "${PYTHON_BIN}" ./utils/git-sync-deps
+    fi
+    if [ ! -d "third_party/spirv-tools" ] || [ ! -d "third_party/spirv-headers" ]; then
+        echo "shaderc dependencies are missing: third_party/spirv-tools or spirv-headers."
+        exit 1
+    fi
     if [ "$MINGWDIR" != "" ]; then
         patch -p1 < $PATCHES_DIR/shaderc_add_shaderc_util.diff
     fi

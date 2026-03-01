@@ -1903,12 +1903,12 @@ fi
 if should_build SVT_AV1; then
     cd $BUILD_DIR/$TARGET_ARCH
     if [ ! -d "svt-av1" ]; then
+        start_build "svt-av1"
+        ensure_test_yuv_files
+        find ../src/ -type d -name "svt-av1*" | xargs -i cp -r {} ./svt-av1
+        cd svt-av1
+        mkdir -p build/msys2 && cd build/msys2
         if [ "${ENABLE_PGO}" = "TRUE" ]; then
-            ensure_test_yuv_files
-            find ../src/ -type d -name "svt-av1*" | xargs -i cp -r {} ./svt-av1
-            start_build "svt-av1"
-            cd svt-av1
-            mkdir -p build/msys2 && cd build/msys2
             SVTAV1_ENABLE_LTO=OFF
             if [ $ENABLE_LTO = "TRUE" ]; then
                 SVTAV1_ENABLE_LTO=ON
@@ -1976,6 +1976,7 @@ if should_build SVT_AV1; then
                 -DCMAKE_C_FLAGS="${BUILD_CCFLAGS}" \
                 -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS}" \
                 -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS}" \
+                ../..
             make -j${NUMBER_OF_PROCESSORS} && make install
         fi
     fi

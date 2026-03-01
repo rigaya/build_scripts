@@ -192,9 +192,24 @@ if [ "$MINGWDIR" = "" ] && [ -n "$LIBSTDCXX_A" ] && [ -f "$LIBSTDCXX_A" ]; then
     LIBSTDCXX_STATIC_FLAGS="-L${LIBSTDCXX_DIR} -l:libstdc++.a"
 fi
 
+TUNE_FLAG=""
+for target_arch in alderlake skylake; do
+    if echo 'int main(){return 0;}' | \
+        "$CC" -x c - -c -mtune=${target_arch} -o /dev/null >/dev/null 2>&1; then
+        TUNE_FLAG="-mtune=${target_arch}"
+        break
+    fi
+done
+
+if [ -n "$TUNE_FLAG" ]; then
+    echo "Using $TUNE_FLAG"
+else
+    echo "No supported -mtune found, building without -mtune"
+fi
+
 FFMPEG_DISABLE_ASM=""
-#BUILD_CCFLAGS="-mtune=alderlake -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
-BUILD_CCFLAGS="-mtune=alderlake -msse2 -mfpmath=sse -fomit-frame-pointer -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
+#BUILD_CCFLAGS="${TUNE_FLAG} -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
+BUILD_CCFLAGS="${TUNE_FLAG} -msse2 -mfpmath=sse -fomit-frame-pointer -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
 BUILD_LDFLAGS="-Wl,--strip-all -L${INSTALL_DIR}/lib"
 if [ $TARGET_ARCH = "x86" ]; then
     BUILD_CCFLAGS="${BUILD_CCFLAGS} -m32 -mstackrealign"

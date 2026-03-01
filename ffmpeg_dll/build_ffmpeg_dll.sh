@@ -1376,7 +1376,7 @@ if should_build LIBVPL && [ ! -d "libvpl" ]; then
         sed -i -e 's/${pcfiledir}\/../${pcfiledir}/g' $INSTALL_DIR/lib/pkgconfig/vpl.pc
     fi
     if [ "$MINGWDIR" = "" ] && [ -f "$LIBSTDCXX_A" ]; then
-        sed -i -e "s#^Libs:.*#Libs: -L\${libdir} -lvpl ${LIBSTDCXX_STATIC_FLAGS} -ldl#g" $INSTALL_DIR/lib/pkgconfig/vpl.pc
+        sed -i -e "s#^Libs:.*#Libs: -L\${libdir} -lvpl ${LIBSTDCXX_STATIC_FLAGS} -lpthread -ldl#g" $INSTALL_DIR/lib/pkgconfig/vpl.pc
     else
         sed -i -e 's/-lvpl/-lvpl -lstdc++/g' $INSTALL_DIR/lib/pkgconfig/vpl.pc
     fi

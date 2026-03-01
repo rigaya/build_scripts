@@ -1278,20 +1278,18 @@ if should_build LIBXML2 && [ ! -d "libxml2" ]; then
     find ../src/ -type d -name "libxml2-*" | xargs -i cp -r {} ./libxml2
     start_build "libxml2"
     cd ./libxml2
-    if [ -e configure ]; then
-        echo "configure already exists, skip autoreconf"
-    else
-        ./autogen.sh --without-python
-    fi
     CFLAGS="${BUILD_CCFLAGS_SMALL}" \
     CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
     LDFLAGS="${BUILD_LDFLAGS}" \
-     ./configure \
-     --prefix=$INSTALL_DIR \
-     --disable-shared \
-     --enable-static \
-     --without-python
-    make install -j$NJOBS
+    meson setup build \
+      --prefix=$INSTALL_DIR \
+      --libdir=lib \
+      --buildtype=release \
+      -Ddefault_library=static \
+      -Dpython=disabled
+
+    ninja -C build
+    ninja -C build install
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH

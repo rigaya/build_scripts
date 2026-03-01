@@ -45,55 +45,27 @@ ADD_TLVMMT="FALSE"
 BUILD_EXE="FALSE"
 ENABLE_GPL="FALSE"
 ENABLE_LTO="FALSE"
+ENABLE_PGO="FALSE"
+SKIP_SRC_ARCHIVE="FALSE"
 
 set -e
 
 # [ bitrate, swscale, exe ]
 TARGET_BUILD=""
 
-while getopts ":-:at:ur" key; do
-  if [[ $key == - ]]; then
-    key=${OPTARG}
-    keyarg=${!OPTIND}
-  else
-    keyarg=$OPTARG
-  fi
-
-  case $key in
-    mmttlv )
-      ADD_TLVMMT="TRUE"
-      ;;
-    enable-gpl )
-      ENABLE_GPL="TRUE"
-      ;;
-    enable-swscale )
-      ENABLE_SWSCALE="TRUE"
-      ;;
-    lto )
-      ENABLE_LTO="TRUE"
-      ;;
-    a | all )
-      BUILD_ALL="TRUE"
-      ;;
-    u | update-ffmpeg )
-      UPDATE_FFMPEG="TRUE"
-      ;;
-    r )
-      FOR_FFMPEG4="TRUE"
-      ;;
-    t | target )
-      TARGET_BUILD=$keyarg
-      ;;
-    ? | *)
-      echo "help message"
-      exit 0
-      ;;
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --skip-src-archive) SKIP_SRC_ARCHIVE="TRUE"; shift ;;
+    --enable-gpl) ENABLE_GPL="TRUE"; shift ;;
+    --enable-swscale) ENABLE_SWSCALE="TRUE"; shift ;;
+    --disable-pgo) ENABLE_PGO="FALSE"; shift ;;
+    --lto) ENABLE_LTO="TRUE"; shift ;;
+    -a|--all) BUILD_ALL="TRUE"; shift ;;
+    -u|--update-ffmpeg) UPDATE_FFMPEG="TRUE"; shift ;;
+    -r) FOR_FFMPEG4="TRUE"; shift ;;
+    -t|--target) TARGET_BUILD="$2"; shift 2 ;;
+    *) echo "Unknown option: $1"; exit 1 ;;
   esac
-
-  while [[ -n ${!OPTIND} && ${!OPTIND} != -* ]]; do
-      args+=(${!OPTIND})
-      OPTIND=$((OPTIND + 1))
-  done
 done
 
 BUILD_DIR=`pwd`/build_ffmpeg
@@ -1700,7 +1672,9 @@ fi
 if should_build X264; then
     cd $BUILD_DIR/$TARGET_ARCH
     if [ ! -d "x264" ]; then
-        ensure_test_yuv_files
+        if [ "${ENABLE_PGO}" = "TRUE" ]; then
+            ensure_test_yuv_files
+        fi
         find ../src/ -type d -name "x264*" | xargs -i cp -r {} ./x264
         start_build "x264"
         cd x264
@@ -1722,7 +1696,11 @@ if should_build X264; then
          --bit-depth=all \
          --extra-cflags="${BUILD_CCFLAGS}" \
          --extra-ldflags="${BUILD_LDFLAGS}"
-        make fprofiled VIDS="${YUVFILE}" -j$NJOBS && make install
+        if [ "${ENABLE_PGO}" = "TRUE" ]; then
+            make fprofiled VIDS="${YUVFILE}" -j$NJOBS && make install
+        else
+            make -j$NJOBS && make install
+        fi
     fi
 fi
 
@@ -1925,64 +1903,81 @@ fi
 if should_build SVT_AV1; then
     cd $BUILD_DIR/$TARGET_ARCH
     if [ ! -d "svt-av1" ]; then
-        ensure_test_yuv_files
-        find ../src/ -type d -name "svt-av1*" | xargs -i cp -r {} ./svt-av1
-        start_build "svt-av1"
-        cd svt-av1
-        mkdir -p build/msys2 && cd build/msys2
-        SVTAV1_ENABLE_LTO=OFF
-        if [ $ENABLE_LTO = "TRUE" ]; then
-            SVTAV1_ENABLE_LTO=ON
-        fi
-        cmake -G "${CMAKE_GENERATOR}" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DBUILD_TESTING=OFF \
-            -DNATIVE=OFF \
-            -DSVT_AV1_LTO=$SVTAV1_ENABLE_LTO \
-            -DENABLE_NASM=ON \
-            -DENABLE_AVX512=ON \
-            -DCMAKE_ASM_NASM_COMPILER=nasm \
-            -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
-            -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC} ${PROFILE_SVTAV1}" \
-            -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC} ${PROFILE_SVTAV1}" \
-            -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_GEN_LD} ${PROFILE_SVTAV1}" \
-            ../..
-        make -j${NUMBER_OF_PROCESSORS}
+        if [ "${ENABLE_PGO}" = "TRUE" ]; then
+            ensure_test_yuv_files
+            find ../src/ -type d -name "svt-av1*" | xargs -i cp -r {} ./svt-av1
+            start_build "svt-av1"
+            cd svt-av1
+            mkdir -p build/msys2 && cd build/msys2
+            SVTAV1_ENABLE_LTO=OFF
+            if [ $ENABLE_LTO = "TRUE" ]; then
+                SVTAV1_ENABLE_LTO=ON
+            fi
+            cmake -G "${CMAKE_GENERATOR}" \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DBUILD_SHARED_LIBS=OFF \
+                -DBUILD_TESTING=OFF \
+                -DNATIVE=OFF \
+                -DSVT_AV1_LTO=$SVTAV1_ENABLE_LTO \
+                -DENABLE_NASM=ON \
+                -DENABLE_AVX512=ON \
+                -DCMAKE_ASM_NASM_COMPILER=nasm \
+                -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+                -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC} ${PROFILE_SVTAV1}" \
+                -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC} ${PROFILE_SVTAV1}" \
+                -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_GEN_LD} ${PROFILE_SVTAV1}" \
+                ../..
+            make -j${NUMBER_OF_PROCESSORS}
 
-        SVTAV1_ENC_APP="../../Bin/Release/SvtAv1EncApp"
-        if [ -x "${SVTAV1_ENC_APP}.exe" ]; then
-            SVTAV1_ENC_APP="${SVTAV1_ENC_APP}.exe"
-        fi
-        if [ ! -x "${SVTAV1_ENC_APP}" ]; then
-            echo "SvtAv1EncApp not found: ${SVTAV1_ENC_APP}"
-            exit 1
-        fi
+            SVTAV1_ENC_APP="../../Bin/Release/SvtAv1EncApp"
+            if [ -x "${SVTAV1_ENC_APP}.exe" ]; then
+                SVTAV1_ENC_APP="${SVTAV1_ENC_APP}.exe"
+            fi
+            if [ ! -x "${SVTAV1_ENC_APP}" ]; then
+                echo "SvtAv1EncApp not found: ${SVTAV1_ENC_APP}"
+                exit 1
+            fi
 
-        "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx512
-        "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 8 -n 30 --asm avx512
-        "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx2
-        "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 8 -n 30 --asm avx2
-        "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx512
-        "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 8 -n 30 --input-depth 10 --asm avx512
-        "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx2
-        "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 8 -n 30 --input-depth 10 --asm avx2
+            "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx512
+            "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 8 -n 30 --asm avx512
+            "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx2
+            "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 8 -n 30 --asm avx2
+            "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx512
+            "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 8 -n 30 --input-depth 10 --asm avx512
+            "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx2
+            "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 8 -n 30 --input-depth 10 --asm avx2
 
-        cmake -G "${CMAKE_GENERATOR}" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DBUILD_TESTING=OFF \
-            -DNATIVE=OFF \
-            -DSVT_AV1_LTO=$SVTAV1_ENABLE_LTO \
-            -DENABLE_NASM=ON \
-            -DENABLE_AVX512=ON \
-            -DCMAKE_ASM_NASM_COMPILER=nasm \
-            -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
-            -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC} ${PROFILE_SVTAV1}" \
-            -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC} ${PROFILE_SVTAV1}" \
-            -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_USE_LD} ${PROFILE_SVTAV1}" \
-            ../..
-        make -j${NUMBER_OF_PROCESSORS} && make install
+            cmake -G "${CMAKE_GENERATOR}" \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DBUILD_SHARED_LIBS=OFF \
+                -DBUILD_TESTING=OFF \
+                -DNATIVE=OFF \
+                -DSVT_AV1_LTO=$SVTAV1_ENABLE_LTO \
+                -DENABLE_NASM=ON \
+                -DENABLE_AVX512=ON \
+                -DCMAKE_ASM_NASM_COMPILER=nasm \
+                -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+                -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC} ${PROFILE_SVTAV1}" \
+                -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC} ${PROFILE_SVTAV1}" \
+                -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_USE_LD} ${PROFILE_SVTAV1}" \
+                ../..
+            make -j${NUMBER_OF_PROCESSORS} && make install
+        else
+            cmake -G "${CMAKE_GENERATOR}" \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DBUILD_SHARED_LIBS=OFF \
+                -DBUILD_TESTING=OFF \
+                -DNATIVE=OFF \
+                -DSVT_AV1_LTO=$SVTAV1_ENABLE_LTO \
+                -DENABLE_NASM=ON \
+                -DENABLE_AVX512=ON \
+                -DCMAKE_ASM_NASM_COMPILER=nasm \
+                -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+                -DCMAKE_C_FLAGS="${BUILD_CCFLAGS}" \
+                -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS}" \
+                -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS}" \
+            make -j${NUMBER_OF_PROCESSORS} && make install
+        fi
     fi
 fi
 
@@ -2296,66 +2291,68 @@ if [ "$MINGWDIR" != "" ]; then
     fi
 fi
 
-cd $BUILD_DIR/src
-SRC_7Z_FILENAME=ffmpeg_lgpl_src.7z
-SRC_GPL_LIBS=
-SRC_EXE_LIBS=
-SRC_ENCODER_LIBS=
-if [ ${ENABLE_GPL} != "FALSE" ]; then
-  SRC_7Z_FILENAME=ffmpeg_gpl_src.7z
-  SRC_GPL_LIBS="$BUILD_DIR/src/x264* $BUILD_DIR/src/x265* $BUILD_DIR/src/xvidcore*"
-fi
-if [ $TARGET_ARCH != "x86" ]; then
-    SRC_ENCODER_LIBS="$BUILD_DIR/src/svt-av1* $BUILD_DIR/src/vvenc*"
-fi
-rm -f ${SRC_7Z_FILENAME}
-echo "compressing src file..."
-
-collect_existing_paths() {
-    local out_var="$1"
-    shift
-    local files=()
-    local pattern
-    local matched
-    for pattern in "$@"; do
-        matched=()
-        for f in $pattern; do
-            if [ -e "$f" ]; then
-                matched+=("$f")
+if [ ${SKIP_SRC_ARCHIVE} = "FALSE" ]; then
+    cd $BUILD_DIR/src
+    SRC_7Z_FILENAME=ffmpeg_lgpl_src.7z
+    SRC_GPL_LIBS=
+    SRC_EXE_LIBS=
+    SRC_ENCODER_LIBS=
+    if [ ${ENABLE_GPL} != "FALSE" ]; then
+    SRC_7Z_FILENAME=ffmpeg_gpl_src.7z
+    SRC_GPL_LIBS="$BUILD_DIR/src/x264* $BUILD_DIR/src/x265* $BUILD_DIR/src/xvidcore*"
+    fi
+    if [ $TARGET_ARCH != "x86" ]; then
+        SRC_ENCODER_LIBS="$BUILD_DIR/src/svt-av1* $BUILD_DIR/src/vvenc*"
+    fi
+    rm -f ${SRC_7Z_FILENAME}
+    echo "compressing src file..."
+    
+    collect_existing_paths() {
+        local out_var="$1"
+        shift
+        local files=()
+        local pattern
+        local matched
+        for pattern in "$@"; do
+            matched=()
+            for f in $pattern; do
+                if [ -e "$f" ]; then
+                    matched+=("$f")
+                fi
+            done
+            if [ ${#matched[@]} -gt 0 ]; then
+                files+=("${matched[@]}")
             fi
         done
-        if [ ${#matched[@]} -gt 0 ]; then
-            files+=("${matched[@]}")
-        fi
-    done
-    eval "$out_var=(\"\${files[@]}\")"
-}
-
-collect_existing_paths SRC_ARCHIVE_PATHS \
-    "$BUILD_DIR/src/ffmpeg*" "$BUILD_DIR/src/opus*" "$BUILD_DIR/src/libogg*" "$BUILD_DIR/src/libvorbis*" \
-    "$BUILD_DIR/src/lame*" "$BUILD_DIR/src/libsndfile*" "$BUILD_DIR/src/twolame*" "$BUILD_DIR/src/soxr*" "$BUILD_DIR/src/speex*" \
-    "$BUILD_DIR/src/expat*" "$BUILD_DIR/src/freetype*" "$BUILD_DIR/src/harfbuzz*" "$BUILD_DIR/src/libunibreak*" \
-    "$BUILD_DIR/src/libiconv*" "$BUILD_DIR/src/fontconfig*" \
-    "$BUILD_DIR/src/libpng*" "$BUILD_DIR/src/libass*" "$BUILD_DIR/src/bzip2*" "$BUILD_DIR/src/libbluray*" \
-    "$BUILD_DIR/src/glslang*" "$BUILD_DIR/src/zimg*" \
-    "$BUILD_DIR/src/aribb24*" "$BUILD_DIR/src/libaribcaption*" "$BUILD_DIR/src/libxml2*" "$BUILD_DIR/src/dav1d*" \
-    "$BUILD_DIR/src/libvpl*" "$BUILD_DIR/src/libvpx*" "$BUILD_DIR/src/nv-codec-headers*" \
-    "$BUILD_DIR/src/libxxhash*" "$BUILD_DIR/src/shaderc*" "$BUILD_DIR/src/SPIRV-Cross*" \
-    "$BUILD_DIR/src/dovi_tool*" "$BUILD_DIR/src/libjpeg-*" "$BUILD_DIR/src/lcms2*" "$BUILD_DIR/src/libplacebo*" "$BUILD_DIR/src/Vulkan-Loader*" \
-    "$SRC_GPL_LIBS" "$SRC_EXE_LIBS" "$SRC_ENCODER_LIBS" \
-    "$PATCHES_DIR/*"
-
-if command -v 7z >/dev/null 2>&1; then
-    7z a -y -t7z -mx=9 -mmt=off -x\!'*.tar.gz' -x\!'*.tar.bz2' -x\!'*.zip' -x\!'*.tar.xz' -xr\!'.git' ${SRC_7Z_FILENAME} \
-    "${SRC_ARCHIVE_PATHS[@]}" \
-    > /dev/null
-else
-    TAR_FILENAME=${SRC_7Z_FILENAME%.7z}.tar.xz
-    echo "7z is not installed; creating ${TAR_FILENAME} (.tar.xz) with tar + xz..."
-    rm -f "${TAR_FILENAME}"
-    tar -cJf "${TAR_FILENAME}" \
-        --exclude='*.tar.gz' --exclude='*.tar.bz2' --exclude='*.zip' --exclude='*.tar.xz' \
-        --exclude='.git' --exclude='.git/*' \
+        eval "$out_var=(\"\${files[@]}\")"
+    }
+    
+    collect_existing_paths SRC_ARCHIVE_PATHS \
+        "$BUILD_DIR/src/ffmpeg*" "$BUILD_DIR/src/opus*" "$BUILD_DIR/src/libogg*" "$BUILD_DIR/src/libvorbis*" \
+        "$BUILD_DIR/src/lame*" "$BUILD_DIR/src/libsndfile*" "$BUILD_DIR/src/twolame*" "$BUILD_DIR/src/soxr*" "$BUILD_DIR/src/speex*" \
+        "$BUILD_DIR/src/expat*" "$BUILD_DIR/src/freetype*" "$BUILD_DIR/src/harfbuzz*" "$BUILD_DIR/src/libunibreak*" \
+        "$BUILD_DIR/src/libiconv*" "$BUILD_DIR/src/fontconfig*" \
+        "$BUILD_DIR/src/libpng*" "$BUILD_DIR/src/libass*" "$BUILD_DIR/src/bzip2*" "$BUILD_DIR/src/libbluray*" \
+        "$BUILD_DIR/src/glslang*" "$BUILD_DIR/src/zimg*" \
+        "$BUILD_DIR/src/aribb24*" "$BUILD_DIR/src/libaribcaption*" "$BUILD_DIR/src/libxml2*" "$BUILD_DIR/src/dav1d*" \
+        "$BUILD_DIR/src/libvpl*" "$BUILD_DIR/src/libvpx*" "$BUILD_DIR/src/nv-codec-headers*" \
+        "$BUILD_DIR/src/libxxhash*" "$BUILD_DIR/src/shaderc*" "$BUILD_DIR/src/SPIRV-Cross*" \
+        "$BUILD_DIR/src/dovi_tool*" "$BUILD_DIR/src/libjpeg-*" "$BUILD_DIR/src/lcms2*" "$BUILD_DIR/src/libplacebo*" "$BUILD_DIR/src/Vulkan-Loader*" \
+        "$SRC_GPL_LIBS" "$SRC_EXE_LIBS" "$SRC_ENCODER_LIBS" \
+        "$PATCHES_DIR/*"
+    
+    if command -v 7z >/dev/null 2>&1; then
+        7z a -y -t7z -mx=9 -mmt=off -x\!'*.tar.gz' -x\!'*.tar.bz2' -x\!'*.zip' -x\!'*.tar.xz' -xr\!'.git' ${SRC_7Z_FILENAME} \
         "${SRC_ARCHIVE_PATHS[@]}" \
-        > /dev/null || { echo "tar failed"; exit 1; }
+        > /dev/null
+    else
+        TAR_FILENAME=${SRC_7Z_FILENAME%.7z}.tar.xz
+        echo "7z is not installed; creating ${TAR_FILENAME} (.tar.xz) with tar + xz..."
+        rm -f "${TAR_FILENAME}"
+        tar -cJf "${TAR_FILENAME}" \
+            --exclude='*.tar.gz' --exclude='*.tar.bz2' --exclude='*.zip' --exclude='*.tar.xz' \
+            --exclude='.git' --exclude='.git/*' \
+            "${SRC_ARCHIVE_PATHS[@]}" \
+            > /dev/null || { echo "tar failed"; exit 1; }
+    fi
 fi

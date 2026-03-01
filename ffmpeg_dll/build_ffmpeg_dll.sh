@@ -486,6 +486,7 @@ fi
 if [ "$MINGWDIR" = "" ]; then
     # static libplacebo連鎖は有効のまま維持する
     BUILD_LIB_LIBPLACEBO_DLL="FALSE"
+    BUILD_LIB_LIBBLURAY="FALSE"
     #BUILD_LIB_LIBARIBCAPTION="FALSE"
     #BUILD_LIB_SOXR="FALSE"
     #BUILD_LIB_TWOLAME="FALSE"

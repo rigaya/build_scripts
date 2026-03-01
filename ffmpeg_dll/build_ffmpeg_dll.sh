@@ -1375,21 +1375,27 @@ if should_build LIBVPL && [ ! -d "libvpl" ]; then
     cmake -G "${CMAKE_GENERATOR}" -B _build -DBUILD_SHARED_LIBS=OFF -DUSE_MSVC_STATIC_RUNTIME=ON -DCMAKE_BUILD_TYPE=Release -DINSTALL_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
     cmake --build _build --config Release
     cmake --install _build --config Release
+    LIBVPL_PC_DIR=$INSTALL_DIR/lib/pkgconfig
     # x86版の場合、$INSTALL_DIR/libに入るべきものが$INSTALL_DIR/lib/x86に入ってしまう
     # あとから強制的に移動する
     # vpl.pcのパスも移動に合わせる
     if [ $TARGET_ARCH = "x86" ]; then
         cp -r $INSTALL_DIR/lib/x86/* $INSTALL_DIR/lib/
         rm -rf $INSTALL_DIR/lib/x86
-        sed -i -e 's/${pcfiledir}\/../${pcfiledir}/g' $INSTALL_DIR/lib/pkgconfig/vpl.pc
+        sed -i -e 's/${pcfiledir}\/../${pcfiledir}/g' $LIBVPL_PC_DIR/vpl.pc
+    fi
+    if [ ! -f ${LIBVPL_PC_DIR}/vpl.pc ]; then
+        if [ -e $INSTALL_DIR/lib64/pkgconfig/vpl.pc ]; then
+            LIBVPL_PC_DIR=$INSTALL_DIR/lib64/pkgconfig
+        fi
     fi
     if [ "$MINGWDIR" = "" ] && [ -f "$LIBSTDCXX_A" ]; then
-        sed -i -e "s#^Libs:.*#Libs: -L\${libdir} -lvpl ${LIBSTDCXX_STATIC_FLAGS} -lpthread -ldl#g" $INSTALL_DIR/lib/pkgconfig/vpl.pc
+        sed -i -e "s#^Libs:.*#Libs: -L\${libdir} -lvpl ${LIBSTDCXX_STATIC_FLAGS} -lpthread -ldl#g" $LIBVPL_PC_DIR/vpl.pc
     else
-        sed -i -e 's/-lvpl/-lvpl -lstdc++/g' $INSTALL_DIR/lib/pkgconfig/vpl.pc
+        sed -i -e 's/-lvpl/-lvpl -lstdc++/g' $LIBVPL_PC_DIR/vpl.pc
     fi
     # ffmpegで参照するpkg-configをここで正規化しておく
-    normalize_static_libstdcxx_pc_dir "$INSTALL_DIR/lib/pkgconfig"
+    normalize_static_libstdcxx_pc_dir "$LIBVPL_PC_DIR"
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH

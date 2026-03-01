@@ -2072,6 +2072,11 @@ if [ "${BUILD_LIB_SOXR}" = "TRUE" ]; then
     SOXR_LIBS="--enable-libsoxr"
 fi
 
+LIBBLURAY_LIBS=""
+if [ "${BUILD_LIB_LIBBLURAY}" = "TRUE" ]; then
+    LIBBLURAY_LIBS="--enable-libbluray"
+fi
+
 # Linux静的リンク時、libsoxr等が要求するlibmを明示的に末尾へ渡す
 FFMPEG_EXTRA_LIBS=""
 if [ "$MINGWDIR" = "" ]; then
@@ -2249,7 +2254,7 @@ $TWOLAME_LIBS \
 --enable-libfreetype \
 $SOXR_LIBS \
 --enable-libopus \
---enable-libbluray \
+$LIBBLURAY_LIBS \
 --enable-libass \
 --enable-libdav1d \
 --enable-libvpl \

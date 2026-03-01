@@ -1880,8 +1880,8 @@ if should_build VVENC; then
         CFLAGS="${BUILD_CCFLAGS}" \
         CPPFLAGS="${BUILD_CCFLAGS}" \
         LDFLAGS="${BUILD_LDFLAGS}" \
-        cmake -G "${CMAKE_GENERATOR}" -B build/release-static -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DVVENC_INSTALL_FULLFEATURE_APP=OFF -DVVENC_ENABLE_THIRDPARTY_JSON=OFF -DVVENC_LIBRARY_ONLY=ON -DVVENC_ENABLE_WERROR=OFF -DBUILD_TESTING=OFF ..
-        cmake --build build/release-static -j$NJOBS && cmake --build build/release-static --target install
+        cmake -G "${CMAKE_GENERATOR}" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DVVENC_INSTALL_FULLFEATURE_APP=OFF -DVVENC_ENABLE_THIRDPARTY_JSON=OFF -DVVENC_LIBRARY_ONLY=ON -DVVENC_ENABLE_WERROR=OFF -DBUILD_TESTING=OFF ..
+        make -j${NJOBS} && make install
         VVENC_PC_FILE="$INSTALL_DIR/lib/pkgconfig/libvvenc.pc"
         if [ ! -f "$VVENC_PC_FILE" ] && [ -f "$INSTALL_DIR/lib/pkgconfig/vvenc.pc" ]; then
             VVENC_PC_FILE="$INSTALL_DIR/lib/pkgconfig/vvenc.pc"

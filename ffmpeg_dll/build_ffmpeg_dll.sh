@@ -915,7 +915,8 @@ if should_build EXPAT && [ ! -d "expat" ]; then
     --without-xmlwf \
     --without-examples \
     --without-tests \
-    --without-getrandom 
+    --without-getrandom \
+    --disable-maintainer-mode
     make -j$NJOBS && make install
 fi
 

@@ -1876,15 +1876,32 @@ if should_build VVENC; then
     if [ ! -d "vvenc" ]; then
         find ../src/ -type d -name "vvenc*" | xargs -i cp -r {} ./vvenc
         start_build "vvenc"
+        VVENC_ENABLE_LTO="-fno-lto"
+        if [ $ENABLE_LTO = "TRUE" ]; then
+            VVENC_ENABLE_LTO="-flto"
+        fi
         cd vvenc
         mkdir build && cd build
         CC=gcc \
         CXX=g++ \
         PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-        CFLAGS="${BUILD_CCFLAGS}" \
-        CPPFLAGS="${BUILD_CCFLAGS}" \
-        LDFLAGS="${BUILD_LDFLAGS}" \
-        cmake -G "${CMAKE_GENERATOR}" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DVVENC_INSTALL_FULLFEATURE_APP=OFF -DVVENC_ENABLE_THIRDPARTY_JSON=OFF -DVVENC_LIBRARY_ONLY=ON -DVVENC_ENABLE_WERROR=OFF -DBUILD_TESTING=OFF ..
+        CFLAGS="${BUILD_CCFLAGS} ${VVENC_ENABLE_LTO}" \
+        CPPFLAGS="${BUILD_CCFLAGS} ${VVENC_ENABLE_LTO}" \
+        LDFLAGS="${BUILD_LDFLAGS} ${VVENC_ENABLE_LTO}" \
+        cmake -G "${CMAKE_GENERATOR}" \
+            -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF \
+            -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${VVENC_ENABLE_LTO}" \
+            -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${VVENC_ENABLE_LTO}" \
+            -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${VVENC_ENABLE_LTO}" \
+            -DCMAKE_SHARED_LINKER_FLAGS="${BUILD_LDFLAGS} ${VVENC_ENABLE_LTO}" \
+            -DVVENC_INSTALL_FULLFEATURE_APP=OFF \
+            -DVVENC_ENABLE_THIRDPARTY_JSON=OFF \
+            -DVVENC_LIBRARY_ONLY=ON \
+            -DVVENC_ENABLE_WERROR=OFF \
+            -DBUILD_TESTING=OFF \
+            ..
         make -j${NJOBS} && make install
         VVENC_PC_FILE="$INSTALL_DIR/lib/pkgconfig/libvvenc.pc"
         if [ ! -f "$VVENC_PC_FILE" ] && [ -f "$INSTALL_DIR/lib/pkgconfig/vvenc.pc" ]; then

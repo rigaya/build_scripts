@@ -1008,7 +1008,7 @@ fi
 #     find . -name CMakeLists.txt | xargs sed -i 's/VERSION 2.8.0 FATAL_ERROR/VERSION 4.0.0/'
 #     sed -i '/Font.h/i #include <cstdint>' tests/featuremap/featuremaptest.cpp
 #     mkdir build && cd build
-#     cmake -G "${CMAKE_GENERATOR}" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DENABLE_SHARED=OFF -DENABLE_STATIC=ON ..
+#     cmake -G "${CMAKE_GENERATOR}" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_BUILD_TYPE=Release -DENABLE_SHARED=OFF -DENABLE_STATIC=ON ..
 #     make -j$NJOBS && make install
 #     read -p "Check install and hit enter: "
 # fi
@@ -1238,6 +1238,7 @@ if should_build SOXR && [ ! -d "soxr" ]; then
     cmake --version
     cmake -G "${CMAKE_GENERATOR}" \
     -D BUILD_SHARED_LIBS:BOOL=FALSE \
+    -D CMAKE_INSTALL_LIBDIR=lib \
     -D CMAKE_C_FLAGS_RELEASE:STRING="${BUILD_CCFLAGS}" \
     -D CMAKE_EXE_LINKER_FLAGS_RELEASE:STRING="${BUILD_LDFLAGS}" \
     -D WITH_OPENMP:BOOL=NO \
@@ -1326,13 +1327,10 @@ if should_build LIBARIBCAPTION && [ ! -d "libaribcaption" ]; then
     CFLAGS="${BUILD_CCFLAGS_SMALL}" \
     CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
     LDFLAGS="${BUILD_LDFLAGS}" \
-    cmake .. -G "${CMAKE_GENERATOR}" -DCMAKE_BUILD_TYPE=Release -DARIBCC_USE_FONTCONFIG=ON -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
+    cmake .. -G "${CMAKE_GENERATOR}" -D CMAKE_INSTALL_LIBDIR=lib -DCMAKE_BUILD_TYPE=Release -DARIBCC_USE_FONTCONFIG=ON -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
     cmake --build . -j$NJOBS
     cmake --install .
     LIBARIBCAPTION_PC=${INSTALL_DIR}/lib/pkgconfig/libaribcaption.pc
-    if [ ! -f ${LIBARIBCAPTION_PC} ]; then
-        LIBARIBCAPTION_PC=${INSTALL_DIR}/lib64/pkgconfig/libaribcaption.pc
-    fi
     #sed -i -e 's/-lC:\//-l\/c\//g' ${INSTALL_DIR}/lib/pkgconfig/libaribcaption.pc
     # 下記のような絶対パス指定だとFFmpegの検出でリンク順が崩れるため、静的リンク指定へ正規化する
     #   -lC:/mingw64/.../libstdc++.a
@@ -1362,7 +1360,7 @@ if should_build DAV1D && [ ! -d "dav1d" ]; then
     CPPFLAGS="${BUILD_CCFLAGS}" \
     LDFLAGS="${BUILD_LDFLAGS}" \
     meson build --buildtype release
-    meson configure build/ --prefix=$INSTALL_DIR -Dbuildtype=release -Ddefault_library=static -Denable_examples=false -Denable_tests=false -Dc_args="${BUILD_CCFLAGS}"
+    meson configure build/ --prefix=$INSTALL_DIR --libdir=lib -Dbuildtype=release -Ddefault_library=static -Denable_examples=false -Denable_tests=false -Dc_args="${BUILD_CCFLAGS}"
     ninja -C build install
 fi
 
@@ -1372,7 +1370,7 @@ if should_build LIBVPL && [ ! -d "libvpl" ]; then
     start_build "libvpl"
     cd libvpl
     #script/bootstrap
-    cmake -G "${CMAKE_GENERATOR}" -B _build -DBUILD_SHARED_LIBS=OFF -DUSE_MSVC_STATIC_RUNTIME=ON -DCMAKE_BUILD_TYPE=Release -DINSTALL_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
+    cmake -G "${CMAKE_GENERATOR}" -B _build -D CMAKE_INSTALL_LIBDIR=lib -DBUILD_SHARED_LIBS=OFF -DUSE_MSVC_STATIC_RUNTIME=ON -DCMAKE_BUILD_TYPE=Release -DINSTALL_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
     cmake --build _build --config Release
     cmake --install _build --config Release
     LIBVPL_PC_DIR=$INSTALL_DIR/lib/pkgconfig
@@ -1383,11 +1381,6 @@ if should_build LIBVPL && [ ! -d "libvpl" ]; then
         cp -r $INSTALL_DIR/lib/x86/* $INSTALL_DIR/lib/
         rm -rf $INSTALL_DIR/lib/x86
         sed -i -e 's/${pcfiledir}\/../${pcfiledir}/g' $LIBVPL_PC_DIR/vpl.pc
-    fi
-    if [ ! -f ${LIBVPL_PC_DIR}/vpl.pc ]; then
-        if [ -e $INSTALL_DIR/lib64/pkgconfig/vpl.pc ]; then
-            LIBVPL_PC_DIR=$INSTALL_DIR/lib64/pkgconfig
-        fi
     fi
     if [ "$MINGWDIR" = "" ] && [ -f "$LIBSTDCXX_A" ]; then
         sed -i -e "s#^Libs:.*#Libs: -L\${libdir} -lvpl ${LIBSTDCXX_STATIC_FLAGS} -lpthread -ldl#g" $LIBVPL_PC_DIR/vpl.pc
@@ -1488,7 +1481,7 @@ if should_build GLSLANG; then
       CFLAGS="${BUILD_CCFLAGS}" \
       CPPFLAGS="${BUILD_CCFLAGS}" \
       LDFLAGS="${BUILD_LDFLAGS}" \
-      cmake ../ -G "${CMAKE_GENERATOR}" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DINSTALL_GTEST=OFF -DGLSLANG_TESTS=OFF
+      cmake ../ -G "${CMAKE_GENERATOR}" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -D CMAKE_INSTALL_LIBDIR=lib -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DINSTALL_GTEST=OFF -DGLSLANG_TESTS=OFF
       make -j$NJOBS && make install
   fi
 fi
@@ -1503,7 +1496,7 @@ if should_build LIBJPEG_TURBO && [ ! -d "libjpeg-turbo" ]; then
     CFLAGS="${BUILD_CCFLAGS}" \
     CPPFLAGS="${BUILD_CCFLAGS}" \
     LDFLAGS="${BUILD_LDFLAGS}" \
-    cmake -G "${CMAKE_GENERATOR}" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DENABLE_SHARED=OFF -DENABLE_STATIC=ON ..
+    cmake -G "${CMAKE_GENERATOR}" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -D CMAKE_INSTALL_LIBDIR=lib -DCMAKE_BUILD_TYPE=Release -DENABLE_SHARED=OFF -DENABLE_STATIC=ON ..
     make -j$NJOBS && make install
 fi
 
@@ -1542,7 +1535,7 @@ if should_build SHADERC && [ ! -d "shaderc" ]; then
     CFLAGS="${BUILD_CCFLAGS}" \
     CPPFLAGS="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include" \
     LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
-    cmake -GNinja -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DBUILD_SHARED_LIBS=OFF -DSHADERC_SKIP_EXAMPLES=ON -DSHADERC_SKIP_TESTS=ON -DSHADERC_SKIP_COPYRIGHT_CHECK=ON -DINSTALL_GTEST=OFF ..
+    cmake -GNinja -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -D CMAKE_INSTALL_LIBDIR=lib -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DBUILD_SHARED_LIBS=OFF -DSHADERC_SKIP_EXAMPLES=ON -DSHADERC_SKIP_TESTS=ON -DSHADERC_SKIP_COPYRIGHT_CHECK=ON -DINSTALL_GTEST=OFF ..
     ninja
     ninja install
     mv -f ${INSTALL_DIR}/lib/pkgconfig/shaderc_static.pc ${INSTALL_DIR}/lib/pkgconfig/shaderc.pc
@@ -1564,7 +1557,7 @@ if should_build SPIRV_CROSS && [ ! -d "SPIRV-Cross" ]; then
     CFLAGS="${BUILD_CCFLAGS}" \
     CPPFLAGS="${BUILD_CCFLAGS}" \
     LDFLAGS="${BUILD_LDFLAGS}" \
-    cmake -G "${CMAKE_GENERATOR}" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DSPIRV_CROSS_ENABLE_TESTS=OFF -DSPIRV_CROSS_SHARED=OFF -DSPIRV_CROSS_CLI=OFF ..
+    cmake -G "${CMAKE_GENERATOR}" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -D CMAKE_INSTALL_LIBDIR=lib -DCMAKE_BUILD_TYPE=Release -DSPIRV_CROSS_ENABLE_TESTS=OFF -DSPIRV_CROSS_SHARED=OFF -DSPIRV_CROSS_CLI=OFF ..
     make -j$NJOBS && make install
     sed -i -e 's/-lspirv-cross-c/-lspirv-cross-c -lspirv-cross-msl -lspirv-cross-hlsl -lspirv-cross-cpp -lspirv-cross-glsl -lspirv-cross-util -lspirv-cross-core -lspirv-cross-reflect -lstdc++/g' ${INSTALL_DIR}/lib/pkgconfig/spirv-cross-c.pc
 fi
@@ -1578,7 +1571,7 @@ if should_build VULKAN_LOADER && [ ! -d "Vulkan-Loader" ]; then
     mkdir build && cd build
     "${PYTHON_BIN}" ../scripts/update_deps.py --no-build
     cd Vulkan-Headers
-    cmake -G "${CMAKE_GENERATOR}" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DVULKAN_HEADERS_ENABLE_MODULE=OFF
+    cmake -G "${CMAKE_GENERATOR}" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -D CMAKE_INSTALL_LIBDIR=lib -DCMAKE_BUILD_TYPE=Release -DVULKAN_HEADERS_ENABLE_MODULE=OFF
     make -j$NJOBS && make install
     cd ..
     CC=gcc \
@@ -1592,7 +1585,7 @@ if should_build VULKAN_LOADER && [ ! -d "Vulkan-Loader" ]; then
         # Linux静的リンク用: X11/Wayland系WSI依存を無効化し、X11ヘッダ依存を避ける
         VULKAN_WSI_OPTIONS="-DBUILD_WSI_XCB_SUPPORT=OFF -DBUILD_WSI_XLIB_SUPPORT=OFF -DBUILD_WSI_WAYLAND_SUPPORT=OFF -DBUILD_WSI_DIRECTFB_SUPPORT=OFF"
     fi
-    cmake -G "${CMAKE_GENERATOR}" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DUNIX=OFF -DVULKAN_HEADERS_INSTALL_DIR=${INSTALL_DIR} ${VULKAN_WSI_OPTIONS} ..
+    cmake -G "${CMAKE_GENERATOR}" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -D CMAKE_INSTALL_LIBDIR=lib -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DUNIX=OFF -DVULKAN_HEADERS_INSTALL_DIR=${INSTALL_DIR} ${VULKAN_WSI_OPTIONS} ..
     make -j$NJOBS && make install
     if [ "$MINGWDIR" = "" ]; then
         # 静的リンク用途では libvulkan.a を優先させるため共有ライブラリを除去
@@ -1850,6 +1843,7 @@ if should_build X265; then
             -DENABLE_SCC_EXT=ON \
             -DENABLE_HDR10_PLUS=OFF \
             -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+            -D CMAKE_INSTALL_LIBDIR=lib \
             -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
             -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
             -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_USE_LD}"
@@ -1916,6 +1910,7 @@ if should_build VVENC; then
         LDFLAGS="${BUILD_LDFLAGS} ${VVENC_LTO}" \
         cmake -G "${CMAKE_GENERATOR}" \
             -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+            -DCMAKE_INSTALL_LIBDIR=lib \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${VVENC_LTO}" \
             -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${VVENC_LTO}" \
@@ -1970,6 +1965,7 @@ if should_build SVT_AV1; then
                 -DENABLE_AVX512=ON \
                 -DCMAKE_ASM_NASM_COMPILER=nasm \
                 -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+                -DCMAKE_INSTALL_LIBDIR=lib \
                 -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC} ${PROFILE_SVTAV1}" \
                 -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC} ${PROFILE_SVTAV1}" \
                 -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_GEN_LD} ${PROFILE_SVTAV1}" \
@@ -2004,6 +2000,7 @@ if should_build SVT_AV1; then
                 -DENABLE_AVX512=ON \
                 -DCMAKE_ASM_NASM_COMPILER=nasm \
                 -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+                -DCMAKE_INSTALL_LIBDIR=lib \
                 -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC} ${PROFILE_SVTAV1}" \
                 -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC} ${PROFILE_SVTAV1}" \
                 -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_USE_LD} ${PROFILE_SVTAV1}" \
@@ -2020,6 +2017,7 @@ if should_build SVT_AV1; then
                 -DENABLE_AVX512=ON \
                 -DCMAKE_ASM_NASM_COMPILER=nasm \
                 -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+                -DCMAKE_INSTALL_LIBDIR=lib \
                 -DCMAKE_C_FLAGS="${BUILD_CCFLAGS}" \
                 -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS}" \
                 -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS}" \

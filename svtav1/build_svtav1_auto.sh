@@ -5,6 +5,8 @@ BUILD_DIR=`pwd`/build_svtav1
 GOOGLE_DIR="/C/Users/rigaya/GoogleDrive/svtav1"
 ONEDRIVE_DIR="/C/Users/rigaya/OneDrive/svtav1"
 DROPBOX_DIR="/C/Users/rigaya/DropBox/svtav1"
+TWEET_PY="/C/ProgramEx/tweet/tweet.py"
+DOWNLOAD_URL="https://1drv.ms/u/s!AsYziax1Q91rvRNtavIfzcJkK79A"
 
 if [ $MSYSTEM = "MINGW32" ]; then
     TARGET_ARCH="x86"
@@ -14,11 +16,13 @@ fi
 
 EXE_NAME=SvtAv1EncApp
 ARCHIEVE_NAME=svtav1
-if [ $1 = "-psy" ]; then
+SVTAV1_PSY=
+if [ "$1" = "-psy" ]; then
     BUILD_PSY="TRUE"
     BUILD_DIR=`pwd`/build_svtav1_psy
     EXE_NAME="${EXE_NAME}Psy"
     ARCHIEVE_NAME="${ARCHIEVE_NAME}_psy"
+    SVTAV1_PSY="-psy"
 fi
 
 . ./build_svtav1.sh $1
@@ -62,3 +66,12 @@ cp -f "$BUILD_DIR/temp/${ARCHIEVE_NAME}_${SVTAV1_REV}_${TARGET_ARCH}.zip" "${DRO
 cp -f "$BUILD_DIR/temp/${ARCHIEVE_NAME}_${SVTAV1_REV}_${TARGET_ARCH}.zip" "${GOOGLE_DIR}/old/${ARCHIEVE_NAME}_${SVTAV1_REV}_${TARGET_ARCH}.zip"
 cp -f "$BUILD_DIR/temp/${ARCHIEVE_NAME}_${SVTAV1_REV}_${TARGET_ARCH}.zip" "${ONEDRIVE_DIR}/old/${ARCHIEVE_NAME}_${SVTAV1_REV}_${TARGET_ARCH}.zip"
 cp -f "$BUILD_DIR/temp/${ARCHIEVE_NAME}_${SVTAV1_REV}_${TARGET_ARCH}.zip" "${DROPBOX_DIR}/old/${ARCHIEVE_NAME}_${SVTAV1_REV}_${TARGET_ARCH}.zip"
+
+cp -f ${EXE_PATH} /y/Encoders/x64
+
+echo "svt-av1${SVTAV1_PSY} ${SVTAV1_REV} をビルドしバイナリを更新しました。 → ${DOWNLOAD_URL}"
+read -p "ok? (y/N): " yn
+case "$yn" in [yY]*) ;; *) echo "abort." ; exit ;; esac
+
+
+

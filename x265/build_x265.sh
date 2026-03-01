@@ -2,8 +2,9 @@
 #msys2用x265ビルドスクリプト
 #pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain p7zip git nasm p7zip
 #そのほかにcmakeのインストールが必要
-#NJOBS=$(($NUMBER_OF_PROCESSORS>16?16:$NUMBER_OF_PROCESSORS))
-NJOBS=8
+NJOBS=$(($NUMBER_OF_PROCESSORS>16?16:$NUMBER_OF_PROCESSORS))
+NJOBS_HIGHBITDEPTH=$(( $NJOBS/2 ))
+#NJOBS=8
 BUILD_DIR=$HOME/build_x265
 BUILD_DIR_WIN=`cygpath -m ${HOME}`/build_x265
 #cmake.exeのある場所
@@ -126,7 +127,7 @@ if [ "${PROFILE_GEN_CC}" != "" ]; then
             -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
             -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
             -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_GEN_LD}"
-        make -j${NJOBS} &
+        make -j${NJOBS_HIGHBITDEPTH} &
         X265_EXTRA_LIB="x265_main12"
     fi
 
@@ -146,7 +147,7 @@ if [ "${PROFILE_GEN_CC}" != "" ]; then
             -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
             -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC}" \
             -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_GEN_LD}"
-        make -j${NJOBS} &
+        make -j${NJOBS_HIGHBITDEPTH} &
         X265_EXTRA_LIB="x265_main10;${X265_EXTRA_LIB}"
     fi
 
@@ -253,7 +254,7 @@ if [ $BUILD_12BIT = "ON" ]; then
         -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
         -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
         -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_USE_LD}"
-    make -j${NJOBS} &
+    make -j${NJOBS_HIGHBITDEPTH} &
     cp libx265.a ../8bit/libx265_main12.a
     X265_EXTRA_LIB="x265_main12"
 fi
@@ -272,7 +273,7 @@ if [ $BUILD_10BIT = "ON" ]; then
         -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
         -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC}" \
         -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_USE_LD}"
-    make -j${NJOBS} &
+    make -j${NJOBS_HIGHBITDEPTH} &
     cp libx265.a ../8bit/libx265_main10.a
     X265_EXTRA_LIB="x265_main10;${X265_EXTRA_LIB}"
 fi

@@ -387,7 +387,7 @@ if [ "$FOR_AUDENC" != "TRUE" ]; then
     BUILD_LIB_LIBPNG="TRUE"
     BUILD_LIB_EXPAT="TRUE"
     BUILD_LIB_FREETYPE="TRUE"
-    BUILD_LIB_LIBICONV="TRUE"
+    #BUILD_LIB_LIBICONV="TRUE"
     BUILD_LIB_FONTCONFIG="TRUE"
 
     # 字幕関連
@@ -949,6 +949,10 @@ cd $BUILD_DIR/$TARGET_ARCH
 if should_build FONTCONFIG && [ ! -d "fontconfig" ]; then
     find ../src/ -type d -name "fontconfig-*" | xargs -i cp -r {} ./fontconfig
     start_build "fontconfig"
+    FONTCONFIG_LIBICONV_CONF=
+    if [ "$MINGWDIR" != "" ]; then
+        FONTCONFIG_LIBICONV_CONF="--enable-iconv --with-libiconv=${INSTALL_DIR}"
+    fi
     cd ./fontconfig
     autoreconf -fvi
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
@@ -964,7 +968,7 @@ if should_build FONTCONFIG && [ ! -d "fontconfig" ]; then
     --prefix=$INSTALL_DIR \
     --disable-shared \
     --enable-static \
-    --enable-iconv --with-libiconv-includes=$INSTALL_DIR/include \
+    $FONTCONFIG_LIBICONV_CONF \
     --disable-docs \
     --disable-libxml2
     make -j$NJOBS && make install

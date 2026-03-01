@@ -1876,26 +1876,42 @@ if should_build VVENC; then
     if [ ! -d "vvenc" ]; then
         find ../src/ -type d -name "vvenc*" | xargs -i cp -r {} ./vvenc
         start_build "vvenc"
-        VVENC_ENABLE_LTO="-fno-lto"
-        if [ $ENABLE_LTO = "TRUE" ]; then
-            VVENC_ENABLE_LTO="-flto"
-        fi
         cd vvenc
+        VVENC_LTO=
+        if [ $ENABLE_LTO != "TRUE" ]; then
+            # vvencは自動でltoが強制されるが、これを無効化する
+            # そうしないとlink時にエラーになることがある
+            # どうしてパッと切れない…ここまでやらないといけないのはどうなんだ…
+            for f in CMakeLists.txt; do
+              cp -a "$f" "$f.bak"
+
+              # 1) IPO/LTO を Release系でOFF
+              sed -i -E \
+                's/(CMAKE_INTERPROCEDURAL_OPTIMIZATION_(RELEASE|RELWITHDEBINFO|MINSIZEREL))[[:space:]]+ON/\1 OFF/g' \
+                "$f"
+
+              # 2) -flto=auto を入れる add_link_options をコメントアウト
+              sed -i -E \
+                '/add_link_options\(.*-flto/ s/^/# DISABLE_LTO: /' \
+                "$f"
+            done
+            VVENC_LTO="-fno-lto"
+        fi
         mkdir build && cd build
         CC=gcc \
         CXX=g++ \
         PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
-        CFLAGS="${BUILD_CCFLAGS} ${VVENC_ENABLE_LTO}" \
-        CPPFLAGS="${BUILD_CCFLAGS} ${VVENC_ENABLE_LTO}" \
-        LDFLAGS="${BUILD_LDFLAGS} ${VVENC_ENABLE_LTO}" \
+        CFLAGS="${BUILD_CCFLAGS} ${VVENC_LTO}" \
+        CPPFLAGS="${BUILD_CCFLAGS} ${VVENC_LTO}" \
+        LDFLAGS="${BUILD_LDFLAGS} ${VVENC_LTO}" \
         cmake -G "${CMAKE_GENERATOR}" \
             -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${VVENC_LTO}" \
+            -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${VVENC_LTO}" \
+            -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${VVENC_LTO}" \
+            -DCMAKE_SHARED_LINKER_FLAGS="${BUILD_LDFLAGS} ${VVENC_LTO}" \
             -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF \
-            -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${VVENC_ENABLE_LTO}" \
-            -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${VVENC_ENABLE_LTO}" \
-            -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${VVENC_ENABLE_LTO}" \
-            -DCMAKE_SHARED_LINKER_FLAGS="${BUILD_LDFLAGS} ${VVENC_ENABLE_LTO}" \
             -DVVENC_INSTALL_FULLFEATURE_APP=OFF \
             -DVVENC_ENABLE_THIRDPARTY_JSON=OFF \
             -DVVENC_LIBRARY_ONLY=ON \

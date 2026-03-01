@@ -1329,6 +1329,10 @@ if should_build LIBARIBCAPTION && [ ! -d "libaribcaption" ]; then
     cmake .. -G "${CMAKE_GENERATOR}" -DCMAKE_BUILD_TYPE=Release -DARIBCC_USE_FONTCONFIG=ON -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
     cmake --build . -j$NJOBS
     cmake --install .
+    LIBARIBCAPTION_PC=${INSTALL_DIR}/lib/pkgconfig/libaribcaption.pc
+    if [ ! -f ${LIBARIBCAPTION_PC} ]; then
+        LIBARIBCAPTION_PC=${INSTALL_DIR}/lib64/pkgconfig/libaribcaption.pc
+    fi
     #sed -i -e 's/-lC:\//-l\/c\//g' ${INSTALL_DIR}/lib/pkgconfig/libaribcaption.pc
     # 下記のような絶対パス指定だとFFmpegの検出でリンク順が崩れるため、静的リンク指定へ正規化する
     #   -lC:/mingw64/.../libstdc++.a
@@ -1338,12 +1342,12 @@ if should_build LIBARIBCAPTION && [ ! -d "libaribcaption" ]; then
             -e "s#-l[A-Z]:/.*/libstdc\\+\\+\\.a#${LIBSTDCXX_STATIC_FLAGS}#g" \
             -e "s#/usr/lib/gcc/[^ ]+/[0-9.]+/libstdc\\+\\+\\.a#${LIBSTDCXX_STATIC_FLAGS}#g" \
             -e "s#-lstdc\\+\\+#${LIBSTDCXX_STATIC_FLAGS}#g" \
-            ${INSTALL_DIR}/lib/pkgconfig/libaribcaption.pc
+            ${LIBARIBCAPTION_PC}
     else
         sed -i -E \
             -e 's#-l[A-Z]:/.*/libstdc\+\+\.a#-lstdc++#g' \
             -e 's#/usr/lib/gcc/[^ ]+/[0-9.]+/libstdc\+\+\.a#-lstdc++#g' \
-            ${INSTALL_DIR}/lib/pkgconfig/libaribcaption.pc
+            ${LIBARIBCAPTION_PC}
     fi
 fi
 

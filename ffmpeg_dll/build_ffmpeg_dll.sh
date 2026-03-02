@@ -855,7 +855,8 @@ if should_build LZMA && [ ! -d "xz" ]; then
     ./configure \
       --disable-shared \
       --enable-static \
-      --prefix=$INSTALL_DIR
+      --prefix=$INSTALL_DIR \
+      SKIP_WERROR_CHECK=yes
     make -j$NJOBS && make install
 fi
 

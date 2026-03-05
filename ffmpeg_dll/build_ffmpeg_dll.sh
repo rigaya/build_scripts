@@ -512,7 +512,7 @@ else
 fi
 
 if should_build ZLIB && [ ! -d "zlib-1.3.2" ]; then
-    wget https://zlib.net/zlib-1.3.2.tar.xz
+    wget https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.xz
     tar xf zlib-1.3.2.tar.xz
 fi
 
@@ -522,7 +522,7 @@ if should_build LIBPNG && [ ! -d "libpng-1.6.50" ]; then
 fi
 
 if should_build BZIP2 && [ ! -d "bzip2-1.0.8" ]; then
-    wget https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
+    wget https://github.com/libarchive/bzip2/archive/refs/tags/bzip2-1.0.8.tar.gz
     tar xf bzip2-1.0.8.tar.gz
 fi
 
@@ -538,8 +538,8 @@ fi
 
 # freetype-2.12.1はダメ
 if should_build FREETYPE && [ ! -d "freetype-2.11.0" ]; then
-    wget https://download.savannah.gnu.org/releases/freetype/freetype-2.11.0.tar.xz
-    tar xf freetype-2.11.0.tar.xz
+    wget https://downloads.sourceforge.net/freetype/freetype-2.11.0.tar.gz
+    tar xf freetype-2.11.0.tar.gz
 fi
 
 if should_build LIBICONV && [ ! -d "libiconv-1.16" ]; then
@@ -598,17 +598,17 @@ if should_build OPUS && [ ! -d "opus-1.6.1" ]; then
 fi
 
 if should_build SPEEX && [ ! -d "speex-1.2.1" ]; then
-    wget http://downloads.xiph.org/releases/speex/speex-1.2.1.tar.gz
+    wget https://downloads.xiph.org/releases/speex/speex-1.2.1.tar.gz
     tar xf speex-1.2.1.tar.gz
 fi
 
 if should_build LAME && [ ! -d "lame-3.100" ]; then
-    wget https://sf-west-interserver-2.dl.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz
+    wget https://download.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz
     tar xf lame-3.100.tar.gz
 fi
 
 if should_build TWOLAME && [ ! -d "twolame-0.4.0" ]; then
-    wget https://sf-west-interserver-2.dl.sourceforge.net/project/twolame/twolame/0.4.0/twolame-0.4.0.tar.gz
+    wget https://download.sourceforge.net/project/twolame/twolame/0.4.0/twolame-0.4.0.tar.gz
     tar xf twolame-0.4.0.tar.gz
 fi
 
@@ -618,7 +618,7 @@ if should_build LIBSNDFILE && [ ! -d "libsndfile-1.2.2" ]; then
 fi
 
 if should_build SOXR && [ ! -d "soxr-0.1.3-Source" ]; then
-    wget https://sf-west-interserver-2.dl.sourceforge.net/project/soxr/soxr-0.1.3-Source.tar.xz
+    wget https://download.sourceforge.net/project/soxr/soxr-0.1.3-Source.tar.xz
     tar xf soxr-0.1.3-Source.tar.xz
 fi
 

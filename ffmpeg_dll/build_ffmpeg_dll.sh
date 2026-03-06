@@ -293,6 +293,13 @@ start_build() {
     echo "=== Building $1 ======================================="
 }
 
+CURL_RETRY_ALL_ERRORS=
+case "$(curl --help all 2>/dev/null || true)" in
+    *--retry-all-errors*)
+        CURL_RETRY_ALL_ERRORS="--retry-all-errors"
+        ;;
+esac
+
 download_archive() {
     local output="$1"
     shift
@@ -312,7 +319,7 @@ download_archive() {
         if curl -fL \
             --retry 5 \
             --retry-delay 5 \
-            --retry-all-errors \
+            ${CURL_RETRY_ALL_ERRORS} \
             --connect-timeout 30 \
             -o "${tmp}" \
             "${url}"; then

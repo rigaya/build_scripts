@@ -549,7 +549,7 @@ fi
 
 #2.12.6でないといろいろ面倒 -> 2.12.1もだめ, 2.13.0もだめ
 if should_build FONTCONFIG && [ ! -d "fontconfig-2.12.6" ]; then
-    wget https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.12.6.tar.gz
+    curl -fL -A "Mozilla/5.0" -o fontconfig-2.12.6.tar.gz https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.12.6.tar.gz
     tar xf fontconfig-2.12.6.tar.gz
 fi
 
@@ -583,22 +583,22 @@ if should_build LIBASS && [ ! -d "libass-${LIBASS_VERSION}" ]; then
 fi
 
 if should_build LIBOGG && [ ! -d "libogg-1.3.6" ]; then
-    wget https://downloads.xiph.org/releases/ogg/libogg-1.3.6.tar.xz
-    tar xf libogg-1.3.6.tar.xz
+    wget https://gitlab.xiph.org/xiph/ogg/-/archive/v1.3.6/libogg-1.3.6.tar.gz
+    tar xf libogg-1.3.6.tar.gz
 fi
 
 if should_build LIBVORBIS && [ ! -d "libvorbis-1.3.7" ]; then
-    wget https://downloads.xiph.org/releases/vorbis/libvorbis-1.3.7.tar.xz
-    tar xf libvorbis-1.3.7.tar.xz
+    wget https://gitlab.xiph.org/xiph/vorbis/-/archive/v1.3.7/libvorbis-1.3.7.tar.gz
+    tar xf libvorbis-1.3.7.tar.gz
 fi
 
 if should_build OPUS && [ ! -d "opus-1.6.1" ]; then
-    wget https://downloads.xiph.org/releases/opus/opus-1.6.1.tar.gz
+    wget https://gitlab.xiph.org/xiph/opus/-/archive/v1.6.1/opus-1.6.1.tar.gz
     tar xf opus-1.6.1.tar.gz
 fi
 
 if should_build SPEEX && [ ! -d "speex-1.2.1" ]; then
-    wget https://downloads.xiph.org/releases/speex/speex-1.2.1.tar.gz
+    wget -O speex-1.2.1.tar.gz https://github.com/xiph/speex/archive/refs/tags/Speex-1.2.1.tar.gz
     tar xf speex-1.2.1.tar.gz
 fi
 

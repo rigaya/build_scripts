@@ -293,6 +293,51 @@ start_build() {
     echo "=== Building $1 ======================================="
 }
 
+download_archive() {
+    local output="$1"
+    shift
+
+    if [ $# -eq 0 ]; then
+        echo "download_archive: no URL specified for ${output}."
+        return 1
+    fi
+
+    local tmp="${output}.part"
+    local url=
+
+    rm -f "${tmp}"
+    for url in "$@"; do
+        echo "Downloading ${output} from ${url}"
+        rm -f "${tmp}"
+        if curl -fL \
+            --retry 5 \
+            --retry-delay 5 \
+            --retry-all-errors \
+            --connect-timeout 30 \
+            -o "${tmp}" \
+            "${url}"; then
+            mv "${tmp}" "${output}"
+            return 0
+        fi
+    done
+
+    echo "Failed to download ${output}."
+    rm -f "${tmp}"
+    return 1
+}
+
+verify_sha256() {
+    local file="$1"
+    local expected="$2"
+    local actual=
+
+    actual=$(sha256sum "${file}" | cut -d' ' -f1)
+    if [ "${actual,,}" != "${expected,,}" ]; then
+        echo "SHA256 mismatch for ${file}: expected ${expected}, got ${actual}."
+        return 1
+    fi
+}
+
 ensure_test_yuv_files() {
     local work_dir
     work_dir="$(dirname "${YUVFILE}")"
@@ -303,7 +348,7 @@ ensure_test_yuv_files() {
     fi
 
     if [ ! -f "${YUVFILE}" ]; then
-        wget -O "${work_dir}/test_8.7z" "${TEST_YUV_8_URL}"
+        download_archive "${work_dir}/test_8.7z" "${TEST_YUV_8_URL}"
         7z x -y "${work_dir}/test_8.7z" -o"${work_dir}"
     fi
     if [ ! -f "${YUVFILE}" ]; then
@@ -312,7 +357,7 @@ ensure_test_yuv_files() {
     fi
 
     if [ ! -f "${YUVFILE_10}" ]; then
-        wget -O "${work_dir}/test_10.7z" "${TEST_YUV_10_URL}"
+        download_archive "${work_dir}/test_10.7z" "${TEST_YUV_10_URL}"
         7z x -y "${work_dir}/test_10.7z" -o"${work_dir}"
     fi
     if [ ! -f "${YUVFILE_10}" ]; then
@@ -479,7 +524,7 @@ done
 #--- ソースのダウンロード ---------------------------------------
 if [ "$FOR_FFMPEG4" = "TRUE" ]; then
     if [ ! -d "ffmpeg" ]; then
-        wget https://ffmpeg.org/releases/ffmpeg-4.4.3.tar.xz
+        download_archive "ffmpeg-4.4.3.tar.xz" "https://ffmpeg.org/releases/ffmpeg-4.4.3.tar.xz"
         tar xf ffmpeg-4.4.3.tar.xz
         mv ffmpeg-4.4.3 ffmpeg
     fi
@@ -503,7 +548,7 @@ else
         #git reset --hard
         #git checkout -b build 9d15fe77e33b757c75a4186fa049857462737713
         #cd ..
-        wget https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz
+        download_archive "ffmpeg-8.0.tar.xz" "https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz"
         tar xf ffmpeg-8.0.tar.xz
         mv ffmpeg-8.0 ffmpeg
         #wget https://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2
@@ -512,49 +557,52 @@ else
 fi
 
 if should_build ZLIB && [ ! -d "zlib-1.3.2" ]; then
-    wget https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.xz
+    download_archive "zlib-1.3.2.tar.xz" "https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.xz"
     tar xf zlib-1.3.2.tar.xz
 fi
 
 if should_build LIBPNG && [ ! -d "libpng-1.6.50" ]; then
-    wget https://download.sourceforge.net/libpng/libpng-1.6.50.tar.xz
+    download_archive "libpng-1.6.50.tar.xz" "https://download.sourceforge.net/libpng/libpng-1.6.50.tar.xz"
     tar xf libpng-1.6.50.tar.xz
 fi
 
 if should_build BZIP2 && [ ! -d "bzip2-1.0.8" ]; then
-    wget https://github.com/libarchive/bzip2/archive/refs/tags/bzip2-1.0.8.tar.gz
+    download_archive "bzip2-1.0.8.tar.gz" "https://github.com/libarchive/bzip2/archive/refs/tags/bzip2-1.0.8.tar.gz"
     tar xf bzip2-1.0.8.tar.gz
 fi
 
 if should_build LZMA && [ ! -d "xz-5.8.2" ]; then
-    wget https://github.com/tukaani-project/xz/releases/download/v5.8.2/xz-5.8.2.tar.xz
+    download_archive "xz-5.8.2.tar.xz" "https://github.com/tukaani-project/xz/releases/download/v5.8.2/xz-5.8.2.tar.xz"
     tar xf xz-5.8.2.tar.xz
 fi
 
 if should_build EXPAT && [ ! -d "expat-2.7.1" ]; then
-    wget https://github.com/libexpat/libexpat/releases/download/R_2_7_1/expat-2.7.1.tar.xz
+    download_archive "expat-2.7.1.tar.xz" "https://github.com/libexpat/libexpat/releases/download/R_2_7_1/expat-2.7.1.tar.xz"
     tar xf expat-2.7.1.tar.xz
 fi
 
 # freetype-2.12.1はダメ
 if should_build FREETYPE && [ ! -d "freetype-2.11.0" ]; then
-    wget https://downloads.sourceforge.net/freetype/freetype-2.11.0.tar.gz
+    download_archive "freetype-2.11.0.tar.gz" "https://downloads.sourceforge.net/freetype/freetype-2.11.0.tar.gz"
     tar xf freetype-2.11.0.tar.gz
 fi
 
 if should_build LIBICONV && [ ! -d "libiconv-1.16" ]; then
-    wget https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.16.tar.gz
+    download_archive "libiconv-1.16.tar.gz" "https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.16.tar.gz"
     tar xf libiconv-1.16.tar.gz
 fi
 
 #2.12.6でないといろいろ面倒 -> 2.12.1もだめ, 2.13.0もだめ
 if should_build FONTCONFIG && [ ! -d "fontconfig-2.12.6" ]; then
-    curl -fL -A "Mozilla/5.0" -o fontconfig-2.12.6.tar.gz https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.12.6.tar.gz
+    download_archive "fontconfig-2.12.6.tar.gz" \
+        "https://download.videolan.org/contrib/fontconfig/fontconfig-2.12.6.tar.gz" \
+        "https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.12.6.tar.gz"
+    verify_sha256 "fontconfig-2.12.6.tar.gz" "064b9ebf060c9e77011733ac9dc0e2ce92870b574cca2405e11f5353a683c334"
     tar xf fontconfig-2.12.6.tar.gz
 fi
 
 if should_build FRIBIDI && [ ! -d "fribidi-1.0.16" ]; then
-    wget https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz
+    download_archive "fribidi-1.0.16.tar.xz" "https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz"
     tar xf fribidi-1.0.16.tar.xz
 fi
 
@@ -564,12 +612,12 @@ fi
 #fi
 
 if should_build HARFBUZZ && [ ! -d "harfbuzz-11.4.4" ]; then
-    wget https://github.com/harfbuzz/harfbuzz/releases/download/11.4.4/harfbuzz-11.4.4.tar.xz
+    download_archive "harfbuzz-11.4.4.tar.xz" "https://github.com/harfbuzz/harfbuzz/releases/download/11.4.4/harfbuzz-11.4.4.tar.xz"
     tar xf harfbuzz-11.4.4.tar.xz
 fi
 
 if should_build LIBUNIBREAK && [ ! -d "libunibreak-6.1" ]; then
-    wget https://github.com/adah1972/libunibreak/releases/download/libunibreak_6_1/libunibreak-6.1.tar.gz
+    download_archive "libunibreak-6.1.tar.gz" "https://github.com/adah1972/libunibreak/releases/download/libunibreak_6_1/libunibreak-6.1.tar.gz"
     tar xf libunibreak-6.1.tar.gz
 fi
 
@@ -578,52 +626,55 @@ if [ $TARGET_ARCH = "x86" ]; then
     LIBASS_VERSION="0.14.0"
 fi  
 if should_build LIBASS && [ ! -d "libass-${LIBASS_VERSION}" ]; then
-    wget https://github.com/libass/libass/releases/download/${LIBASS_VERSION}/libass-${LIBASS_VERSION}.tar.xz
+    download_archive "libass-${LIBASS_VERSION}.tar.xz" "https://github.com/libass/libass/releases/download/${LIBASS_VERSION}/libass-${LIBASS_VERSION}.tar.xz"
     tar xf libass-${LIBASS_VERSION}.tar.xz
 fi
 
 if should_build LIBOGG && [ ! -d "libogg-1.3.6" ]; then
-    wget https://gitlab.xiph.org/xiph/ogg/-/archive/v1.3.6/libogg-1.3.6.tar.gz
+    download_archive "libogg-1.3.6.tar.gz" "https://gitlab.xiph.org/xiph/ogg/-/archive/v1.3.6/libogg-1.3.6.tar.gz"
     tar xf libogg-1.3.6.tar.gz
+    mv ogg-v1.3.6-* libogg-1.3.6
 fi
 
 if should_build LIBVORBIS && [ ! -d "libvorbis-1.3.7" ]; then
-    wget https://gitlab.xiph.org/xiph/vorbis/-/archive/v1.3.7/libvorbis-1.3.7.tar.gz
+    download_archive "libvorbis-1.3.7.tar.gz" "https://gitlab.xiph.org/xiph/vorbis/-/archive/v1.3.7/libvorbis-1.3.7.tar.gz"
     tar xf libvorbis-1.3.7.tar.gz
+    mv vorbis-v1.3.7-* libvorbis-1.3.7
 fi
 
 if should_build OPUS && [ ! -d "opus-1.6.1" ]; then
-    wget https://gitlab.xiph.org/xiph/opus/-/archive/v1.6.1/opus-1.6.1.tar.gz
+    download_archive "opus-1.6.1.tar.gz" "https://gitlab.xiph.org/xiph/opus/-/archive/v1.6.1/opus-1.6.1.tar.gz"
     tar xf opus-1.6.1.tar.gz
+    mv opus-v1.6.1-* opus-1.6.1
 fi
 
 if should_build SPEEX && [ ! -d "speex-1.2.1" ]; then
-    wget -O speex-1.2.1.tar.gz https://github.com/xiph/speex/archive/refs/tags/Speex-1.2.1.tar.gz
+    download_archive "speex-1.2.1.tar.gz" "https://github.com/xiph/speex/archive/refs/tags/Speex-1.2.1.tar.gz"
     tar xf speex-1.2.1.tar.gz
 fi
 
 if should_build LAME && [ ! -d "lame-3.100" ]; then
-    wget https://download.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz
+    download_archive "lame-3.100.tar.gz" "https://download.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz"
     tar xf lame-3.100.tar.gz
 fi
 
 if should_build TWOLAME && [ ! -d "twolame-0.4.0" ]; then
-    wget https://download.sourceforge.net/project/twolame/twolame/0.4.0/twolame-0.4.0.tar.gz
+    download_archive "twolame-0.4.0.tar.gz" "https://download.sourceforge.net/project/twolame/twolame/0.4.0/twolame-0.4.0.tar.gz"
     tar xf twolame-0.4.0.tar.gz
 fi
 
 if should_build LIBSNDFILE && [ ! -d "libsndfile-1.2.2" ]; then
-    wget https://github.com/libsndfile/libsndfile/releases/download/1.2.2/libsndfile-1.2.2.tar.xz
+    download_archive "libsndfile-1.2.2.tar.xz" "https://github.com/libsndfile/libsndfile/releases/download/1.2.2/libsndfile-1.2.2.tar.xz"
     tar xf libsndfile-1.2.2.tar.xz
 fi
 
 if should_build SOXR && [ ! -d "soxr-0.1.3-Source" ]; then
-    wget https://download.sourceforge.net/project/soxr/soxr-0.1.3-Source.tar.xz
+    download_archive "soxr-0.1.3-Source.tar.xz" "https://download.sourceforge.net/project/soxr/soxr-0.1.3-Source.tar.xz"
     tar xf soxr-0.1.3-Source.tar.xz
 fi
 
 if should_build LIBXML2 && [ ! -d "libxml2-2.14.5" ]; then
-    wget -O libxml2-2.14.5.tar.gz https://github.com/GNOME/libxml2/archive/refs/tags/v2.14.5.tar.gz
+    download_archive "libxml2-2.14.5.tar.gz" "https://github.com/GNOME/libxml2/archive/refs/tags/v2.14.5.tar.gz"
     tar xf libxml2-2.14.5.tar.gz
 fi
 
@@ -633,33 +684,33 @@ fi
 #fi
 
 if should_build LIBBLURAY && [ ! -d "libbluray-1.3.4" ]; then
-    wget https://download.videolan.org/pub/videolan/libbluray/1.3.4/libbluray-1.3.4.tar.bz2
+    download_archive "libbluray-1.3.4.tar.bz2" "https://download.videolan.org/pub/videolan/libbluray/1.3.4/libbluray-1.3.4.tar.bz2"
     tar xf libbluray-1.3.4.tar.bz2
 fi
 
 if should_build ARIBB24 && [ ! -d "aribb24-master" ]; then
-    wget https://github.com/nkoriyama/aribb24/archive/master.zip
+    download_archive "master.zip" "https://github.com/nkoriyama/aribb24/archive/master.zip"
     mv master.zip aribb24-master.zip
     unzip aribb24-master.zip
 fi
 
 if should_build LIBARIBCAPTION && [ ! -d "libaribcaption-1.1.1" ]; then
-    wget -O libaribcaption-1.1.1.tar.gz https://github.com/xqq/libaribcaption/archive/refs/tags/v1.1.1.tar.gz
+    download_archive "libaribcaption-1.1.1.tar.gz" "https://github.com/xqq/libaribcaption/archive/refs/tags/v1.1.1.tar.gz"
     tar xf libaribcaption-1.1.1.tar.gz
 fi
 
 if should_build LIBVPL && [ ! -d "libvpl-2.16.0" ]; then
-    wget -O libvpl-2.16.0.tar.gz https://github.com/intel/libvpl/archive/refs/tags/v2.16.0.tar.gz
+    download_archive "libvpl-2.16.0.tar.gz" "https://github.com/intel/libvpl/archive/refs/tags/v2.16.0.tar.gz"
     tar xf libvpl-2.16.0.tar.gz
 fi
 
 if should_build NV_CODEC_HEADERS && [ ! -d "nv-codec-headers-12.2.72.0" ]; then
-    wget https://github.com/FFmpeg/nv-codec-headers/releases/download/n12.2.72.0/nv-codec-headers-12.2.72.0.tar.gz
+    download_archive "nv-codec-headers-12.2.72.0.tar.gz" "https://github.com/FFmpeg/nv-codec-headers/releases/download/n12.2.72.0/nv-codec-headers-12.2.72.0.tar.gz"
     tar xf nv-codec-headers-12.2.72.0.tar.gz
 fi
 
 if should_build LIBVPX && [ ! -d "libvpx-1.16.0" ]; then
-    wget -O libvpx-1.16.0.tar.gz https://github.com/webmproject/libvpx/archive/refs/tags/v1.16.0.tar.gz
+    download_archive "libvpx-1.16.0.tar.gz" "https://github.com/webmproject/libvpx/archive/refs/tags/v1.16.0.tar.gz"
     tar xf libvpx-1.16.0.tar.gz
 fi
 
@@ -684,18 +735,18 @@ fi
 # fi
 
 if should_build DAV1D && [ ! -d "dav1d-1.5.3" ]; then
-    wget https://code.videolan.org/videolan/dav1d/-/archive/1.5.3/dav1d-1.5.3.tar.gz
+    download_archive "dav1d-1.5.3.tar.gz" "https://code.videolan.org/videolan/dav1d/-/archive/1.5.3/dav1d-1.5.3.tar.gz"
     tar xf dav1d-1.5.3.tar.gz
 fi
 
 if should_build LIBXXHASH && [ ! -d "libxxhash-0.8.3" ]; then
-    wget -O libxxhash-0.8.3.tar.gz https://github.com/Cyan4973/xxHash/archive/refs/tags/v0.8.3.tar.gz
+    download_archive "libxxhash-0.8.3.tar.gz" "https://github.com/Cyan4973/xxHash/archive/refs/tags/v0.8.3.tar.gz"
     tar xf libxxhash-0.8.3.tar.gz
     mv xxHash-0.8.3 libxxhash-0.8.3
 fi
 
 if should_build GLSLANG && [ ! -d "glslang-15.4.0" ]; then
-    wget -O glslang-15.4.0.tar.gz https://github.com/KhronosGroup/glslang/archive/refs/tags/15.4.0.tar.gz
+    download_archive "glslang-15.4.0.tar.gz" "https://github.com/KhronosGroup/glslang/archive/refs/tags/15.4.0.tar.gz"
     tar xf glslang-15.4.0.tar.gz
 fi
 
@@ -713,27 +764,27 @@ if should_build SPIRV_CROSS && [ ! -d "SPIRV-Cross" ]; then
 fi
 
 if should_build DOVI_TOOL && [ ! -d "dovi_tool-2.3.1" ]; then
-    wget -O dovi_tool-2.3.1.tar.gz https://github.com/quietvoid/dovi_tool/archive/refs/tags/2.3.1.tar.gz
+    download_archive "dovi_tool-2.3.1.tar.gz" "https://github.com/quietvoid/dovi_tool/archive/refs/tags/2.3.1.tar.gz"
     tar xf dovi_tool-2.3.1.tar.gz
 fi
 
 if should_build LIBJPEG_TURBO && [ ! -d "libjpeg-turbo-3.1.1" ]; then
-    wget https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.1.1/libjpeg-turbo-3.1.1.tar.gz
+    download_archive "libjpeg-turbo-3.1.1.tar.gz" "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.1.1/libjpeg-turbo-3.1.1.tar.gz"
     tar xf libjpeg-turbo-3.1.1.tar.gz
 fi
 
 if should_build LCMS2 && [ ! -d "lcms2-2.17" ]; then
-    wget https://github.com/mm2/Little-CMS/releases/download/lcms2.17/lcms2-2.17.tar.gz
+    download_archive "lcms2-2.17.tar.gz" "https://github.com/mm2/Little-CMS/releases/download/lcms2.17/lcms2-2.17.tar.gz"
     tar xf lcms2-2.17.tar.gz
 fi
 
 if should_build VULKAN_LOADER && [ ! -d "Vulkan-Loader-1.3.295" ]; then
-    wget -O Vulkan-Loader-v1.3.295.tar.gz https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/v1.3.295.tar.gz
+    download_archive "Vulkan-Loader-v1.3.295.tar.gz" "https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/v1.3.295.tar.gz"
     tar xf Vulkan-Loader-v1.3.295.tar.gz
 fi
 
 if should_build ZIMG && [ ! -d "zimg-3.0.6" ]; then
-    wget -O zimg-3.0.6.tar.gz https://github.com/sekrit-twc/zimg/archive/refs/tags/release-3.0.6.tar.gz
+    download_archive "zimg-3.0.6.tar.gz" "https://github.com/sekrit-twc/zimg/archive/refs/tags/release-3.0.6.tar.gz"
     tar xf zimg-3.0.6.tar.gz
     mv zimg-release-3.0.6 zimg-3.0.6
 fi
@@ -747,18 +798,18 @@ if should_build LIBPLACEBO && [ ! -d "libplacebo" ]; then
 fi
 
 if should_build VVENC && [ ! -d "vvenc-1.13.1" ]; then
-    wget -O vvenc-v1.13.1.tar.gz https://github.com/fraunhoferhhi/vvenc/archive/refs/tags/v1.13.1.tar.gz
+    download_archive "vvenc-v1.13.1.tar.gz" "https://github.com/fraunhoferhhi/vvenc/archive/refs/tags/v1.13.1.tar.gz"
     tar xf vvenc-v1.13.1.tar.gz
 fi
 
 if should_build SVT_AV1 && [ ! -d "svt-av1" ]; then
-    wget https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v3.1.0/SVT-AV1-v3.1.0.tar.gz
+    download_archive "SVT-AV1-v3.1.0.tar.gz" "https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v3.1.0/SVT-AV1-v3.1.0.tar.gz"
     tar xf SVT-AV1-v3.1.0.tar.gz
     mv SVT-AV1-v3.1.0 svt-av1
 fi
 
 if should_build XVIDCORE && [ ! -d "xvidcore" ]; then
-    wget https://downloads.xvid.com/downloads/xvidcore-1.3.7.tar.gz
+    download_archive "xvidcore-1.3.7.tar.gz" "https://downloads.xvid.com/downloads/xvidcore-1.3.7.tar.gz"
     tar xf xvidcore-1.3.7.tar.gz
 fi
 if should_build X264 && [ ! -d "x264" ]; then
@@ -1171,6 +1222,7 @@ if should_build LIBVORBIS && [ ! -d "libvorbis" ]; then
     find ../src/ -type d -name "libvorbis-*" | xargs -i cp -r {} ./libvorbis
     start_build "libvorbis"
     cd ./libvorbis
+    autoreconf -fvi
     CFLAGS="${BUILD_CCFLAGS}" \
     CPPFLAGS="${BUILD_CCFLAGS}" \
     LDFLAGS="${BUILD_LDFLAGS}" \

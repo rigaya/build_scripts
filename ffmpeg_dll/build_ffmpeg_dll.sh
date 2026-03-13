@@ -47,6 +47,7 @@ ENABLE_GPL="FALSE"
 ENABLE_LTO="FALSE"
 ENABLE_PGO="FALSE"
 SKIP_SRC_ARCHIVE="FALSE"
+ENABLE_V4L2_MULTIPLANAR="FALSE"
 
 set -e
 
@@ -60,6 +61,7 @@ while [[ $# -gt 0 ]]; do
     --enable-swscale) ENABLE_SWSCALE="TRUE"; shift ;;
     --disable-pgo) ENABLE_PGO="FALSE"; shift ;;
     --lto) ENABLE_LTO="TRUE"; shift ;;
+    --v4l2-multiplanar) ENABLE_V4L2_MULTIPLANAR="TRUE"; shift ;;
     -a|--all) BUILD_ALL="TRUE"; shift ;;
     -u|--update-ffmpeg) UPDATE_FFMPEG="TRUE"; shift ;;
     -r) FOR_FFMPEG4="TRUE"; shift ;;
@@ -93,6 +95,7 @@ fi
 echo TARGET_BUILD=$TARGET_BUILD
 echo FOR_FFMPEG4=$FOR_FFMPEG4
 echo BUILD_DIR=$BUILD_DIR
+echo ENABLE_V4L2_MULTIPLANAR=$ENABLE_V4L2_MULTIPLANAR
 
 mkdir -p $BUILD_DIR
 mkdir -p $BUILD_DIR/src
@@ -105,7 +108,7 @@ if [ "$ENABLE_GPL" != "FALSE" ]; then
   fi
 fi
 
-# [ "x86", "x64" ]
+# [ "x86", "x64", "arm64" ]
 if [ "${MSYSTEM:-}" = "MINGW32" ]; then
     TARGET_ARCH="x86"
     VC_ARCH="win32"
@@ -121,22 +124,43 @@ elif [ "${MSYSTEM:-}" = "MINGW64" ]; then
     CMAKE_GENERATOR="MSYS Makefiles"
     CARGOC_TARGET="x86_64-pc-windows-gnu"
 else
-    if [ `arch` = "x86_64" ]; then
-        TARGET_ARCH="x64"
-    else
-        TARGET_ARCH="x86"
-    fi
+    case "$(uname -m)" in
+        x86_64|amd64)
+            TARGET_ARCH="x64"
+            FFMPEG_ARCH="x86_64"
+            CARGOC_TARGET="x86_64-unknown-linux-gnu"
+            ;;
+        i686|i386)
+            TARGET_ARCH="x86"
+            FFMPEG_ARCH="i686"
+            CARGOC_TARGET="i686-unknown-linux-gnu"
+            ;;
+        aarch64|arm64)
+            TARGET_ARCH="arm64"
+            FFMPEG_ARCH="aarch64"
+            CARGOC_TARGET="aarch64-unknown-linux-gnu"
+            ;;
+        *)
+            echo "Unsupported host architecture: $(uname -m)"
+            exit 1
+            ;;
+    esac
     VC_ARCH=
-    FFMPEG_ARCH=`arch`
     MINGWDIR=
     CMAKE_GENERATOR="Unix Makefiles"
-    CARGOC_TARGET="x86_64-unknown-linux-gnu"
 fi
 
 if [ "$MINGWDIR" = "" ]; then
     FFMPEG_TARGET_OS="linux"
 else
     FFMPEG_TARGET_OS="mingw32"
+fi
+
+if [ "$ENABLE_V4L2_MULTIPLANAR" = "TRUE" ]; then
+    if [ "$FOR_FFMPEG4" = "TRUE" ] || [ "$MINGWDIR" != "" ] || [ "$TARGET_ARCH" != "arm64" ] || [ "$BUILD_EXE" = "TRUE" ]; then
+        echo "--v4l2-multiplanar is only supported for Linux arm64 FFmpeg 8 static library builds."
+        exit 1
+    fi
 fi
 
 PYTHON_BIN="python"
@@ -165,13 +189,15 @@ if [ "$MINGWDIR" = "" ] && [ -n "$LIBSTDCXX_A" ] && [ -f "$LIBSTDCXX_A" ]; then
 fi
 
 TUNE_FLAG=""
-for target_arch in alderlake skylake; do
-    if echo 'int main(){return 0;}' | \
-        "$CC" -x c - -c -mtune=${target_arch} -o /dev/null >/dev/null 2>&1; then
-        TUNE_FLAG="-mtune=${target_arch}"
-        break
-    fi
-done
+if [ "$TARGET_ARCH" = "x86" ] || [ "$TARGET_ARCH" = "x64" ]; then
+    for target_arch in alderlake skylake; do
+        if echo 'int main(){return 0;}' | \
+            "${CC:-gcc}" -x c - -c -mtune=${target_arch} -o /dev/null >/dev/null 2>&1; then
+            TUNE_FLAG="-mtune=${target_arch}"
+            break
+        fi
+    done
+fi
 
 if [ -n "$TUNE_FLAG" ]; then
     echo "Using $TUNE_FLAG"
@@ -181,7 +207,13 @@ fi
 
 FFMPEG_DISABLE_ASM=""
 #BUILD_CCFLAGS="${TUNE_FLAG} -msse2 -fexcess-precision=fast -mfpmath=sse -ffast-math -fomit-frame-pointer -ffunction-sections -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
-BUILD_CCFLAGS="${TUNE_FLAG} -msse2 -mfpmath=sse -fomit-frame-pointer -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
+BUILD_ARCH_CCFLAGS=""
+FFMPEG_ARCH_CFLAGS=""
+if [ "$TARGET_ARCH" = "x86" ] || [ "$TARGET_ARCH" = "x64" ]; then
+    BUILD_ARCH_CCFLAGS="${TUNE_FLAG} -msse2 -mfpmath=sse"
+    FFMPEG_ARCH_CFLAGS="-msse2"
+fi
+BUILD_CCFLAGS="${BUILD_ARCH_CCFLAGS} -fomit-frame-pointer -fno-ident -D_FORTIFY_SOURCE=0 -I${INSTALL_DIR}/include"
 BUILD_LDFLAGS="-Wl,--strip-all -L${INSTALL_DIR}/lib"
 if [ $TARGET_ARCH = "x86" ]; then
     BUILD_CCFLAGS="${BUILD_CCFLAGS} -m32 -mstackrealign"
@@ -213,10 +245,9 @@ if [ "$FOR_FFMPEG4" = "TRUE" ]; then
 else
     FFMPEG_DIR_NAME="ffmpeg_dll"
 fi
-FFMPEG_SSE="-msse2"
-if [ $SSE4_2 = "TRUE" ]; then
+if [ $SSE4_2 = "TRUE" ] && [ "$TARGET_ARCH" = "x86" -o "$TARGET_ARCH" = "x64" ]; then
     FFMPEG_DIR_NAME="${FFMPEG_DIR_NAME}_sse42"
-    FFMPEG_SSE="-msse4.2 -mpopcnt"
+    FFMPEG_ARCH_CFLAGS="-msse4.2 -mpopcnt"
 fi
 
 # static link用のフラグ (これらがないとundefined referenceが出る)
@@ -456,22 +487,26 @@ if [ "$FOR_AUDENC" != "TRUE" ]; then
     BUILD_LIB_DAV1D="TRUE"
 
     # HWアクセラレーション関連
-    BUILD_LIB_LIBVPL="TRUE"
-    BUILD_LIB_NV_CODEC_HEADERS="TRUE"
+    if [ "$TARGET_ARCH" != "arm64" ]; then
+        BUILD_LIB_LIBVPL="TRUE"
+        BUILD_LIB_NV_CODEC_HEADERS="TRUE"
+    fi
 
     # 映像コーデック
     BUILD_LIB_LIBVPX="TRUE"
 
     # GPU/Vulkan関連 (libplacebo依存チェーン)
     # libplacebo <- libjpeg, lcms2, shaderc, SPIRV-Cross, dovi_tool, libxxhash, Vulkan-Loader
-    BUILD_LIB_LIBXXHASH="TRUE"
-    BUILD_LIB_DOVI_TOOL="TRUE"
-    BUILD_LIB_LIBJPEG_TURBO="TRUE"
-    BUILD_LIB_LCMS2="TRUE"
-    BUILD_LIB_SHADERC="TRUE"
-    BUILD_LIB_SPIRV_CROSS="TRUE"
-    BUILD_LIB_VULKAN_LOADER="TRUE"
-    BUILD_LIB_LIBPLACEBO="TRUE"
+    if [ "$TARGET_ARCH" != "arm64" ]; then
+        BUILD_LIB_LIBXXHASH="TRUE"
+        BUILD_LIB_DOVI_TOOL="TRUE"
+        BUILD_LIB_LIBJPEG_TURBO="TRUE"
+        BUILD_LIB_LCMS2="TRUE"
+        BUILD_LIB_SHADERC="TRUE"
+        BUILD_LIB_SPIRV_CROSS="TRUE"
+        BUILD_LIB_VULKAN_LOADER="TRUE"
+        BUILD_LIB_LIBPLACEBO="TRUE"
+    fi
 
     # 画像処理
     BUILD_LIB_ZIMG="TRUE"
@@ -479,24 +514,28 @@ if [ "$FOR_AUDENC" != "TRUE" ]; then
     #bluray
     BUILD_LIB_LIBBLURAY="TRUE"
 
-    # x64専用ライブラリ
-    if [ "$TARGET_ARCH" = "x64" ]; then
+    # x86ではビルドしないライブラリ
+    if [ "$TARGET_ARCH" != "x86" ]; then
         BUILD_LIB_HARFBUZZ="TRUE"
         BUILD_LIB_LIBUNIBREAK="TRUE"
-        # エンコーダー (x64のみ)
+        # エンコーダー (x86以外)
         BUILD_LIB_VVENC="TRUE"
         BUILD_LIB_SVT_AV1="TRUE"
     fi
 
     # exe/dll固有のライブラリ
     if [ "$BUILD_EXE" = "TRUE" ]; then
-        # exe: glslangが必要, DLL版ライブラリは不要
-        BUILD_LIB_GLSLANG="TRUE"
+        # exe: libplaceboを使う場合のみglslangが必要, DLL版ライブラリは不要
+        if [ "${BUILD_LIB_LIBPLACEBO}" = "TRUE" ]; then
+            BUILD_LIB_GLSLANG="TRUE"
+        fi
     else
         # dll: DLL版ライブラリが必要, libblurayも使用
-        if [ "$MINGWDIR" != "" ]; then
+        if [ "$MINGWDIR" != "" ] && [ "${BUILD_LIB_LIBPLACEBO}" = "TRUE" ]; then
             BUILD_LIB_LIBASS_DLL="TRUE"
             BUILD_LIB_LIBPLACEBO_DLL="TRUE"
+        elif [ "$MINGWDIR" != "" ]; then
+            BUILD_LIB_LIBASS_DLL="TRUE"
         fi
     fi
 
@@ -855,6 +894,12 @@ if [ $ADD_TLVMMT = "TRUE" ]; then
     echo "Patch ffmpeg_tlvmmt_asset_group_desc.diff..."
     patch -p1 < $PATCHES_DIR/ffmpeg_tlvmmt_asset_group_desc.diff
     read -p "Check patch and hit enter: "
+fi
+
+if [ "$ENABLE_V4L2_MULTIPLANAR" = "TRUE" ]; then
+    cd $FFMPEG_DIR_NAME
+    echo "Patch v4l2_multiplanar.patch..."
+    patch -p1 < $PATCHES_DIR/v4l2_multiplanar.patch
 fi
   
   #$BUILD_DIR/src/soxr* $BUILD_DIR/src/nettle* $BUILD_DIR/src/gnutls*
@@ -2033,20 +2078,22 @@ if should_build SVT_AV1; then
         find ../src/ -type d -name "svt-av1*" | xargs -i cp -r {} ./svt-av1
         cd svt-av1
         mkdir -p build/msys2 && cd build/msys2
+        SVTAV1_ENABLE_LTO=OFF
+        if [ $ENABLE_LTO = "TRUE" ]; then
+            SVTAV1_ENABLE_LTO=ON
+        fi
+        SVTAV1_ARCH_OPTIONS="-DENABLE_NASM=OFF -DENABLE_AVX512=OFF"
+        if [ "$TARGET_ARCH" = "x86" ] || [ "$TARGET_ARCH" = "x64" ]; then
+            SVTAV1_ARCH_OPTIONS="-DENABLE_NASM=ON -DENABLE_AVX512=ON -DCMAKE_ASM_NASM_COMPILER=nasm"
+        fi
         if [ "${ENABLE_PGO}" = "TRUE" ]; then
-            SVTAV1_ENABLE_LTO=OFF
-            if [ $ENABLE_LTO = "TRUE" ]; then
-                SVTAV1_ENABLE_LTO=ON
-            fi
             cmake -G "${CMAKE_GENERATOR}" \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DBUILD_SHARED_LIBS=OFF \
                 -DBUILD_TESTING=OFF \
                 -DNATIVE=OFF \
                 -DSVT_AV1_LTO=$SVTAV1_ENABLE_LTO \
-                -DENABLE_NASM=ON \
-                -DENABLE_AVX512=ON \
-                -DCMAKE_ASM_NASM_COMPILER=nasm \
+                ${SVTAV1_ARCH_OPTIONS} \
                 -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
                 -DCMAKE_INSTALL_LIBDIR=lib \
                 -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC} ${PROFILE_SVTAV1}" \
@@ -2064,14 +2111,21 @@ if should_build SVT_AV1; then
                 exit 1
             fi
 
-            "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx512
-            "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 8 -n 30 --asm avx512
-            "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx2
-            "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 8 -n 30 --asm avx2
-            "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx512
-            "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 8 -n 30 --input-depth 10 --asm avx512
-            "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx2
-            "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 8 -n 30 --input-depth 10 --asm avx2
+            if [ "$TARGET_ARCH" = "x86" ] || [ "$TARGET_ARCH" = "x64" ]; then
+                "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx512
+                "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 8 -n 30 --asm avx512
+                "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30 --asm avx2
+                "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 8 -n 30 --asm avx2
+                "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx512
+                "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 8 -n 30 --input-depth 10 --asm avx512
+                "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10 --asm avx2
+                "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 8 -n 30 --input-depth 10 --asm avx2
+            else
+                "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 4 -n 30
+                "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE}    --preset 8 -n 30
+                "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 4 -n 30 --input-depth 10
+                "${SVTAV1_ENC_APP}" -w 1280 -h 720 --crf 30 --scd 1 --fps-num 30 --fps-denom 1 -b /dev/null -i ${YUVFILE_10} --preset 8 -n 30 --input-depth 10
+            fi
 
             cmake -G "${CMAKE_GENERATOR}" \
                 -DCMAKE_BUILD_TYPE=Release \
@@ -2079,9 +2133,7 @@ if should_build SVT_AV1; then
                 -DBUILD_TESTING=OFF \
                 -DNATIVE=OFF \
                 -DSVT_AV1_LTO=$SVTAV1_ENABLE_LTO \
-                -DENABLE_NASM=ON \
-                -DENABLE_AVX512=ON \
-                -DCMAKE_ASM_NASM_COMPILER=nasm \
+                ${SVTAV1_ARCH_OPTIONS} \
                 -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
                 -DCMAKE_INSTALL_LIBDIR=lib \
                 -DCMAKE_C_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC} ${PROFILE_SVTAV1}" \
@@ -2096,9 +2148,7 @@ if should_build SVT_AV1; then
                 -DBUILD_TESTING=OFF \
                 -DNATIVE=OFF \
                 -DSVT_AV1_LTO=$SVTAV1_ENABLE_LTO \
-                -DENABLE_NASM=ON \
-                -DENABLE_AVX512=ON \
-                -DCMAKE_ASM_NASM_COMPILER=nasm \
+                ${SVTAV1_ARCH_OPTIONS} \
                 -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
                 -DCMAKE_INSTALL_LIBDIR=lib \
                 -DCMAKE_C_FLAGS="${BUILD_CCFLAGS}" \
@@ -2170,6 +2220,11 @@ else
     FFMPEG5_CUDA_DISABLE_FLAGS=" --disable-cuda-nvcc --disable-cuda-llvm"
 fi
 
+FFMPEG_X86_DISABLE_FLAGS=""
+if [ "$TARGET_ARCH" = "x86" ] || [ "$TARGET_ARCH" = "x64" ]; then
+    FFMPEG_X86_DISABLE_FLAGS="--disable-amd3dnow --disable-amd3dnowext --disable-xop --disable-fma4 --disable-aesni"
+fi
+
 if [ $TARGET_ARCH != "x86" ]; then
     ENCODER_LIBS=""
     if [ "${BUILD_LIB_VVENC}" = "TRUE" ]; then
@@ -2217,6 +2272,26 @@ if [ "${BUILD_LIB_TWOLAME}" = "TRUE" ]; then
     TWOLAME_LIBS="--enable-libtwolame"
 fi
 
+FFMPEG_LIBVPL_FLAGS=""
+if [ "${BUILD_LIB_LIBVPL}" = "TRUE" ]; then
+    FFMPEG_LIBVPL_FLAGS="--enable-libvpl"
+fi
+
+FFMPEG_NV_CODEC_FLAGS=""
+if [ "${BUILD_LIB_NV_CODEC_HEADERS}" = "TRUE" ]; then
+    FFMPEG_NV_CODEC_FLAGS="--enable-ffnvcodec --enable-nvdec --enable-cuvid"
+fi
+
+FFMPEG_LIBPLACEBO_FLAGS=""
+if [ "${BUILD_LIB_LIBPLACEBO}" = "TRUE" ]; then
+    FFMPEG_LIBPLACEBO_FLAGS="--enable-libplacebo"
+fi
+
+FFMPEG_GLSLANG_FLAGS=""
+if [ "${BUILD_LIB_GLSLANG}" = "TRUE" ]; then
+    FFMPEG_GLSLANG_FLAGS="--enable-libglslang"
+fi
+
 # Linuxではlibiconvが不要/存在しないため、過去ビルド由来の-likonv混入を除去
 if [ "$MINGWDIR" = "" ]; then
     sed -i 's/ -liconv//g' ${INSTALL_DIR}/lib/pkgconfig/*.pc 2>/dev/null || true
@@ -2254,13 +2329,10 @@ $GPL_LIBS \
 --disable-devices \
 --disable-debug \
 --disable-shared \
---disable-amd3dnow \
---disable-amd3dnowext \
 --disable-dxva2 \
 --disable-d3d11va \
 $FFMPEG5_CUDA_DISABLE_FLAGS \
---disable-xop \
---disable-fma4 \
+$FFMPEG_X86_DISABLE_FLAGS \
 --disable-network \
 --disable-bsfs \
 --enable-swresample \
@@ -2283,7 +2355,7 @@ $SOXR_LIBS \
 --enable-small \
 --disable-mediafoundation \
 --pkg-config-flags="--static" \
---extra-cflags="${BUILD_CCFLAGS} -Os -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
+--extra-cflags="${BUILD_CCFLAGS} -Os -I${INSTALL_DIR}/include ${FFMPEG_ARCH_CFLAGS}" \
 --extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
 $FFMPEG_EXTRA_LIBS
 elif [ $BUILD_EXE = "TRUE" ]; then
@@ -2303,10 +2375,7 @@ $FFMPEG_DISABLE_ASM \
 $ENCODER_LIBS \
 $GPL_LIBS \
 --disable-outdevs \
---disable-amd3dnow \
---disable-amd3dnowext \
---disable-xop \
---disable-fma4 \
+$FFMPEG_X86_DISABLE_FLAGS \
 --disable-w32threads \
 $FFMPEG5_CUDA_DISABLE_FLAGS \
 --enable-pthreads \
@@ -2325,18 +2394,16 @@ $SOXR_LIBS \
 --enable-libopus \
 --enable-libass \
 --enable-libdav1d \
---enable-libvpl \
+${FFMPEG_LIBVPL_FLAGS} \
 --enable-libvpx \
---enable-libglslang \
+${FFMPEG_GLSLANG_FLAGS} \
 --enable-libzimg \
---enable-libplacebo \
---enable-ffnvcodec \
---enable-nvdec \
---enable-cuvid \
+${FFMPEG_LIBPLACEBO_FLAGS} \
+${FFMPEG_NV_CODEC_FLAGS} \
 --disable-mediafoundation \
 --pkg-config-flags="--static" \
 $ARIB_LIBS \
---extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
+--extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_ARCH_CFLAGS}" \
 --extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
 $FFMPEG_EXTRA_LIBS
 else
@@ -2360,11 +2427,7 @@ $ENCODER_LIBS \
 --disable-outdevs \
 --disable-debug \
 --enable-static \
---disable-amd3dnow \
---disable-amd3dnowext \
---disable-xop \
---disable-fma4 \
---disable-aesni \
+$FFMPEG_X86_DISABLE_FLAGS \
 --disable-w32threads \
 --disable-dxva2 \
 --disable-d3d11va \
@@ -2386,15 +2449,13 @@ $SOXR_LIBS \
 $LIBBLURAY_LIBS \
 --enable-libass \
 --enable-libdav1d \
---enable-libvpl \
+${FFMPEG_LIBVPL_FLAGS} \
 --enable-libvpx \
---enable-ffnvcodec \
---enable-nvdec \
---enable-cuvid \
+${FFMPEG_NV_CODEC_FLAGS} \
 --disable-mediafoundation \
 --pkg-config-flags="--static" \
 $ARIB_LIBS \
---extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_SSE}" \
+--extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_ARCH_CFLAGS}" \
 --extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
 $FFMPEG_EXTRA_LIBS
 fi

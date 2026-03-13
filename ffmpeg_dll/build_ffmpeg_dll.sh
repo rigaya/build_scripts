@@ -29,9 +29,10 @@
 # Vulkan
 # pacman -S mingw-w64-i686-uasm mingw-w64-x86_64-uasm
 NJOBS=$NUMBER_OF_PROCESSORS
-PATCHES_DIR=`pwd`/patches
-YUVFILE=`pwd`/test.yuv
-YUVFILE_10=`pwd`/test_10.yuv
+WORK_DIR=`pwd`
+PATCHES_DIR=${WORK_DIR}/patches
+YUVFILE=${WORK_DIR}/test.yuv
+YUVFILE_10=${WORK_DIR}/test_10.yuv
 TEST_YUV_8_URL="https://github.com/rigaya/ffmpeg_dlls_for_hwenc/releases/download/20250825/test_8.7z"
 TEST_YUV_10_URL="https://github.com/rigaya/ffmpeg_dlls_for_hwenc/releases/download/20250825/test_10.7z"
 
@@ -41,6 +42,7 @@ UPDATE_FFMPEG="FALSE"
 ENABLE_SWSCALE="FALSE"
 FOR_FFMPEG4="FALSE"
 FOR_AUDENC="FALSE"
+FOR_TSREPLACE="FALSE"
 ADD_TLVMMT="FALSE"
 BUILD_EXE="FALSE"
 ENABLE_GPL="FALSE"
@@ -51,7 +53,7 @@ ENABLE_V4L2_MULTIPLANAR="FALSE"
 
 set -e
 
-# [ bitrate, swscale, exe ]
+# [ audenc, exe, tsreplace ]
 TARGET_BUILD=""
 
 while [[ $# -gt 0 ]]; do
@@ -70,36 +72,34 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-BUILD_DIR=`pwd`/build_ffmpeg
-if [ "$FOR_FFMPEG4" = "TRUE" ]; then
-    BUILD_DIR=${BUILD_DIR}4
-fi
-
-if [ $ENABLE_LTO = "TRUE" ]; then
-    BUILD_DIR=${BUILD_DIR}_lto
-fi
-
-
 if [ "$TARGET_BUILD" = "audenc" ]; then
     FOR_AUDENC="TRUE"
     BUILD_EXE="TRUE"
+    TARGET_DIR_NAME="audenc"
 elif [ "$TARGET_BUILD" = "exe" ]; then
     BUILD_EXE="TRUE"
     ENABLE_SWSCALE="TRUE"
+    TARGET_DIR_NAME="exe"
+elif [ "$TARGET_BUILD" = "tsreplace" ]; then
+    FOR_TSREPLACE="TRUE"
+    TARGET_DIR_NAME="tsreplace"
+else
+    TARGET_DIR_NAME="build_dll"
 fi
 
-if [ $BUILD_EXE != "TRUE" ]; then
-    BUILD_DIR=${BUILD_DIR}_dll
-fi
+SRC_DIR=${WORK_DIR}/src
+TARGET_DIR=${WORK_DIR}/${TARGET_DIR_NAME}
+BUILD_DIR=${TARGET_DIR}
 
 echo TARGET_BUILD=$TARGET_BUILD
 echo FOR_FFMPEG4=$FOR_FFMPEG4
-echo BUILD_DIR=$BUILD_DIR
+echo SRC_DIR=$SRC_DIR
+echo TARGET_DIR=$TARGET_DIR
 echo ENABLE_V4L2_MULTIPLANAR=$ENABLE_V4L2_MULTIPLANAR
 
 mkdir -p $BUILD_DIR
-mkdir -p $BUILD_DIR/src
-cd $BUILD_DIR/src
+mkdir -p $SRC_DIR
+cd $SRC_DIR
 
 if [ "$ENABLE_GPL" != "FALSE" ]; then
   if [ "$BUILD_EXE" = "FALSE" ]; then
@@ -174,6 +174,8 @@ fi
 
 INSTALL_DIR=$BUILD_DIR/$TARGET_ARCH/build
 PKG_CONFIG_PATH_FFMPEG=${INSTALL_DIR}/lib/pkgconfig
+FFMPEG_WORK_DIR=$BUILD_DIR/$TARGET_ARCH/ffmpeg
+FFMPEG_TMP_DIR=${FFMPEG_WORK_DIR}/tmp/$TARGET_ARCH
 
 
 LIBSTDCXX_A=
@@ -269,6 +271,9 @@ fi
 if [ $FOR_AUDENC = "TRUE" ]; then
     FFMPEG_DIR_NAME="${FFMPEG_DIR_NAME}_audenc"
 fi
+if [ $FOR_TSREPLACE = "TRUE" ]; then
+    FFMPEG_DIR_NAME="${FFMPEG_DIR_NAME}_tsreplace"
+fi
 if [ $BUILD_EXE = "TRUE" ]; then
     FFMPEG_DIR_NAME="${FFMPEG_DIR_NAME}_exe"
 fi
@@ -281,6 +286,7 @@ echo BUILD_ALL=$BUILD_ALL
 echo SSE4_2=$SSE4_2
 echo UPDATE_FFMPEG=$UPDATE_FFMPEG
 echo FOR_AUDENC=$FOR_AUDENC
+echo FOR_TSREPLACE=$FOR_TSREPLACE
 echo ENABLE_SWSCALE=$ENABLE_SWSCALE
 echo FFMPEG_DIR_NAME=$FFMPEG_DIR_NAME
 echo BUILD_EXE=$BUILD_EXE
@@ -380,12 +386,11 @@ ensure_test_yuv_files() {
     local work_dir
     work_dir="$(dirname "${YUVFILE}")"
 
-    if ! command -v 7z >/dev/null 2>&1; then
-        echo "7z is required to extract test_8.7z/test_10.7z."
-        exit 1
-    fi
-
     if [ ! -f "${YUVFILE}" ]; then
+        if ! command -v 7z >/dev/null 2>&1; then
+            echo "7z is required to extract test_8.7z."
+            exit 1
+        fi
         download_archive "${work_dir}/test_8.7z" "${TEST_YUV_8_URL}"
         7z x -y "${work_dir}/test_8.7z" -o"${work_dir}"
     fi
@@ -395,6 +400,10 @@ ensure_test_yuv_files() {
     fi
 
     if [ ! -f "${YUVFILE_10}" ]; then
+        if ! command -v 7z >/dev/null 2>&1; then
+            echo "7z is required to extract test_10.7z."
+            exit 1
+        fi
         download_archive "${work_dir}/test_10.7z" "${TEST_YUV_10_URL}"
         7z x -y "${work_dir}/test_10.7z" -o"${work_dir}"
     fi
@@ -451,18 +460,28 @@ BUILD_LIB_XVIDCORE="FALSE"
 BUILD_LIB_X264="FALSE"
 BUILD_LIB_X265="FALSE"
 
-# --- 音声系ライブラリ (全モードで必要) ---
-BUILD_LIB_OPUS="TRUE"
-BUILD_LIB_LIBOGG="TRUE"
-BUILD_LIB_LIBVORBIS="TRUE"
-BUILD_LIB_SPEEX="TRUE"
-BUILD_LIB_LAME="TRUE"
-BUILD_LIB_LIBSNDFILE="TRUE"
-BUILD_LIB_TWOLAME="TRUE"
-BUILD_LIB_SOXR="TRUE"
+# --- tsreplace向け最小構成 ---
+if [ "$FOR_TSREPLACE" = "TRUE" ]; then
+    BUILD_LIB_ZLIB="TRUE"
+    BUILD_LIB_BZIP2="TRUE"
+    BUILD_LIB_LZMA="TRUE"
+    BUILD_LIB_LIBPNG="TRUE"
+fi
+
+# --- 音声系ライブラリ (通常モードで必要) ---
+if [ "$FOR_TSREPLACE" != "TRUE" ]; then
+    BUILD_LIB_OPUS="TRUE"
+    BUILD_LIB_LIBOGG="TRUE"
+    BUILD_LIB_LIBVORBIS="TRUE"
+    BUILD_LIB_SPEEX="TRUE"
+    BUILD_LIB_LAME="TRUE"
+    BUILD_LIB_LIBSNDFILE="TRUE"
+    BUILD_LIB_TWOLAME="TRUE"
+    BUILD_LIB_SOXR="TRUE"
+fi
 
 # --- 映像系ライブラリ (audenc以外で必要) ---
-if [ "$FOR_AUDENC" != "TRUE" ]; then
+if [ "$FOR_AUDENC" != "TRUE" ] && [ "$FOR_TSREPLACE" != "TRUE" ]; then
     # 基本ライブラリ (字幕・フォント描画の依存チェーン)
     # freetype <- zlib, bzip2, libpng
     # fontconfig <- freetype, libiconv, expat, libpng
@@ -879,16 +898,16 @@ if [ $UPDATE_FFMPEG != "FALSE" ] && [ -d ffmpeg_test ]; then
     rm -rf ffmpeg_test
 fi
 if [ ! -d ffmpeg_test ]; then
-    cp -r ../src/ffmpeg ffmpeg_test
+    cp -r "$SRC_DIR/ffmpeg" ffmpeg_test
 fi
 
-if [ -d $FFMPEG_DIR_NAME ]; then
-    rm -rf $FFMPEG_DIR_NAME
+if [ -d "$FFMPEG_WORK_DIR" ]; then
+    rm -rf "$FFMPEG_WORK_DIR"
 fi
-cp -r ../src/ffmpeg $FFMPEG_DIR_NAME
+cp -r "$SRC_DIR/ffmpeg" "$FFMPEG_WORK_DIR"
 
 if [ $ADD_TLVMMT = "TRUE" ]; then
-    cd $FFMPEG_DIR_NAME
+    cd "$FFMPEG_WORK_DIR"
     echo "Patch ffmpeg_tlvmmt.diff..."
     patch -p1 < $PATCHES_DIR/ffmpeg_tlvmmt.diff
     echo "Patch ffmpeg_tlvmmt_asset_group_desc.diff..."
@@ -897,7 +916,7 @@ if [ $ADD_TLVMMT = "TRUE" ]; then
 fi
 
 if [ "$ENABLE_V4L2_MULTIPLANAR" = "TRUE" ]; then
-    cd $FFMPEG_DIR_NAME
+    cd "$FFMPEG_WORK_DIR"
     echo "Patch v4l2_multiplanar.patch..."
     patch -p1 < $PATCHES_DIR/v4l2_multiplanar.patch
 fi
@@ -922,7 +941,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build ZLIB && [ ! -d "zlib" ]; then
-    find ../src/ -type d -name "zlib-*" | xargs -i cp -r {} ./zlib
+    find "${SRC_DIR}" -type d -name "zlib-*" | xargs -i cp -r {} ./zlib
     start_build "zlib"
     cd ./zlib
     CFLAGS="${BUILD_CCFLAGS_SMALL}" \
@@ -934,7 +953,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build BZIP2 && [ ! -d "bzip2" ]; then
-    find ../src/ -type d -name "bzip2-*" | xargs -i cp -r {} ./bzip2
+    find "${SRC_DIR}" -type d -name "bzip2-*" | xargs -i cp -r {} ./bzip2
     start_build "bzip2"
     cd ./bzip2
     if [ "$MINGWDIR" != "" ]; then
@@ -948,7 +967,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LZMA && [ ! -d "xz" ]; then
-    find ../src/ -type d -name "xz-*" | xargs -i cp -r {} ./xz
+    find "${SRC_DIR}" -type d -name "xz-*" | xargs -i cp -r {} ./xz
     start_build "xz"
     cd ./xz
     autoreconf -fvi
@@ -965,7 +984,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LIBPNG && [ ! -d "libpng" ]; then
-    find ../src/ -type d -name "libpng-*" | xargs -i cp -r {} ./libpng
+    find "${SRC_DIR}" -type d -name "libpng-*" | xargs -i cp -r {} ./libpng
     start_build "libpng"
     cd ./libpng
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
@@ -1001,7 +1020,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build EXPAT && [ ! -d "expat" ]; then
-    find ../src/ -type d -name "expat-*" | xargs -i cp -r {} ./expat
+    find "${SRC_DIR}" -type d -name "expat-*" | xargs -i cp -r {} ./expat
     start_build "expat"
     cd ./expat
     CFLAGS="${BUILD_CCFLAGS_SMALL}" \
@@ -1022,7 +1041,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build FREETYPE && [ ! -d "freetype" ]; then
-    find ../src/ -type d -name "freetype-*" | xargs -i cp -r {} ./freetype
+    find "${SRC_DIR}" -type d -name "freetype-*" | xargs -i cp -r {} ./freetype
     start_build "freetype"
     #msys側のzlib(zlib.h, zconf.h, libz.a, libz.pcを消さないとうまくいかない)
     #あるいはconfigure後に、build/unix/unix-cc.mk内の
@@ -1056,7 +1075,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LIBICONV && [ ! -d "libiconv" ]; then
-    find ../src/ -type d -name "libiconv-*" | xargs -i cp -r {} ./libiconv
+    find "${SRC_DIR}" -type d -name "libiconv-*" | xargs -i cp -r {} ./libiconv
     start_build "libiconv"
     cd ./libiconv
     if [ "$MINGWDIR" != "" ]; then
@@ -1074,7 +1093,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build FONTCONFIG && [ ! -d "fontconfig" ]; then
-    find ../src/ -type d -name "fontconfig-*" | xargs -i cp -r {} ./fontconfig
+    find "${SRC_DIR}" -type d -name "fontconfig-*" | xargs -i cp -r {} ./fontconfig
     start_build "fontconfig"
     FONTCONFIG_LIBICONV_CONF=
     if [ "$MINGWDIR" != "" ]; then
@@ -1111,7 +1130,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build FRIBIDI && [ ! -d "fribidi" ]; then
-    find ../src/ -type d -name "fribidi-*" | xargs -i cp -r {} ./fribidi
+    find "${SRC_DIR}" -type d -name "fribidi-*" | xargs -i cp -r {} ./fribidi
     start_build "fribidi"
     cd ./fribidi
     autoreconf -fvi
@@ -1144,7 +1163,7 @@ fi
 if should_build HARFBUZZ; then
     cd $BUILD_DIR/$TARGET_ARCH
     if [ ! -d "harfbuzz" ]; then
-        find ../src/ -type d -name "harfbuzz-*" | xargs -i cp -r {} ./harfbuzz
+        find "${SRC_DIR}" -type d -name "harfbuzz-*" | xargs -i cp -r {} ./harfbuzz
         start_build "harfbuzz"
         cd ./harfbuzz
         CC=gcc \
@@ -1161,7 +1180,7 @@ fi
 if should_build LIBUNIBREAK; then
     cd $BUILD_DIR/$TARGET_ARCH
     if [ ! -d "libunibreak" ]; then
-        find ../src/ -type d -name "libunibreak-*" | xargs -i cp -r {} ./libunibreak
+        find "${SRC_DIR}" -type d -name "libunibreak-*" | xargs -i cp -r {} ./libunibreak
         start_build "libunibreak"
         cd ./libunibreak
         CFLAGS="${BUILD_CCFLAGS_SMALL}" \
@@ -1177,7 +1196,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LIBASS && [ ! -d "libass" ]; then
-    find ../src/ -type d -name "libass-${LIBASS_VERSION}" | xargs -i cp -r {} ./libass
+    find "${SRC_DIR}" -type d -name "libass-${LIBASS_VERSION}" | xargs -i cp -r {} ./libass
     start_build "libass"
     cd ./libass
     autoreconf -fvi
@@ -1193,7 +1212,7 @@ if should_build LIBASS && [ ! -d "libass" ]; then
 fi
 
 if should_build LIBASS_DLL && [ ! -d "libass_dll" ]; then
-    find ../src/ -type d -name "libass-${LIBASS_VERSION}" | xargs -i cp -r {} ./libass_dll
+    find "${SRC_DIR}" -type d -name "libass-${LIBASS_VERSION}" | xargs -i cp -r {} ./libass_dll
     start_build "libass_dll"
     cd $BUILD_DIR/$TARGET_ARCH/libass_dll
     autoreconf -fvi
@@ -1238,7 +1257,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build OPUS && [ ! -d "opus" ]; then
-    find ../src/ -type d -name "opus-*" | xargs -i cp -r {} ./opus
+    find "${SRC_DIR}" -type d -name "opus-*" | xargs -i cp -r {} ./opus
     start_build "opus"
     cd ./opus
     autoreconf -fvi
@@ -1256,7 +1275,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LIBOGG && [ ! -d "libogg" ]; then
-    find ../src/ -type d -name "libogg-*" | xargs -i cp -r {} ./libogg
+    find "${SRC_DIR}" -type d -name "libogg-*" | xargs -i cp -r {} ./libogg
     start_build "libogg"
     cd ./libogg
     autoreconf -fvi
@@ -1271,7 +1290,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LIBVORBIS && [ ! -d "libvorbis" ]; then
-    find ../src/ -type d -name "libvorbis-*" | xargs -i cp -r {} ./libvorbis
+    find "${SRC_DIR}" -type d -name "libvorbis-*" | xargs -i cp -r {} ./libvorbis
     start_build "libvorbis"
     cd ./libvorbis
     autoreconf -fvi
@@ -1289,7 +1308,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build SPEEX && [ ! -d "speex" ]; then
-    find ../src/ -type d -name "speex-*" | xargs -i cp -r {} ./speex
+    find "${SRC_DIR}" -type d -name "speex-*" | xargs -i cp -r {} ./speex
     start_build "speex"
     cd ./speex
     autoreconf -fvi
@@ -1305,7 +1324,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LAME && [ ! -d "lame" ]; then
-    find ../src/ -type d -name "lame-*" | xargs -i cp -r {} ./lame
+    find "${SRC_DIR}" -type d -name "lame-*" | xargs -i cp -r {} ./lame
     start_build "lame"
     cd ./lame
     if [ "$MINGWDIR" != "" ]; then
@@ -1324,7 +1343,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LIBSNDFILE && [ ! -d "libsndfile" ]; then
-    find ../src/ -type d -name "libsndfile-*" | xargs -i cp -r {} ./libsndfile
+    find "${SRC_DIR}" -type d -name "libsndfile-*" | xargs -i cp -r {} ./libsndfile
     start_build "libsndfile"
     cd ./libsndfile
     CFLAGS="${BUILD_CCFLAGS}" \
@@ -1340,7 +1359,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build TWOLAME && [ ! -d "twolame" ]; then
-    find ../src/ -type d -name "twolame-*" | xargs -i cp -r {} ./twolame
+    find "${SRC_DIR}" -type d -name "twolame-*" | xargs -i cp -r {} ./twolame
     start_build "twolame"
     cd ./twolame
     if [ "$MINGWDIR" != "" ]; then
@@ -1359,7 +1378,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build SOXR && [ ! -d "soxr" ]; then
-    find ../src/ -type d -name "soxr-*" | xargs -i cp -r {} ./soxr
+    find "${SRC_DIR}" -type d -name "soxr-*" | xargs -i cp -r {} ./soxr
     start_build "soxr"
     cd ./soxr
     which cmake
@@ -1381,7 +1400,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LIBXML2 && [ ! -d "libxml2" ]; then
-    find ../src/ -type d -name "libxml2-*" | xargs -i cp -r {} ./libxml2
+    find "${SRC_DIR}" -type d -name "libxml2-*" | xargs -i cp -r {} ./libxml2
     start_build "libxml2"
     cd ./libxml2
     CFLAGS="${BUILD_CCFLAGS_SMALL}" \
@@ -1400,7 +1419,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LIBBLURAY && [ ! -d "libbluray" ]; then
-    find ../src/ -type d -name "libbluray-*" | xargs -i cp -r {} ./libbluray
+    find "${SRC_DIR}" -type d -name "libbluray-*" | xargs -i cp -r {} ./libbluray
     start_build "libbluray"
     cd ./libbluray
     # Linux static link時にFFmpeg本体のdec_initと衝突するため、libbluray側を名前空間化する
@@ -1430,7 +1449,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build ARIBB24 && [ ! -d "aribb24" ]; then
-    find ../src/ -type d -name "aribb24-*" | xargs -i cp -r {} ./aribb24
+    find "${SRC_DIR}" -type d -name "aribb24-*" | xargs -i cp -r {} ./aribb24
     start_build "aribb24"
     cd ./aribb24
     autoreconf -fvi
@@ -1448,7 +1467,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LIBARIBCAPTION && [ ! -d "libaribcaption" ]; then
-    find ../src/ -type d -name "libaribcaption-*" | xargs -i cp -r {} ./libaribcaption
+    find "${SRC_DIR}" -type d -name "libaribcaption-*" | xargs -i cp -r {} ./libaribcaption
     start_build "libaribcaption"
     cd ./libaribcaption
     mkdir build && cd build
@@ -1479,7 +1498,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build DAV1D && [ ! -d "dav1d" ]; then
-    find ../src/ -type d -name "dav1d-*" | xargs -i cp -r {} ./dav1d
+    find "${SRC_DIR}" -type d -name "dav1d-*" | xargs -i cp -r {} ./dav1d
     start_build "dav1d"
     cd ./dav1d
     CC=gcc \
@@ -1494,7 +1513,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LIBVPL && [ ! -d "libvpl" ]; then
-    find ../src/ -type d -name "libvpl-*" | xargs -i cp -r {} ./libvpl
+    find "${SRC_DIR}" -type d -name "libvpl-*" | xargs -i cp -r {} ./libvpl
     start_build "libvpl"
     cd libvpl
     #script/bootstrap
@@ -1521,7 +1540,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LIBVPX && [ ! -d "libvpx" ]; then
-    find ../src/ -type d -name "libvpx-*" | xargs -i cp -r {} ./libvpx
+    find "${SRC_DIR}" -type d -name "libvpx-*" | xargs -i cp -r {} ./libvpx
     start_build "libvpx"
     cd ./libvpx
     CFLAGS="${BUILD_CCFLAGS}" \
@@ -1542,7 +1561,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build NV_CODEC_HEADERS && [ ! -d "nv-codec-headers" ]; then
-    find ../src/ -type d -name "nv-codec-headers-*" | xargs -i cp -r {} ./nv-codec-headers
+    find "${SRC_DIR}" -type d -name "nv-codec-headers-*" | xargs -i cp -r {} ./nv-codec-headers
     start_build "nv-codec-headers"
     cd nv-codec-headers
     make PREFIX=$INSTALL_DIR install
@@ -1550,7 +1569,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LIBXXHASH && [ ! -d "libxxhash" ]; then
-    find ../src/ -type d -name "libxxhash-*" | xargs -i cp -r {} ./libxxhash
+    find "${SRC_DIR}" -type d -name "libxxhash-*" | xargs -i cp -r {} ./libxxhash
     start_build "libxxhash"
     cd ./libxxhash
     CC=gcc \
@@ -1573,7 +1592,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build DOVI_TOOL && [ ! -d "dovi_tool" ]; then
-    find ../src/ -type d -name "dovi_tool-*" | xargs -i cp -r {} ./dovi_tool
+    find "${SRC_DIR}" -type d -name "dovi_tool-*" | xargs -i cp -r {} ./dovi_tool
     start_build "dovi_tool"
     cd ./dovi_tool/dolby_vision
     cargo cinstall --target ${CARGOC_TARGET} --release --prefix=$INSTALL_DIR
@@ -1600,7 +1619,7 @@ fi
 if should_build GLSLANG; then
   cd $BUILD_DIR/$TARGET_ARCH
   if [ ! -d "glslang" ]; then
-      find ../src/ -type d -name "glslang-*" | xargs -i cp -r {} ./glslang
+      find "${SRC_DIR}" -type d -name "glslang-*" | xargs -i cp -r {} ./glslang
       start_build "glslang"
       cd ./glslang
       ./update_glslang_sources.py
@@ -1616,7 +1635,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LIBJPEG_TURBO && [ ! -d "libjpeg-turbo" ]; then
-    find ../src/ -type d -name "libjpeg-*" | xargs -i cp -r {} ./libjpeg-turbo
+    find "${SRC_DIR}" -type d -name "libjpeg-*" | xargs -i cp -r {} ./libjpeg-turbo
     start_build "libjpeg-turbo"
     cd ./libjpeg-turbo
     mkdir build && cd build
@@ -1630,7 +1649,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LCMS2 && [ ! -d "lcms2" ]; then
-    find ../src/ -type d -name "lcms2*" | xargs -i cp -r {} ./lcms2
+    find "${SRC_DIR}" -type d -name "lcms2*" | xargs -i cp -r {} ./lcms2
     start_build "lcms2"
     cd ./lcms2
     CC=gcc \
@@ -1645,7 +1664,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build SHADERC && [ ! -d "shaderc" ]; then
-    find ../src/ -type d -name "shaderc*" | xargs -i cp -r {} ./shaderc
+    find "${SRC_DIR}" -type d -name "shaderc*" | xargs -i cp -r {} ./shaderc
     start_build "shaderc"
     cd ./shaderc
     if [ ! -d "third_party/spirv-tools" ] || [ ! -d "third_party/spirv-headers" ]; then
@@ -1675,7 +1694,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build SPIRV_CROSS && [ ! -d "SPIRV-Cross" ]; then
-    find ../src/ -type d -name "SPIRV-Cross*" | xargs -i cp -r {} ./SPIRV-Cross
+    find "${SRC_DIR}" -type d -name "SPIRV-Cross*" | xargs -i cp -r {} ./SPIRV-Cross
     start_build "SPIRV-Cross"
     cd ./SPIRV-Cross
     mkdir build && cd build
@@ -1692,7 +1711,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build VULKAN_LOADER && [ ! -d "Vulkan-Loader" ]; then
-    find ../src/ -type d -name "Vulkan-Loader*" | xargs -i cp -r {} ./Vulkan-Loader
+    find "${SRC_DIR}" -type d -name "Vulkan-Loader*" | xargs -i cp -r {} ./Vulkan-Loader
     start_build "Vulkan-Loader"
     cd ./Vulkan-Loader
     patch -p1 < $PATCHES_DIR/vulkan_loader_static.diff
@@ -1723,7 +1742,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LIBPLACEBO && [ ! -d "libplacebo" ]; then
-    find ../src/ -type d -name "libplacebo*" | xargs -i cp -r {} ./libplacebo
+    find "${SRC_DIR}" -type d -name "libplacebo*" | xargs -i cp -r {} ./libplacebo
     start_build "libplacebo"
     cd ./libplacebo
     if [ "$MINGWDIR" != "" ]; then
@@ -1752,7 +1771,7 @@ fi
 if should_build LIBPLACEBO_DLL; then
     cd $BUILD_DIR/$TARGET_ARCH
     if [ ! -d "libplacebo_dll" ]; then
-        find ../src/ -type d -name "libplacebo*" | xargs -i cp -r {} ./libplacebo_dll
+        find "${SRC_DIR}" -type d -name "libplacebo*" | xargs -i cp -r {} ./libplacebo_dll
         start_build "libplacebo_dll"
         cd ./libplacebo_dll
         if [ "$MINGWDIR" != "" ]; then
@@ -1789,7 +1808,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build ZIMG && [ ! -d "zimg" ]; then
-    find ../src/ -type d -name "zimg*" | xargs -i cp -r {} ./zimg
+    find "${SRC_DIR}" -type d -name "zimg*" | xargs -i cp -r {} ./zimg
     start_build "zimg"
     cd zimg
     ./autogen.sh
@@ -1810,7 +1829,7 @@ if should_build X264; then
         if [ "${ENABLE_PGO}" = "TRUE" ]; then
             ensure_test_yuv_files
         fi
-        find ../src/ -type d -name "x264*" | xargs -i cp -r {} ./x264
+        find "${SRC_DIR}" -type d -name "x264*" | xargs -i cp -r {} ./x264
         start_build "x264"
         cd x264
         X264_ENABLE_LTO=
@@ -1843,7 +1862,7 @@ if should_build X265; then
     cd $BUILD_DIR/$TARGET_ARCH
     if [ ! -d "x265" ]; then
         ensure_test_yuv_files
-        find ../src/ -type d -name "x265*" | xargs -i cp -r {} ./x265
+        find "${SRC_DIR}" -type d -name "x265*" | xargs -i cp -r {} ./x265
         start_build "x265"
         cd x265
         patch -p 1 < $HOME/patches/x265_version.diff
@@ -1988,7 +2007,7 @@ fi
 if should_build XVIDCORE; then
     cd $BUILD_DIR/$TARGET_ARCH
     if [ ! -d "xvidcore" ]; then
-        find ../src/ -type d -name "xvidcore*" | xargs -i cp -r {} ./xvidcore
+        find "${SRC_DIR}" -type d -name "xvidcore*" | xargs -i cp -r {} ./xvidcore
         start_build "xvidcore"
         cd xvidcore/build/generic
         ./configure --help
@@ -1998,7 +2017,7 @@ if should_build XVIDCORE; then
         LDFLAGS=${BUILD_LDFLAGS} \
         ./configure --prefix=$INSTALL_DIR
         make -j${NUMBER_OF_PROCESSORS}
-        cp ../../src/xvid.h $INSTALL_DIR/include/
+        cp "${SRC_DIR}/xvid.h" $INSTALL_DIR/include/
         cp '=build/xvidcore.a' $INSTALL_DIR/lib/libxvidcore.a
     fi
 fi
@@ -2006,7 +2025,7 @@ fi
 if should_build VVENC; then
     cd $BUILD_DIR/$TARGET_ARCH
     if [ ! -d "vvenc" ]; then
-        find ../src/ -type d -name "vvenc*" | xargs -i cp -r {} ./vvenc
+        find "${SRC_DIR}" -type d -name "vvenc*" | xargs -i cp -r {} ./vvenc
         start_build "vvenc"
         cd vvenc
         VVENC_LTO=
@@ -2075,7 +2094,7 @@ if should_build SVT_AV1; then
     if [ ! -d "svt-av1" ]; then
         start_build "svt-av1"
         ensure_test_yuv_files
-        find ../src/ -type d -name "svt-av1*" | xargs -i cp -r {} ./svt-av1
+        find "${SRC_DIR}" -type d -name "svt-av1*" | xargs -i cp -r {} ./svt-av1
         cd svt-av1
         mkdir -p build/msys2 && cd build/msys2
         SVTAV1_ENABLE_LTO=OFF
@@ -2292,6 +2311,66 @@ if [ "${BUILD_LIB_GLSLANG}" = "TRUE" ]; then
     FFMPEG_GLSLANG_FLAGS="--enable-libglslang"
 fi
 
+FFMPEG_LIBVORBIS_FLAGS=""
+if [ "${BUILD_LIB_LIBVORBIS}" = "TRUE" ]; then
+    FFMPEG_LIBVORBIS_FLAGS="--enable-libvorbis"
+fi
+
+FFMPEG_LIBSPEEX_FLAGS=""
+if [ "${BUILD_LIB_SPEEX}" = "TRUE" ]; then
+    FFMPEG_LIBSPEEX_FLAGS="--enable-libspeex"
+fi
+
+FFMPEG_LIBMP3LAME_FLAGS=""
+if [ "${BUILD_LIB_LAME}" = "TRUE" ]; then
+    FFMPEG_LIBMP3LAME_FLAGS="--enable-libmp3lame"
+fi
+
+FFMPEG_FONTCONFIG_FLAGS=""
+if [ "${BUILD_LIB_FONTCONFIG}" = "TRUE" ]; then
+    FFMPEG_FONTCONFIG_FLAGS="--enable-fontconfig"
+fi
+
+FFMPEG_LIBFRIBIDI_FLAGS=""
+if [ "${BUILD_LIB_FRIBIDI}" = "TRUE" ]; then
+    FFMPEG_LIBFRIBIDI_FLAGS="--enable-libfribidi"
+fi
+
+FFMPEG_LIBFREETYPE_FLAGS=""
+if [ "${BUILD_LIB_FREETYPE}" = "TRUE" ]; then
+    FFMPEG_LIBFREETYPE_FLAGS="--enable-libfreetype"
+fi
+
+FFMPEG_LIBOPUS_FLAGS=""
+if [ "${BUILD_LIB_OPUS}" = "TRUE" ]; then
+    FFMPEG_LIBOPUS_FLAGS="--enable-libopus"
+fi
+
+FFMPEG_LIBASS_FLAGS=""
+if [ "${BUILD_LIB_LIBASS}" = "TRUE" ]; then
+    FFMPEG_LIBASS_FLAGS="--enable-libass"
+fi
+
+FFMPEG_LIBDAV1D_FLAGS=""
+if [ "${BUILD_LIB_DAV1D}" = "TRUE" ]; then
+    FFMPEG_LIBDAV1D_FLAGS="--enable-libdav1d"
+fi
+
+FFMPEG_LIBVPX_FLAGS=""
+if [ "${BUILD_LIB_LIBVPX}" = "TRUE" ]; then
+    FFMPEG_LIBVPX_FLAGS="--enable-libvpx"
+fi
+
+FFMPEG_LIBZIMG_FLAGS=""
+if [ "${BUILD_LIB_ZIMG}" = "TRUE" ]; then
+    FFMPEG_LIBZIMG_FLAGS="--enable-libzimg"
+fi
+
+FFMPEG_TSREPLACE_FLAGS=""
+if [ "$FOR_TSREPLACE" = "TRUE" ]; then
+    FFMPEG_TSREPLACE_FLAGS="--disable-avdevice --disable-hwaccels --disable-encoders --disable-cuvid --disable-ffnvcodec --disable-libdrm --disable-nvenc --disable-v4l2-m2m --disable-vaapi --disable-vulkan"
+fi
+
 # Linuxではlibiconvが不要/存在しないため、過去ビルド由来の-likonv混入を除去
 if [ "$MINGWDIR" = "" ]; then
     sed -i 's/ -liconv//g' ${INSTALL_DIR}/lib/pkgconfig/*.pc 2>/dev/null || true
@@ -2309,13 +2388,13 @@ if [ "$MINGWDIR" = "" ]; then
     done
 fi
 
-cd $BUILD_DIR/$TARGET_ARCH/$FFMPEG_DIR_NAME
+cd "$FFMPEG_WORK_DIR"
 if [ $FOR_AUDENC = "TRUE" ]; then
 start_build "FFmpeg for Audenc"
 pwd
 PKG_CONFIG_PATH=${PKG_CONFIG_PATH_FFMPEG} \
 ./configure \
---prefix=${BUILD_DIR}/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH \
+--prefix=${FFMPEG_TMP_DIR} \
 $PKG_CONFIG_FLAGS \
 --arch="${FFMPEG_ARCH}" \
 --target-os="${FFMPEG_TARGET_OS}" \
@@ -2362,7 +2441,7 @@ elif [ $BUILD_EXE = "TRUE" ]; then
 start_build "FFmpeg for Executable"
 PKG_CONFIG_PATH=${PKG_CONFIG_PATH_FFMPEG} \
 ./configure \
---prefix=${BUILD_DIR}/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH \
+--prefix=${FFMPEG_TMP_DIR} \
 $PKG_CONFIG_FLAGS \
 --arch="${FFMPEG_ARCH}" \
 --target-os="${FFMPEG_TARGET_OS}" \
@@ -2383,21 +2462,21 @@ $FFMPEG5_CUDA_DISABLE_FLAGS \
 --enable-filters \
 --enable-swresample \
 --disable-decoder=vorbis \
---enable-libvorbis \
---enable-libspeex \
---enable-libmp3lame \
+$FFMPEG_LIBVORBIS_FLAGS \
+$FFMPEG_LIBSPEEX_FLAGS \
+$FFMPEG_LIBMP3LAME_FLAGS \
 $TWOLAME_LIBS \
---enable-fontconfig \
---enable-libfribidi \
---enable-libfreetype \
+$FFMPEG_FONTCONFIG_FLAGS \
+$FFMPEG_LIBFRIBIDI_FLAGS \
+$FFMPEG_LIBFREETYPE_FLAGS \
 $SOXR_LIBS \
---enable-libopus \
---enable-libass \
---enable-libdav1d \
+$FFMPEG_LIBOPUS_FLAGS \
+$FFMPEG_LIBASS_FLAGS \
+$FFMPEG_LIBDAV1D_FLAGS \
 ${FFMPEG_LIBVPL_FLAGS} \
---enable-libvpx \
+$FFMPEG_LIBVPX_FLAGS \
 ${FFMPEG_GLSLANG_FLAGS} \
---enable-libzimg \
+$FFMPEG_LIBZIMG_FLAGS \
 ${FFMPEG_LIBPLACEBO_FLAGS} \
 ${FFMPEG_NV_CODEC_FLAGS} \
 --disable-mediafoundation \
@@ -2407,8 +2486,12 @@ $ARIB_LIBS \
 --extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
 $FFMPEG_EXTRA_LIBS
 else
-start_build "FFmpeg for Library"
-FFMPEG_INSTALL_DIR=${BUILD_DIR}/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH
+if [ "$FOR_TSREPLACE" = "TRUE" ]; then
+    start_build "FFmpeg for TSReplace Library"
+else
+    start_build "FFmpeg for Library"
+fi
+FFMPEG_INSTALL_DIR=${FFMPEG_TMP_DIR}
 if [ "$MINGWDIR" = "" ]; then
     FFMPEG_INSTALL_DIR=$INSTALL_DIR
 fi
@@ -2432,25 +2515,26 @@ $FFMPEG_X86_DISABLE_FLAGS \
 --disable-dxva2 \
 --disable-d3d11va \
 $FFMPEG5_CUDA_DISABLE_FLAGS \
+$FFMPEG_TSREPLACE_FLAGS \
 --enable-pthreads \
 --enable-bsfs \
 --enable-swresample \
 --disable-shared \
 --disable-decoder=vorbis \
---enable-libvorbis \
---enable-libspeex \
---enable-libmp3lame \
+$FFMPEG_LIBVORBIS_FLAGS \
+$FFMPEG_LIBSPEEX_FLAGS \
+$FFMPEG_LIBMP3LAME_FLAGS \
 $TWOLAME_LIBS \
---enable-fontconfig \
---enable-libfribidi \
---enable-libfreetype \
+$FFMPEG_FONTCONFIG_FLAGS \
+$FFMPEG_LIBFRIBIDI_FLAGS \
+$FFMPEG_LIBFREETYPE_FLAGS \
 $SOXR_LIBS \
---enable-libopus \
+$FFMPEG_LIBOPUS_FLAGS \
 $LIBBLURAY_LIBS \
---enable-libass \
---enable-libdav1d \
+$FFMPEG_LIBASS_FLAGS \
+$FFMPEG_LIBDAV1D_FLAGS \
 ${FFMPEG_LIBVPL_FLAGS} \
---enable-libvpx \
+$FFMPEG_LIBVPX_FLAGS \
 ${FFMPEG_NV_CODEC_FLAGS} \
 --disable-mediafoundation \
 --pkg-config-flags="--static" \
@@ -2462,42 +2546,42 @@ fi
 make clean && make -j$NJOBS && make install
 
 if [ "$MINGWDIR" != "" ]; then
-    mkdir -p $BUILD_DIR/$FFMPEG_DIR_NAME/include
-    mkdir -p $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
-    cp -f -r $BUILD_DIR/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH/include/* $BUILD_DIR/$FFMPEG_DIR_NAME/include
-    if [ -d "$BUILD_DIR/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH/bin" ]; then
-    cp -f -r $BUILD_DIR/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH/bin/*     $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
+    mkdir -p ${FFMPEG_WORK_DIR}/include
+    mkdir -p ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
+    cp -f -r ${FFMPEG_TMP_DIR}/include/* ${FFMPEG_WORK_DIR}/include
+    if [ -d "${FFMPEG_TMP_DIR}/bin" ]; then
+    cp -f -r ${FFMPEG_TMP_DIR}/bin/*     ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
     fi
-    cp -f -r $BUILD_DIR/$FFMPEG_DIR_NAME/tmp/$TARGET_ARCH/lib/*     $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
-    rm -rf   $BUILD_DIR/$FFMPEG_DIR_NAME/tmp
+    cp -f -r ${FFMPEG_TMP_DIR}/lib/*     ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
+    rm -rf   ${FFMPEG_WORK_DIR}/tmp
 
     if should_build LIBASS_DLL; then
-        cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.dll $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
-        cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.def $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
-        cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.lib $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
-        cp -f -r $INSTALL_DIR/include/ass $BUILD_DIR/$FFMPEG_DIR_NAME/include
+        cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.dll ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
+        cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.def ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
+        cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.lib ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
+        cp -f -r $INSTALL_DIR/include/ass ${FFMPEG_WORK_DIR}/include
     fi
 
     if should_build LIBPLACEBO_DLL; then
-        cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.dll $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
-        cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.def $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
-        cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.lib $BUILD_DIR/$FFMPEG_DIR_NAME/lib/$VC_ARCH
-        cp -f -r $INSTALL_DIR/include/libplacebo $BUILD_DIR/$FFMPEG_DIR_NAME/include
+        cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.dll ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
+        cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.def ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
+        cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.lib ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
+        cp -f -r $INSTALL_DIR/include/libplacebo ${FFMPEG_WORK_DIR}/include
     fi
 fi
 
 if [ ${SKIP_SRC_ARCHIVE} = "FALSE" ]; then
-    cd $BUILD_DIR/src
+    cd $SRC_DIR
     SRC_7Z_FILENAME=ffmpeg_lgpl_src.7z
     SRC_GPL_LIBS=
     SRC_EXE_LIBS=
     SRC_ENCODER_LIBS=
     if [ ${ENABLE_GPL} != "FALSE" ]; then
     SRC_7Z_FILENAME=ffmpeg_gpl_src.7z
-    SRC_GPL_LIBS="$BUILD_DIR/src/x264* $BUILD_DIR/src/x265* $BUILD_DIR/src/xvidcore*"
+    SRC_GPL_LIBS="$SRC_DIR/x264* $SRC_DIR/x265* $SRC_DIR/xvidcore*"
     fi
     if [ $TARGET_ARCH != "x86" ]; then
-        SRC_ENCODER_LIBS="$BUILD_DIR/src/svt-av1* $BUILD_DIR/src/vvenc*"
+        SRC_ENCODER_LIBS="$SRC_DIR/svt-av1* $SRC_DIR/vvenc*"
     fi
     rm -f ${SRC_7Z_FILENAME}
     echo "compressing src file..."
@@ -2523,16 +2607,16 @@ if [ ${SKIP_SRC_ARCHIVE} = "FALSE" ]; then
     }
     
     collect_existing_paths SRC_ARCHIVE_PATHS \
-        "$BUILD_DIR/src/ffmpeg*" "$BUILD_DIR/src/opus*" "$BUILD_DIR/src/libogg*" "$BUILD_DIR/src/libvorbis*" \
-        "$BUILD_DIR/src/lame*" "$BUILD_DIR/src/libsndfile*" "$BUILD_DIR/src/twolame*" "$BUILD_DIR/src/soxr*" "$BUILD_DIR/src/speex*" \
-        "$BUILD_DIR/src/expat*" "$BUILD_DIR/src/freetype*" "$BUILD_DIR/src/harfbuzz*" "$BUILD_DIR/src/libunibreak*" \
-        "$BUILD_DIR/src/libiconv*" "$BUILD_DIR/src/fontconfig*" \
-        "$BUILD_DIR/src/libpng*" "$BUILD_DIR/src/libass*" "$BUILD_DIR/src/bzip2*" "$BUILD_DIR/src/libbluray*" \
-        "$BUILD_DIR/src/glslang*" "$BUILD_DIR/src/zimg*" \
-        "$BUILD_DIR/src/aribb24*" "$BUILD_DIR/src/libaribcaption*" "$BUILD_DIR/src/libxml2*" "$BUILD_DIR/src/dav1d*" \
-        "$BUILD_DIR/src/libvpl*" "$BUILD_DIR/src/libvpx*" "$BUILD_DIR/src/nv-codec-headers*" \
-        "$BUILD_DIR/src/libxxhash*" "$BUILD_DIR/src/shaderc*" "$BUILD_DIR/src/SPIRV-Cross*" \
-        "$BUILD_DIR/src/dovi_tool*" "$BUILD_DIR/src/libjpeg-*" "$BUILD_DIR/src/lcms2*" "$BUILD_DIR/src/libplacebo*" "$BUILD_DIR/src/Vulkan-Loader*" \
+        "$SRC_DIR/ffmpeg*" "$SRC_DIR/opus*" "$SRC_DIR/libogg*" "$SRC_DIR/libvorbis*" \
+        "$SRC_DIR/lame*" "$SRC_DIR/libsndfile*" "$SRC_DIR/twolame*" "$SRC_DIR/soxr*" "$SRC_DIR/speex*" \
+        "$SRC_DIR/expat*" "$SRC_DIR/freetype*" "$SRC_DIR/harfbuzz*" "$SRC_DIR/libunibreak*" \
+        "$SRC_DIR/libiconv*" "$SRC_DIR/fontconfig*" \
+        "$SRC_DIR/libpng*" "$SRC_DIR/libass*" "$SRC_DIR/bzip2*" "$SRC_DIR/libbluray*" \
+        "$SRC_DIR/glslang*" "$SRC_DIR/zimg*" \
+        "$SRC_DIR/aribb24*" "$SRC_DIR/libaribcaption*" "$SRC_DIR/libxml2*" "$SRC_DIR/dav1d*" \
+        "$SRC_DIR/libvpl*" "$SRC_DIR/libvpx*" "$SRC_DIR/nv-codec-headers*" \
+        "$SRC_DIR/libxxhash*" "$SRC_DIR/shaderc*" "$SRC_DIR/SPIRV-Cross*" \
+        "$SRC_DIR/dovi_tool*" "$SRC_DIR/libjpeg-*" "$SRC_DIR/lcms2*" "$SRC_DIR/libplacebo*" "$SRC_DIR/Vulkan-Loader*" \
         "$SRC_GPL_LIBS" "$SRC_EXE_LIBS" "$SRC_ENCODER_LIBS" \
         "$PATCHES_DIR/*"
     

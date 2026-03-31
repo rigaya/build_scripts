@@ -148,7 +148,6 @@ MESON_COMMON_ARGS=(
     "--libdir=lib"
     "-Denable_tests=false"
     "-Denable_docs=false"
-    "-Denable_tools=false"
 )
 
 if [ "${BUILD_MODE}" = "shared" ]; then

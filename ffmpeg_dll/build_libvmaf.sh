@@ -474,6 +474,7 @@ build_libvmaf() {
         "-Denable_docs=false"
         "-Denable_tools=false"
         "-Dbuilt_in_models=true"
+        "-Denable_float=true"
     )
 
     if [ "${ENABLE_CUDA}" = "TRUE" ]; then

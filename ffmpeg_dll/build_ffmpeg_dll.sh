@@ -588,7 +588,7 @@ done
 
 #--- ライブラリバージョン (更新時はここを変更) -----------------
 # git clone で最新取得するもの (aribb24 / SPIRV-Cross / x264 / x265) は含めない
-VER_FFMPEG="8.0"
+VER_FFMPEG="8.1.2"
 VER_FFMPEG4="4.4.8"
 VER_ZLIB="1.3.2"
 VER_LIBPNG="1.6.58"
@@ -684,6 +684,10 @@ fi
 if should_build BZIP2 && [ ! -d "bzip2-${VER_BZIP2}" ]; then
     download_archive "bzip2-${VER_BZIP2}.tar.gz" "https://github.com/libarchive/bzip2/archive/refs/tags/bzip2-${VER_BZIP2}.tar.gz"
     tar xf bzip2-${VER_BZIP2}.tar.gz
+    # GitHub archive extracts as bzip2-bzip2-VERSION
+    if [ -d "bzip2-bzip2-${VER_BZIP2}" ] && [ ! -d "bzip2-${VER_BZIP2}" ]; then
+        mv "bzip2-bzip2-${VER_BZIP2}" "bzip2-${VER_BZIP2}"
+    fi
 fi
 
 if should_build LZMA && [ ! -d "xz-${VER_XZ}" ]; then
@@ -762,6 +766,10 @@ fi
 if should_build SPEEX && [ ! -d "speex-${VER_SPEEX}" ]; then
     download_archive "speex-${VER_SPEEX}.tar.gz" "https://github.com/xiph/speex/archive/refs/tags/Speex-${VER_SPEEX}.tar.gz"
     tar xf speex-${VER_SPEEX}.tar.gz
+    # GitHub archive extracts as speex-Speex-VERSION
+    if [ -d "speex-Speex-${VER_SPEEX}" ] && [ ! -d "speex-${VER_SPEEX}" ]; then
+        mv "speex-Speex-${VER_SPEEX}" "speex-${VER_SPEEX}"
+    fi
 fi
 
 if should_build LAME && [ ! -d "lame-${VER_LAME}" ]; then
@@ -795,8 +803,8 @@ fi
 #fi
 
 if should_build LIBBLURAY && [ ! -d "libbluray-${VER_LIBBLURAY}" ]; then
-    download_archive "libbluray-${VER_LIBBLURAY}.tar.bz2" "https://download.videolan.org/pub/videolan/libbluray/${VER_LIBBLURAY}/libbluray-${VER_LIBBLURAY}.tar.bz2"
-    tar xf libbluray-${VER_LIBBLURAY}.tar.bz2
+    download_archive "libbluray-${VER_LIBBLURAY}.tar.xz" "https://download.videolan.org/pub/videolan/libbluray/${VER_LIBBLURAY}/libbluray-${VER_LIBBLURAY}.tar.xz"
+    tar xf libbluray-${VER_LIBBLURAY}.tar.xz
 fi
 
 if should_build ARIBB24 && [ ! -d "aribb24-master" ]; then
@@ -863,8 +871,9 @@ fi
 
 if should_build SHADERC; then
     if [ ! -d "shaderc" ]; then
-        git clone --depth 1 https://github.com/google/shaderc shaderc
-        cd shaderc && git checkout tags/v${VER_SHADERC} && "${PYTHON_BIN}" ./utils/git-sync-deps && cd ..
+        # --depth 1 のまま checkout tags/... するとタグが取れないため、ブランチ指定で clone する
+        git clone --depth 1 --branch "v${VER_SHADERC}" https://github.com/google/shaderc shaderc
+        cd shaderc && "${PYTHON_BIN}" ./utils/git-sync-deps && cd ..
     elif [ ! -d "shaderc/third_party/spirv-tools" ] || [ ! -d "shaderc/third_party/spirv-headers" ]; then
         cd shaderc && "${PYTHON_BIN}" ./utils/git-sync-deps && cd ..
     fi
@@ -904,8 +913,8 @@ fi
 # [ libjpeg -> lcms2 ], shaderc, SPIRV-Cross, dovi_tool, libxxhash, vulkan-loader -> libplacebo
 # shadercがあればglslangは不要
 if should_build LIBPLACEBO && [ ! -d "libplacebo" ]; then
-    git clone --depth 1 --recursive https://code.videolan.org/videolan/libplacebo
-    cd libplacebo && git checkout tags/v${VER_LIBPLACEBO} && cd ..
+    # --depth 1 のまま checkout tags/... するとタグが取れないため、ブランチ指定で clone する
+    git clone --depth 1 --branch "v${VER_LIBPLACEBO}" --recursive https://code.videolan.org/videolan/libplacebo
 fi
 
 if should_build VVENC && [ ! -d "vvenc-${VER_VVENC}" ]; then
@@ -1023,9 +1032,22 @@ if should_build LZMA && [ ! -d "xz" ]; then
     ./configure \
       --disable-shared \
       --enable-static \
+      --disable-nls \
+      --disable-xz \
+      --disable-xzdec \
+      --disable-lzmadec \
+      --disable-lzmainfo \
+      --disable-lzma-links \
+      --disable-scripts \
+      --disable-doc \
       --prefix=$INSTALL_DIR \
       SKIP_WERROR_CHECK=yes
-    make -j$NJOBS && make install
+    # libtool が windres に CFLAGS (-Os 等) を渡し失敗するため、w32 リソースをビルド対象から外す
+    if [ -f src/liblzma/Makefile ]; then
+        sed -i -e 's/[[:space:]]*liblzma_w32res\.lo//g' src/liblzma/Makefile
+    fi
+    make -j$NJOBS
+    make install
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
@@ -1147,6 +1169,9 @@ if should_build FONTCONFIG && [ ! -d "fontconfig" ]; then
     fi
     cd ./fontconfig
     autoreconf -fvi
+    # リリースアーカイブ同梱の fcblanks.h を使用し、
+    # 廃止済みの Unicode.org 生成処理が実行されないようにする
+    touch fc-blanks/fcblanks.h
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
     FREETYPE_CFLAGS=-I$INSTALL_DIR/include/freetype2 \
     FREETYPE_LIBS="-L$INSTALL_DIR/lib -lfreetype" \
@@ -1218,8 +1243,23 @@ if should_build HARFBUZZ; then
         CFLAGS="${BUILD_CCFLAGS_SMALL} -I${INSTALL_DIR}/include" \
         CPPFLAGS="${BUILD_CCFLAGS_SMALL} -I${INSTALL_DIR}/include" \
         LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
-        meson build --buildtype release
-        meson configure build/ --prefix=$INSTALL_DIR --libdir=lib -Dbuildtype=release -Ddefault_library=static -Dglib=disabled -Dcairo=disabled -Dfreetype=enabled -Ddocs=disabled -Dtests=disabled -Dc_args="${BUILD_CCFLAGS_SMALL}" -Dc_link_args="${BUILD_LDFLAGS}"
+        meson setup build \
+          --prefix=$INSTALL_DIR \
+          --libdir=lib \
+          -Dbuildtype=release \
+          -Ddefault_library=static \
+          -Dglib=disabled \
+          -Dgobject=disabled \
+          -Dcairo=disabled \
+          -Dchafa=disabled \
+          -Dicu=disabled \
+          -Dfreetype=enabled \
+          -Dintrospection=disabled \
+          -Ddocs=disabled \
+          -Dtests=disabled \
+          -Dutilities=disabled \
+          -Dc_args="${BUILD_CCFLAGS_SMALL}" \
+          -Dc_link_args="${BUILD_LDFLAGS}"
         ninja -C build install
     fi
 fi
@@ -1257,6 +1297,7 @@ if should_build LIBASS && [ ! -d "libass" ]; then
     make -j$NJOBS && make install
 fi
 
+cd $BUILD_DIR/$TARGET_ARCH
 if should_build LIBASS_DLL && [ ! -d "libass_dll" ]; then
     find "${SRC_DIR}" -type d -name "libass-${VER_LIBASS}" | xargs -i cp -r {} ./libass_dll
     start_build "libass_dll"
@@ -1266,39 +1307,47 @@ if should_build LIBASS_DLL && [ ! -d "libass_dll" ]; then
     CC="gcc -static-libgcc -static-libstdc++" \
     CFLAGS="${BUILD_CCFLAGS_SMALL}" \
     CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
-    LDFLAGS="-L${INSTALL_DIR}/lib -static-libgcc -static-libstdc++ -Wl,-Bstatic -Wl,-lm,-liconv,-lfreetype,-lfribidi,-lfontconfig,-lexpat,-lfreetype,-lpng,-lbz2,-lz" \
+    LDFLAGS="-L${INSTALL_DIR}/lib -static-libgcc -static-libstdc++" \
     ./configure \
     --prefix=$INSTALL_DIR \
     --enable-static=no \
     --enable-shared=yes
-    #実行したコマンドを出力するように
-    sed -i -e 's/AM_DEFAULT_VERBOSITY = 0/AM_DEFAULT_VERBOSITY = 1/g' libass/Makefile
-    make -j$NJOBS
+    #実行したコマンドを出力するように (新しめの libass はトップレベル Makefile)
+    if [ -f libass/Makefile ]; then
+        sed -i -e 's/AM_DEFAULT_VERBOSITY = 0/AM_DEFAULT_VERBOSITY = 1/g' libass/Makefile
+    elif [ -f Makefile ]; then
+        sed -i -e 's/AM_DEFAULT_VERBOSITY = 0/AM_DEFAULT_VERBOSITY = 1/g' Makefile
+    fi
+    # libtool は静的依存のみだと DLL を諦めるため、オブジェクト生成まで make し、DLL は手動リンクする
+    make -j$NJOBS || true
     cd libass
-    # ../libtool --tag=CC   --mode=link gcc -std=gnu99 \
-    # -D_GNU_SOURCE \
-    # ${BUILD_CCFLAGS_SMALL} \
-    # -I${INSTALL_DIR}/include/freetype2 \
-    # -I${INSTALL_DIR}/include/fribidi \
-    # -I${INSTALL_DIR}/include \
-    # -I${INSTALL_DIR}/include/freetype2 \
-    # -no-undefined -version-info 8:0:3 -export-symbols ./libass.sym  -o libass.la -rpath ${INSTALL_DIR}/lib \
-    # `find ./ -name "*.lo" | tr '\n' ' '` \
-    # -L${INSTALL_DIR}/lib \
-    # -static -static-libgcc -static-libstdc++ \
-    # -Wl,-lm,-liconv,-lfreetype,-lfribidi,-lfontconfig,-lexpat,-lfreetype,-lpng,-lbz2,-lz \
-    # -Wl,--output-def,libass.def -Wl,-s -Wl,-gc-sections
-    # sed -i -e "s/ @[^ ]*//" libass.def
+    if [ ! -f .libs/libass_internal.a ]; then
+        echo "libass_internal.a was not produced."
+        exit 1
+    fi
+    gcc -shared -o .libs/libass-0.dll \
+      -Wl,--whole-archive .libs/libass_internal.a -Wl,--no-whole-archive \
+      -Wl,--output-def,.libs/libass-0.dll.def \
+      -Wl,--enable-auto-image-base \
+      -static-libgcc \
+      -L${INSTALL_DIR}/lib \
+      -Wl,-Bstatic -lharfbuzz -lunibreak -lfribidi -lfontconfig -lexpat -lfreetype -lpng16 -lbz2 -lz -liconv \
+      -Wl,-Bdynamic -lm -lgdi32 -ldwrite
 
-    LIBASS_DEF_FILENAME=`find ./.libs/libass-*.dll`.def
-    LIBASS_DEF_FILENAME=${LIBASS_DEF_FILENAME/.dll.def/.def}
-    cp -f `find ./.libs/libass-*.dll`.def ${LIBASS_DEF_FILENAME}
-    cp -f ${LIBASS_DEF_FILENAME} .
-    LIBASS_DEF_FILENAME=`basename $LIBASS_DEF_FILENAME`
-    sed -i -e "s/ @[^ ]*//" ${LIBASS_DEF_FILENAME}
-    LIBASS_LIB_FILENAME=$(basename $LIBASS_DEF_FILENAME .def).lib
-    lib.exe -machine:$TARGET_ARCH -def:$LIBASS_DEF_FILENAME -out:$LIBASS_LIB_FILENAME
-    cp `find ./.libs/libass-*.dll` .
+    LIBASS_DLL_PATH=.libs/libass-0.dll
+    LIBASS_DEF_FILENAME=.libs/libass-0.dll.def
+    cp -f "${LIBASS_DEF_FILENAME}" ./libass-0.def
+    LIBASS_DEF_FILENAME=libass-0.def
+    sed -i -e "s/ @[^ ]*//" "${LIBASS_DEF_FILENAME}"
+    LIBASS_LIB_FILENAME=libass-0.lib
+    if [ -n "${MSVC_LIB_EXE:-}" ]; then
+        "${MSVC_LIB_EXE}" -machine:$TARGET_ARCH -def:$LIBASS_DEF_FILENAME -out:$LIBASS_LIB_FILENAME
+    elif command -v lib.exe >/dev/null 2>&1; then
+        lib.exe -machine:$TARGET_ARCH -def:$LIBASS_DEF_FILENAME -out:$LIBASS_LIB_FILENAME
+    else
+        dlltool -d "$LIBASS_DEF_FILENAME" -l "$LIBASS_LIB_FILENAME" -D "libass-0.dll"
+    fi
+    cp "${LIBASS_DLL_PATH}" .
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
@@ -1373,9 +1422,8 @@ if should_build LAME && [ ! -d "lame" ]; then
     find "${SRC_DIR}" -type d -name "lame-*" | xargs -i cp -r {} ./lame
     start_build "lame"
     cd ./lame
-    if [ "$MINGWDIR" != "" ]; then
-        patch -p1 < $PATCHES_DIR/lame-${VER_LAME}-parse_c.diff
-    fi
+    # LAME 4.0以降はHAVE_LANGINFO_H非存在時のフォールバックが本体に入っているため、MinGW向けparse.cパッチは不要
+    # GCC 16 では frontend/parse.c が型エラーで落ちるため、ffmpeg向けには frontend を無効化する
     CFLAGS="${BUILD_CCFLAGS}" \
     CPPFLAGS="${BUILD_CCFLAGS}" \
     LDFLAGS="${BUILD_LDFLAGS}" \
@@ -1383,7 +1431,8 @@ if should_build LAME && [ ! -d "lame" ]; then
      --prefix=$INSTALL_DIR \
      --disable-shared \
      --enable-static \
-     --disable-decoder
+     --disable-decoder \
+     --disable-frontend
     make install -j$NJOBS
 fi
 
@@ -1392,8 +1441,9 @@ if should_build LIBSNDFILE && [ ! -d "libsndfile" ]; then
     find "${SRC_DIR}" -type d -name "libsndfile-*" | xargs -i cp -r {} ./libsndfile
     start_build "libsndfile"
     cd ./libsndfile
-    CFLAGS="${BUILD_CCFLAGS}" \
-    CPPFLAGS="${BUILD_CCFLAGS}" \
+    # GCC 16 既定の C23 では ALAC 内の bool/false 定義がキーワード衝突するため C17 に固定
+    CFLAGS="${BUILD_CCFLAGS} -std=gnu17" \
+    CPPFLAGS="${BUILD_CCFLAGS} -std=gnu17" \
     LDFLAGS="${BUILD_LDFLAGS}" \
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
      ./configure \
@@ -1423,10 +1473,13 @@ if should_build TWOLAME && [ ! -d "twolame" ]; then
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
-if should_build SOXR && [ ! -d "soxr" ]; then
+if should_build SOXR && [ ! -f "${INSTALL_DIR}/lib/pkgconfig/soxr.pc" ]; then
+    rm -rf ./soxr
     find "${SRC_DIR}" -type d -name "soxr-*" | xargs -i cp -r {} ./soxr
     start_build "soxr"
     cd ./soxr
+    # soxr 0.1.3 はWIN32でpkg-configファイルを生成しないため、MinGWでも生成する
+    sed -i -e 's/elseif (NOT WIN32)/else ()/g' src/CMakeLists.txt
     which cmake
     cmake --version
     cmake -G "${CMAKE_GENERATOR}" \
@@ -1440,8 +1493,10 @@ if should_build SOXR && [ ! -d "soxr" ]; then
     -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
     .
     make install -j$NJOBS
-    # staticリンク時にlibmが必要
-    sed -i -e '/^Libs:/ s/$/ -lm/' ${INSTALL_DIR}/lib/pkgconfig/soxr.pc
+    if [ "$MINGWDIR" = "" ]; then
+        # Linuxでのstaticリンク時にlibmが必要
+        sed -i -e '/^Libs:/ s/$/ -lm/' ${INSTALL_DIR}/lib/pkgconfig/soxr.pc
+    fi
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
@@ -1449,6 +1504,8 @@ if should_build LIBXML2 && [ ! -d "libxml2" ]; then
     find "${SRC_DIR}" -type d -name "libxml2-*" | xargs -i cp -r {} ./libxml2
     start_build "libxml2"
     cd ./libxml2
+    CC=gcc \
+    CXX=g++ \
     CFLAGS="${BUILD_CCFLAGS_SMALL}" \
     CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
     LDFLAGS="${BUILD_LDFLAGS}" \
@@ -1469,23 +1526,32 @@ if should_build LIBBLURAY && [ ! -d "libbluray" ]; then
     start_build "libbluray"
     cd ./libbluray
     # Linux static link時にFFmpeg本体のdec_initと衝突するため、libbluray側を名前空間化する
-    if [ "$MINGWDIR" = "" ]; then
-        sed -i 's/\bdec_init\b/bluray_dec_init/g' src/libbluray/disc/dec.h src/libbluray/disc/dec.c src/libbluray/disc/disc.c
-    fi
-    autoreconf -fvi
+    sed -i 's/\bdec_init\b/bluray_dec_init/g' src/libbluray/disc/dec.h src/libbluray/disc/dec.c src/libbluray/disc/disc.c
+    # 1.4系からAutotools廃止・Mesonのみ
+    CC=gcc \
+    CXX=g++ \
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
     CFLAGS="${BUILD_CCFLAGS_SMALL}" \
     CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
     LDFLAGS="${BUILD_LDFLAGS}" \
-     ./configure \
-     --prefix=$INSTALL_DIR \
-     --disable-shared \
-     --enable-static \
-     --disable-bdjava-jar \
-     --disable-doxygen-doc \
-     --disable-examples
-    make -j$NJOBS
-    make install
+    meson setup build \
+      --prefix=$INSTALL_DIR \
+      --libdir=lib \
+      --buildtype=release \
+      -Ddefault_library=static \
+      -Dbdj_jar=disabled \
+      -Denable_docs=false \
+      -Denable_tools=false \
+      -Denable_examples=false \
+      -Dembed_udfread=true \
+      -Dfreetype=enabled \
+      -Dfontconfig=enabled \
+      -Dlibxml2=enabled \
+      --force-fallback-for=libudfread \
+      -Dc_args="${BUILD_CCFLAGS_SMALL}" \
+      -Dc_link_args="${BUILD_LDFLAGS}"
+    ninja -C build
+    ninja -C build install
     if [ ! -f "${INSTALL_DIR}/lib/pkgconfig/libbluray.pc" ]; then
         echo "libbluray.pc is missing after install."
         find "${INSTALL_DIR}" -maxdepth 5 -name "libbluray.pc" -print || true
@@ -1552,8 +1618,14 @@ if should_build DAV1D && [ ! -d "dav1d" ]; then
     CFLAGS="${BUILD_CCFLAGS}" \
     CPPFLAGS="${BUILD_CCFLAGS}" \
     LDFLAGS="${BUILD_LDFLAGS}" \
-    meson build --buildtype release
-    meson configure build/ --prefix=$INSTALL_DIR --libdir=lib -Dbuildtype=release -Ddefault_library=static -Denable_examples=false -Denable_tests=false -Dc_args="${BUILD_CCFLAGS}"
+    meson setup build \
+      --prefix=$INSTALL_DIR \
+      --libdir=lib \
+      -Dbuildtype=release \
+      -Ddefault_library=static \
+      -Denable_examples=false \
+      -Denable_tests=false \
+      -Dc_args="${BUILD_CCFLAGS}"
     ninja -C build install
 fi
 
@@ -1618,22 +1690,22 @@ if should_build LIBXXHASH && [ ! -d "libxxhash" ]; then
     find "${SRC_DIR}" -type d -name "libxxhash-*" | xargs -i cp -r {} ./libxxhash
     start_build "libxxhash"
     cd ./libxxhash
+    mkdir build && cd build
     CC=gcc \
     CXX=g++ \
-    CFLAGS="${BUILD_CCFLAGS} -DXXH_STATIC_LINKING_ONLY" \
-    CPPFLAGS="${BUILD_CCFLAGS} -DXXH_STATIC_LINKING_ONLY" \
+    CFLAGS="${BUILD_CCFLAGS}" \
+    CPPFLAGS="${BUILD_CCFLAGS}" \
     LDFLAGS="${BUILD_LDFLAGS}" \
-    PREFIX=$INSTALL_DIR \
-    prefix=$INSTALL_DIR \
-    DISPATCH=1 \
-    make 
-    PREFIX=$INSTALL_DIR \
-    prefix=$INSTALL_DIR \
-    make install
-    if [ "$MINGWDIR" = "" ]; then
-        # Linux静的リンク用途では共有ライブラリを除去
-        rm -f ${INSTALL_DIR}/lib/libxxhash.so*
-    fi
+    cmake -G "${CMAKE_GENERATOR}" \
+      -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+      -DCMAKE_INSTALL_LIBDIR=lib \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_SHARED_LIBS=OFF \
+      -DXXHASH_BUILD_XXHSUM=OFF \
+      -DDISPATCH=ON \
+      ../cmake_unofficial
+    cmake --build . --parallel $NJOBS
+    cmake --install "$(pwd -W)"
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH

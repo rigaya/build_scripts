@@ -586,12 +586,62 @@ for flag in BUILD_LIB_ZLIB BUILD_LIB_BZIP2 BUILD_LIB_LZMA BUILD_LIB_LIBPNG BUILD
     fi
 done
 
+#--- ライブラリバージョン (更新時はここを変更) -----------------
+# git clone で最新取得するもの (aribb24 / SPIRV-Cross / x264 / x265) は含めない
+VER_FFMPEG="8.0"
+VER_FFMPEG4="4.4.3"
+VER_ZLIB="1.3.2"
+VER_LIBPNG="1.6.50"
+VER_BZIP2="1.0.8"
+VER_XZ="5.8.2"
+VER_EXPAT="2.7.1"
+VER_FREETYPE="2.11.0"          # 2.12.1はダメ
+VER_LIBICONV="1.16"
+VER_FONTCONFIG="2.12.6"        # 2.12.6でないといろいろ面倒 -> 2.12.1もだめ, 2.13.0もだめ
+VER_FONTCONFIG_SHA256="064b9ebf060c9e77011733ac9dc0e2ce92870b574cca2405e11f5353a683c334"
+VER_FRIBIDI="1.0.16"
+VER_HARFBUZZ="11.4.4"
+VER_LIBUNIBREAK="6.1"
+VER_LIBASS="0.17.4"
+VER_LIBASS_X86="0.14.0"        # x86向け
+VER_LIBOGG="1.3.6"
+VER_LIBVORBIS="1.3.7"
+VER_OPUS="1.6.1"
+VER_SPEEX="1.2.1"
+VER_LAME="3.100"
+VER_TWOLAME="0.4.0"
+VER_LIBSNDFILE="1.2.2"
+VER_SOXR="0.1.3"
+VER_LIBXML2="2.14.5"
+VER_LIBBLURAY="1.3.4"
+VER_LIBARIBCAPTION="1.1.1"
+VER_LIBVPL="2.16.0"
+VER_NV_CODEC_HEADERS="12.2.72.0"
+VER_LIBVPX="1.16.0"
+VER_DAV1D="1.5.3"
+VER_LIBXXHASH="0.8.3"
+VER_GLSLANG="15.4.0"
+VER_SHADERC="2024.1"
+VER_DOVI_TOOL="2.3.1"
+VER_LIBJPEG_TURBO="3.1.1"
+VER_LCMS2="2.17"
+VER_VULKAN_LOADER="1.3.295"
+VER_ZIMG="3.0.6"
+VER_LIBPLACEBO="7.351.0"
+VER_VVENC="1.13.1"
+VER_SVT_AV1="3.1.0"
+VER_XVIDCORE="1.3.7"
+
+if [ "$TARGET_ARCH" = "x86" ]; then
+    VER_LIBASS="${VER_LIBASS_X86}"
+fi
+
 #--- ソースのダウンロード ---------------------------------------
 if [ "$FOR_FFMPEG4" = "TRUE" ]; then
     if [ ! -d "ffmpeg" ]; then
-        download_archive "ffmpeg-4.4.3.tar.xz" "https://ffmpeg.org/releases/ffmpeg-4.4.3.tar.xz"
-        tar xf ffmpeg-4.4.3.tar.xz
-        mv ffmpeg-4.4.3 ffmpeg
+        download_archive "ffmpeg-${VER_FFMPEG4}.tar.xz" "https://ffmpeg.org/releases/ffmpeg-${VER_FFMPEG4}.tar.xz"
+        tar xf ffmpeg-${VER_FFMPEG4}.tar.xz
+        mv ffmpeg-${VER_FFMPEG4} ffmpeg
     fi
 else
     if [ ! -d "ffmpeg" ]; then
@@ -613,62 +663,62 @@ else
         #git reset --hard
         #git checkout -b build 9d15fe77e33b757c75a4186fa049857462737713
         #cd ..
-        download_archive "ffmpeg-8.0.tar.xz" "https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz"
-        tar xf ffmpeg-8.0.tar.xz
-        mv ffmpeg-8.0 ffmpeg
+        download_archive "ffmpeg-${VER_FFMPEG}.tar.xz" "https://ffmpeg.org/releases/ffmpeg-${VER_FFMPEG}.tar.xz"
+        tar xf ffmpeg-${VER_FFMPEG}.tar.xz
+        mv ffmpeg-${VER_FFMPEG} ffmpeg
         #wget https://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2
         #tar xf ffmpeg-snapshot.tar.bz2
     fi
 fi
 
-if should_build ZLIB && [ ! -d "zlib-1.3.2" ]; then
-    download_archive "zlib-1.3.2.tar.xz" "https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.xz"
-    tar xf zlib-1.3.2.tar.xz
+if should_build ZLIB && [ ! -d "zlib-${VER_ZLIB}" ]; then
+    download_archive "zlib-${VER_ZLIB}.tar.xz" "https://github.com/madler/zlib/releases/download/v${VER_ZLIB}/zlib-${VER_ZLIB}.tar.xz"
+    tar xf zlib-${VER_ZLIB}.tar.xz
 fi
 
-if should_build LIBPNG && [ ! -d "libpng-1.6.50" ]; then
-    download_archive "libpng-1.6.50.tar.xz" "https://download.sourceforge.net/libpng/libpng-1.6.50.tar.xz"
-    tar xf libpng-1.6.50.tar.xz
+if should_build LIBPNG && [ ! -d "libpng-${VER_LIBPNG}" ]; then
+    download_archive "libpng-${VER_LIBPNG}.tar.xz" "https://download.sourceforge.net/libpng/libpng-${VER_LIBPNG}.tar.xz"
+    tar xf libpng-${VER_LIBPNG}.tar.xz
 fi
 
-if should_build BZIP2 && [ ! -d "bzip2-1.0.8" ]; then
-    download_archive "bzip2-1.0.8.tar.gz" "https://github.com/libarchive/bzip2/archive/refs/tags/bzip2-1.0.8.tar.gz"
-    tar xf bzip2-1.0.8.tar.gz
+if should_build BZIP2 && [ ! -d "bzip2-${VER_BZIP2}" ]; then
+    download_archive "bzip2-${VER_BZIP2}.tar.gz" "https://github.com/libarchive/bzip2/archive/refs/tags/bzip2-${VER_BZIP2}.tar.gz"
+    tar xf bzip2-${VER_BZIP2}.tar.gz
 fi
 
-if should_build LZMA && [ ! -d "xz-5.8.2" ]; then
-    download_archive "xz-5.8.2.tar.xz" "https://github.com/tukaani-project/xz/releases/download/v5.8.2/xz-5.8.2.tar.xz"
-    tar xf xz-5.8.2.tar.xz
+if should_build LZMA && [ ! -d "xz-${VER_XZ}" ]; then
+    download_archive "xz-${VER_XZ}.tar.xz" "https://github.com/tukaani-project/xz/releases/download/v${VER_XZ}/xz-${VER_XZ}.tar.xz"
+    tar xf xz-${VER_XZ}.tar.xz
 fi
 
-if should_build EXPAT && [ ! -d "expat-2.7.1" ]; then
-    download_archive "expat-2.7.1.tar.xz" "https://github.com/libexpat/libexpat/releases/download/R_2_7_1/expat-2.7.1.tar.xz"
-    tar xf expat-2.7.1.tar.xz
+if should_build EXPAT && [ ! -d "expat-${VER_EXPAT}" ]; then
+    download_archive "expat-${VER_EXPAT}.tar.xz" "https://github.com/libexpat/libexpat/releases/download/R_${VER_EXPAT//./_}/expat-${VER_EXPAT}.tar.xz"
+    tar xf expat-${VER_EXPAT}.tar.xz
 fi
 
 # freetype-2.12.1はダメ
-if should_build FREETYPE && [ ! -d "freetype-2.11.0" ]; then
-    download_archive "freetype-2.11.0.tar.gz" "https://downloads.sourceforge.net/freetype/freetype-2.11.0.tar.gz"
-    tar xf freetype-2.11.0.tar.gz
+if should_build FREETYPE && [ ! -d "freetype-${VER_FREETYPE}" ]; then
+    download_archive "freetype-${VER_FREETYPE}.tar.gz" "https://downloads.sourceforge.net/freetype/freetype-${VER_FREETYPE}.tar.gz"
+    tar xf freetype-${VER_FREETYPE}.tar.gz
 fi
 
-if should_build LIBICONV && [ ! -d "libiconv-1.16" ]; then
-    download_archive "libiconv-1.16.tar.gz" "https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.16.tar.gz"
-    tar xf libiconv-1.16.tar.gz
+if should_build LIBICONV && [ ! -d "libiconv-${VER_LIBICONV}" ]; then
+    download_archive "libiconv-${VER_LIBICONV}.tar.gz" "https://ftp.gnu.org/pub/gnu/libiconv/libiconv-${VER_LIBICONV}.tar.gz"
+    tar xf libiconv-${VER_LIBICONV}.tar.gz
 fi
 
 #2.12.6でないといろいろ面倒 -> 2.12.1もだめ, 2.13.0もだめ
-if should_build FONTCONFIG && [ ! -d "fontconfig-2.12.6" ]; then
-    download_archive "fontconfig-2.12.6.tar.gz" \
-        "https://download.videolan.org/contrib/fontconfig/fontconfig-2.12.6.tar.gz" \
-        "https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.12.6.tar.gz"
-    verify_sha256 "fontconfig-2.12.6.tar.gz" "064b9ebf060c9e77011733ac9dc0e2ce92870b574cca2405e11f5353a683c334"
-    tar xf fontconfig-2.12.6.tar.gz
+if should_build FONTCONFIG && [ ! -d "fontconfig-${VER_FONTCONFIG}" ]; then
+    download_archive "fontconfig-${VER_FONTCONFIG}.tar.gz" \
+        "https://download.videolan.org/contrib/fontconfig/fontconfig-${VER_FONTCONFIG}.tar.gz" \
+        "https://www.freedesktop.org/software/fontconfig/release/fontconfig-${VER_FONTCONFIG}.tar.gz"
+    verify_sha256 "fontconfig-${VER_FONTCONFIG}.tar.gz" "${VER_FONTCONFIG_SHA256}"
+    tar xf fontconfig-${VER_FONTCONFIG}.tar.gz
 fi
 
-if should_build FRIBIDI && [ ! -d "fribidi-1.0.16" ]; then
-    download_archive "fribidi-1.0.16.tar.xz" "https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz"
-    tar xf fribidi-1.0.16.tar.xz
+if should_build FRIBIDI && [ ! -d "fribidi-${VER_FRIBIDI}" ]; then
+    download_archive "fribidi-${VER_FRIBIDI}.tar.xz" "https://github.com/fribidi/fribidi/releases/download/v${VER_FRIBIDI}/fribidi-${VER_FRIBIDI}.tar.xz"
+    tar xf fribidi-${VER_FRIBIDI}.tar.xz
 fi
 
 #if [ ! -d "graphite2-1.3.14" ]; then
@@ -676,71 +726,67 @@ fi
 #    tar xf graphite2-1.3.14.tgz
 #fi
 
-if should_build HARFBUZZ && [ ! -d "harfbuzz-11.4.4" ]; then
-    download_archive "harfbuzz-11.4.4.tar.xz" "https://github.com/harfbuzz/harfbuzz/releases/download/11.4.4/harfbuzz-11.4.4.tar.xz"
-    tar xf harfbuzz-11.4.4.tar.xz
+if should_build HARFBUZZ && [ ! -d "harfbuzz-${VER_HARFBUZZ}" ]; then
+    download_archive "harfbuzz-${VER_HARFBUZZ}.tar.xz" "https://github.com/harfbuzz/harfbuzz/releases/download/${VER_HARFBUZZ}/harfbuzz-${VER_HARFBUZZ}.tar.xz"
+    tar xf harfbuzz-${VER_HARFBUZZ}.tar.xz
 fi
 
-if should_build LIBUNIBREAK && [ ! -d "libunibreak-6.1" ]; then
-    download_archive "libunibreak-6.1.tar.gz" "https://github.com/adah1972/libunibreak/releases/download/libunibreak_6_1/libunibreak-6.1.tar.gz"
-    tar xf libunibreak-6.1.tar.gz
+if should_build LIBUNIBREAK && [ ! -d "libunibreak-${VER_LIBUNIBREAK}" ]; then
+    download_archive "libunibreak-${VER_LIBUNIBREAK}.tar.gz" "https://github.com/adah1972/libunibreak/releases/download/libunibreak_${VER_LIBUNIBREAK//./_}/libunibreak-${VER_LIBUNIBREAK}.tar.gz"
+    tar xf libunibreak-${VER_LIBUNIBREAK}.tar.gz
 fi
 
-LIBASS_VERSION="0.17.4"
-if [ $TARGET_ARCH = "x86" ]; then
-    LIBASS_VERSION="0.14.0"
-fi  
-if should_build LIBASS && [ ! -d "libass-${LIBASS_VERSION}" ]; then
-    download_archive "libass-${LIBASS_VERSION}.tar.xz" "https://github.com/libass/libass/releases/download/${LIBASS_VERSION}/libass-${LIBASS_VERSION}.tar.xz"
-    tar xf libass-${LIBASS_VERSION}.tar.xz
+if should_build LIBASS && [ ! -d "libass-${VER_LIBASS}" ]; then
+    download_archive "libass-${VER_LIBASS}.tar.xz" "https://github.com/libass/libass/releases/download/${VER_LIBASS}/libass-${VER_LIBASS}.tar.xz"
+    tar xf libass-${VER_LIBASS}.tar.xz
 fi
 
-if should_build LIBOGG && [ ! -d "libogg-1.3.6" ]; then
-    download_archive "libogg-1.3.6.tar.gz" "https://gitlab.xiph.org/xiph/ogg/-/archive/v1.3.6/libogg-1.3.6.tar.gz"
-    tar xf libogg-1.3.6.tar.gz
-    mv ogg-v1.3.6-* libogg-1.3.6
+if should_build LIBOGG && [ ! -d "libogg-${VER_LIBOGG}" ]; then
+    download_archive "libogg-${VER_LIBOGG}.tar.gz" "https://gitlab.xiph.org/xiph/ogg/-/archive/v${VER_LIBOGG}/libogg-${VER_LIBOGG}.tar.gz"
+    tar xf libogg-${VER_LIBOGG}.tar.gz
+    mv ogg-v${VER_LIBOGG}-* libogg-${VER_LIBOGG}
 fi
 
-if should_build LIBVORBIS && [ ! -d "libvorbis-1.3.7" ]; then
-    download_archive "libvorbis-1.3.7.tar.gz" "https://gitlab.xiph.org/xiph/vorbis/-/archive/v1.3.7/libvorbis-1.3.7.tar.gz"
-    tar xf libvorbis-1.3.7.tar.gz
-    mv vorbis-v1.3.7-* libvorbis-1.3.7
+if should_build LIBVORBIS && [ ! -d "libvorbis-${VER_LIBVORBIS}" ]; then
+    download_archive "libvorbis-${VER_LIBVORBIS}.tar.gz" "https://gitlab.xiph.org/xiph/vorbis/-/archive/v${VER_LIBVORBIS}/libvorbis-${VER_LIBVORBIS}.tar.gz"
+    tar xf libvorbis-${VER_LIBVORBIS}.tar.gz
+    mv vorbis-v${VER_LIBVORBIS}-* libvorbis-${VER_LIBVORBIS}
 fi
 
-if should_build OPUS && [ ! -d "opus-1.6.1" ]; then
-    download_archive "opus-1.6.1.tar.gz" "https://gitlab.xiph.org/xiph/opus/-/archive/v1.6.1/opus-1.6.1.tar.gz"
-    tar xf opus-1.6.1.tar.gz
-    mv opus-v1.6.1-* opus-1.6.1
+if should_build OPUS && [ ! -d "opus-${VER_OPUS}" ]; then
+    download_archive "opus-${VER_OPUS}.tar.gz" "https://gitlab.xiph.org/xiph/opus/-/archive/v${VER_OPUS}/opus-${VER_OPUS}.tar.gz"
+    tar xf opus-${VER_OPUS}.tar.gz
+    mv opus-v${VER_OPUS}-* opus-${VER_OPUS}
 fi
 
-if should_build SPEEX && [ ! -d "speex-1.2.1" ]; then
-    download_archive "speex-1.2.1.tar.gz" "https://github.com/xiph/speex/archive/refs/tags/Speex-1.2.1.tar.gz"
-    tar xf speex-1.2.1.tar.gz
+if should_build SPEEX && [ ! -d "speex-${VER_SPEEX}" ]; then
+    download_archive "speex-${VER_SPEEX}.tar.gz" "https://github.com/xiph/speex/archive/refs/tags/Speex-${VER_SPEEX}.tar.gz"
+    tar xf speex-${VER_SPEEX}.tar.gz
 fi
 
-if should_build LAME && [ ! -d "lame-3.100" ]; then
-    download_archive "lame-3.100.tar.gz" "https://download.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz"
-    tar xf lame-3.100.tar.gz
+if should_build LAME && [ ! -d "lame-${VER_LAME}" ]; then
+    download_archive "lame-${VER_LAME}.tar.gz" "https://download.sourceforge.net/project/lame/lame/${VER_LAME}/lame-${VER_LAME}.tar.gz"
+    tar xf lame-${VER_LAME}.tar.gz
 fi
 
-if should_build TWOLAME && [ ! -d "twolame-0.4.0" ]; then
-    download_archive "twolame-0.4.0.tar.gz" "https://download.sourceforge.net/project/twolame/twolame/0.4.0/twolame-0.4.0.tar.gz"
-    tar xf twolame-0.4.0.tar.gz
+if should_build TWOLAME && [ ! -d "twolame-${VER_TWOLAME}" ]; then
+    download_archive "twolame-${VER_TWOLAME}.tar.gz" "https://download.sourceforge.net/project/twolame/twolame/${VER_TWOLAME}/twolame-${VER_TWOLAME}.tar.gz"
+    tar xf twolame-${VER_TWOLAME}.tar.gz
 fi
 
-if should_build LIBSNDFILE && [ ! -d "libsndfile-1.2.2" ]; then
-    download_archive "libsndfile-1.2.2.tar.xz" "https://github.com/libsndfile/libsndfile/releases/download/1.2.2/libsndfile-1.2.2.tar.xz"
-    tar xf libsndfile-1.2.2.tar.xz
+if should_build LIBSNDFILE && [ ! -d "libsndfile-${VER_LIBSNDFILE}" ]; then
+    download_archive "libsndfile-${VER_LIBSNDFILE}.tar.xz" "https://github.com/libsndfile/libsndfile/releases/download/${VER_LIBSNDFILE}/libsndfile-${VER_LIBSNDFILE}.tar.xz"
+    tar xf libsndfile-${VER_LIBSNDFILE}.tar.xz
 fi
 
-if should_build SOXR && [ ! -d "soxr-0.1.3-Source" ]; then
-    download_archive "soxr-0.1.3-Source.tar.xz" "https://download.sourceforge.net/project/soxr/soxr-0.1.3-Source.tar.xz"
-    tar xf soxr-0.1.3-Source.tar.xz
+if should_build SOXR && [ ! -d "soxr-${VER_SOXR}-Source" ]; then
+    download_archive "soxr-${VER_SOXR}-Source.tar.xz" "https://download.sourceforge.net/project/soxr/soxr-${VER_SOXR}-Source.tar.xz"
+    tar xf soxr-${VER_SOXR}-Source.tar.xz
 fi
 
-if should_build LIBXML2 && [ ! -d "libxml2-2.14.5" ]; then
-    download_archive "libxml2-2.14.5.tar.gz" "https://github.com/GNOME/libxml2/archive/refs/tags/v2.14.5.tar.gz"
-    tar xf libxml2-2.14.5.tar.gz
+if should_build LIBXML2 && [ ! -d "libxml2-${VER_LIBXML2}" ]; then
+    download_archive "libxml2-${VER_LIBXML2}.tar.gz" "https://github.com/GNOME/libxml2/archive/refs/tags/v${VER_LIBXML2}.tar.gz"
+    tar xf libxml2-${VER_LIBXML2}.tar.gz
 fi
 
 #if [ ! -d "apache-ant-1.10.6-src.tar.xz" ]; then
@@ -748,9 +794,9 @@ fi
 #    tar xf apache-ant-1.10.6-src.tar.xz
 #fi
 
-if should_build LIBBLURAY && [ ! -d "libbluray-1.3.4" ]; then
-    download_archive "libbluray-1.3.4.tar.bz2" "https://download.videolan.org/pub/videolan/libbluray/1.3.4/libbluray-1.3.4.tar.bz2"
-    tar xf libbluray-1.3.4.tar.bz2
+if should_build LIBBLURAY && [ ! -d "libbluray-${VER_LIBBLURAY}" ]; then
+    download_archive "libbluray-${VER_LIBBLURAY}.tar.bz2" "https://download.videolan.org/pub/videolan/libbluray/${VER_LIBBLURAY}/libbluray-${VER_LIBBLURAY}.tar.bz2"
+    tar xf libbluray-${VER_LIBBLURAY}.tar.bz2
 fi
 
 if should_build ARIBB24 && [ ! -d "aribb24-master" ]; then
@@ -759,24 +805,24 @@ if should_build ARIBB24 && [ ! -d "aribb24-master" ]; then
     unzip aribb24-master.zip
 fi
 
-if should_build LIBARIBCAPTION && [ ! -d "libaribcaption-1.1.1" ]; then
-    download_archive "libaribcaption-1.1.1.tar.gz" "https://github.com/xqq/libaribcaption/archive/refs/tags/v1.1.1.tar.gz"
-    tar xf libaribcaption-1.1.1.tar.gz
+if should_build LIBARIBCAPTION && [ ! -d "libaribcaption-${VER_LIBARIBCAPTION}" ]; then
+    download_archive "libaribcaption-${VER_LIBARIBCAPTION}.tar.gz" "https://github.com/xqq/libaribcaption/archive/refs/tags/v${VER_LIBARIBCAPTION}.tar.gz"
+    tar xf libaribcaption-${VER_LIBARIBCAPTION}.tar.gz
 fi
 
-if should_build LIBVPL && [ ! -d "libvpl-2.16.0" ]; then
-    download_archive "libvpl-2.16.0.tar.gz" "https://github.com/intel/libvpl/archive/refs/tags/v2.16.0.tar.gz"
-    tar xf libvpl-2.16.0.tar.gz
+if should_build LIBVPL && [ ! -d "libvpl-${VER_LIBVPL}" ]; then
+    download_archive "libvpl-${VER_LIBVPL}.tar.gz" "https://github.com/intel/libvpl/archive/refs/tags/v${VER_LIBVPL}.tar.gz"
+    tar xf libvpl-${VER_LIBVPL}.tar.gz
 fi
 
-if should_build NV_CODEC_HEADERS && [ ! -d "nv-codec-headers-12.2.72.0" ]; then
-    download_archive "nv-codec-headers-12.2.72.0.tar.gz" "https://github.com/FFmpeg/nv-codec-headers/releases/download/n12.2.72.0/nv-codec-headers-12.2.72.0.tar.gz"
-    tar xf nv-codec-headers-12.2.72.0.tar.gz
+if should_build NV_CODEC_HEADERS && [ ! -d "nv-codec-headers-${VER_NV_CODEC_HEADERS}" ]; then
+    download_archive "nv-codec-headers-${VER_NV_CODEC_HEADERS}.tar.gz" "https://github.com/FFmpeg/nv-codec-headers/releases/download/n${VER_NV_CODEC_HEADERS}/nv-codec-headers-${VER_NV_CODEC_HEADERS}.tar.gz"
+    tar xf nv-codec-headers-${VER_NV_CODEC_HEADERS}.tar.gz
 fi
 
-if should_build LIBVPX && [ ! -d "libvpx-1.16.0" ]; then
-    download_archive "libvpx-1.16.0.tar.gz" "https://github.com/webmproject/libvpx/archive/refs/tags/v1.16.0.tar.gz"
-    tar xf libvpx-1.16.0.tar.gz
+if should_build LIBVPX && [ ! -d "libvpx-${VER_LIBVPX}" ]; then
+    download_archive "libvpx-${VER_LIBVPX}.tar.gz" "https://github.com/webmproject/libvpx/archive/refs/tags/v${VER_LIBVPX}.tar.gz"
+    tar xf libvpx-${VER_LIBVPX}.tar.gz
 fi
 
 # if [ ! -d "gperf-3.0.4" ]; then
@@ -799,26 +845,26 @@ fi
     # tar xf gnutls-3.3.19.tar.xz
 # fi
 
-if should_build DAV1D && [ ! -d "dav1d-1.5.3" ]; then
-    download_archive "dav1d-1.5.3.tar.gz" "https://code.videolan.org/videolan/dav1d/-/archive/1.5.3/dav1d-1.5.3.tar.gz"
-    tar xf dav1d-1.5.3.tar.gz
+if should_build DAV1D && [ ! -d "dav1d-${VER_DAV1D}" ]; then
+    download_archive "dav1d-${VER_DAV1D}.tar.gz" "https://code.videolan.org/videolan/dav1d/-/archive/${VER_DAV1D}/dav1d-${VER_DAV1D}.tar.gz"
+    tar xf dav1d-${VER_DAV1D}.tar.gz
 fi
 
-if should_build LIBXXHASH && [ ! -d "libxxhash-0.8.3" ]; then
-    download_archive "libxxhash-0.8.3.tar.gz" "https://github.com/Cyan4973/xxHash/archive/refs/tags/v0.8.3.tar.gz"
-    tar xf libxxhash-0.8.3.tar.gz
-    mv xxHash-0.8.3 libxxhash-0.8.3
+if should_build LIBXXHASH && [ ! -d "libxxhash-${VER_LIBXXHASH}" ]; then
+    download_archive "libxxhash-${VER_LIBXXHASH}.tar.gz" "https://github.com/Cyan4973/xxHash/archive/refs/tags/v${VER_LIBXXHASH}.tar.gz"
+    tar xf libxxhash-${VER_LIBXXHASH}.tar.gz
+    mv xxHash-${VER_LIBXXHASH} libxxhash-${VER_LIBXXHASH}
 fi
 
-if should_build GLSLANG && [ ! -d "glslang-15.4.0" ]; then
-    download_archive "glslang-15.4.0.tar.gz" "https://github.com/KhronosGroup/glslang/archive/refs/tags/15.4.0.tar.gz"
-    tar xf glslang-15.4.0.tar.gz
+if should_build GLSLANG && [ ! -d "glslang-${VER_GLSLANG}" ]; then
+    download_archive "glslang-${VER_GLSLANG}.tar.gz" "https://github.com/KhronosGroup/glslang/archive/refs/tags/${VER_GLSLANG}.tar.gz"
+    tar xf glslang-${VER_GLSLANG}.tar.gz
 fi
 
 if should_build SHADERC; then
     if [ ! -d "shaderc" ]; then
         git clone --depth 1 https://github.com/google/shaderc shaderc
-        cd shaderc && git checkout tags/v2024.1 && "${PYTHON_BIN}" ./utils/git-sync-deps && cd ..
+        cd shaderc && git checkout tags/v${VER_SHADERC} && "${PYTHON_BIN}" ./utils/git-sync-deps && cd ..
     elif [ ! -d "shaderc/third_party/spirv-tools" ] || [ ! -d "shaderc/third_party/spirv-headers" ]; then
         cd shaderc && "${PYTHON_BIN}" ./utils/git-sync-deps && cd ..
     fi
@@ -828,30 +874,30 @@ if should_build SPIRV_CROSS && [ ! -d "SPIRV-Cross" ]; then
     git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Cross.git
 fi
 
-if should_build DOVI_TOOL && [ ! -d "dovi_tool-2.3.1" ]; then
-    download_archive "dovi_tool-2.3.1.tar.gz" "https://github.com/quietvoid/dovi_tool/archive/refs/tags/2.3.1.tar.gz"
-    tar xf dovi_tool-2.3.1.tar.gz
+if should_build DOVI_TOOL && [ ! -d "dovi_tool-${VER_DOVI_TOOL}" ]; then
+    download_archive "dovi_tool-${VER_DOVI_TOOL}.tar.gz" "https://github.com/quietvoid/dovi_tool/archive/refs/tags/${VER_DOVI_TOOL}.tar.gz"
+    tar xf dovi_tool-${VER_DOVI_TOOL}.tar.gz
 fi
 
-if should_build LIBJPEG_TURBO && [ ! -d "libjpeg-turbo-3.1.1" ]; then
-    download_archive "libjpeg-turbo-3.1.1.tar.gz" "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.1.1/libjpeg-turbo-3.1.1.tar.gz"
-    tar xf libjpeg-turbo-3.1.1.tar.gz
+if should_build LIBJPEG_TURBO && [ ! -d "libjpeg-turbo-${VER_LIBJPEG_TURBO}" ]; then
+    download_archive "libjpeg-turbo-${VER_LIBJPEG_TURBO}.tar.gz" "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/${VER_LIBJPEG_TURBO}/libjpeg-turbo-${VER_LIBJPEG_TURBO}.tar.gz"
+    tar xf libjpeg-turbo-${VER_LIBJPEG_TURBO}.tar.gz
 fi
 
-if should_build LCMS2 && [ ! -d "lcms2-2.17" ]; then
-    download_archive "lcms2-2.17.tar.gz" "https://github.com/mm2/Little-CMS/releases/download/lcms2.17/lcms2-2.17.tar.gz"
-    tar xf lcms2-2.17.tar.gz
+if should_build LCMS2 && [ ! -d "lcms2-${VER_LCMS2}" ]; then
+    download_archive "lcms2-${VER_LCMS2}.tar.gz" "https://github.com/mm2/Little-CMS/releases/download/lcms${VER_LCMS2}/lcms2-${VER_LCMS2}.tar.gz"
+    tar xf lcms2-${VER_LCMS2}.tar.gz
 fi
 
-if should_build VULKAN_LOADER && [ ! -d "Vulkan-Loader-1.3.295" ]; then
-    download_archive "Vulkan-Loader-v1.3.295.tar.gz" "https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/v1.3.295.tar.gz"
-    tar xf Vulkan-Loader-v1.3.295.tar.gz
+if should_build VULKAN_LOADER && [ ! -d "Vulkan-Loader-${VER_VULKAN_LOADER}" ]; then
+    download_archive "Vulkan-Loader-v${VER_VULKAN_LOADER}.tar.gz" "https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/v${VER_VULKAN_LOADER}.tar.gz"
+    tar xf Vulkan-Loader-v${VER_VULKAN_LOADER}.tar.gz
 fi
 
-if should_build ZIMG && [ ! -d "zimg-3.0.6" ]; then
-    download_archive "zimg-3.0.6.tar.gz" "https://github.com/sekrit-twc/zimg/archive/refs/tags/release-3.0.6.tar.gz"
-    tar xf zimg-3.0.6.tar.gz
-    mv zimg-release-3.0.6 zimg-3.0.6
+if should_build ZIMG && [ ! -d "zimg-${VER_ZIMG}" ]; then
+    download_archive "zimg-${VER_ZIMG}.tar.gz" "https://github.com/sekrit-twc/zimg/archive/refs/tags/release-${VER_ZIMG}.tar.gz"
+    tar xf zimg-${VER_ZIMG}.tar.gz
+    mv zimg-release-${VER_ZIMG} zimg-${VER_ZIMG}
 fi
 
 # 依存関係は以下の通り
@@ -859,23 +905,23 @@ fi
 # shadercがあればglslangは不要
 if should_build LIBPLACEBO && [ ! -d "libplacebo" ]; then
     git clone --depth 1 --recursive https://code.videolan.org/videolan/libplacebo
-    cd libplacebo && git checkout tags/v7.351.0 && cd ..
+    cd libplacebo && git checkout tags/v${VER_LIBPLACEBO} && cd ..
 fi
 
-if should_build VVENC && [ ! -d "vvenc-1.13.1" ]; then
-    download_archive "vvenc-v1.13.1.tar.gz" "https://github.com/fraunhoferhhi/vvenc/archive/refs/tags/v1.13.1.tar.gz"
-    tar xf vvenc-v1.13.1.tar.gz
+if should_build VVENC && [ ! -d "vvenc-${VER_VVENC}" ]; then
+    download_archive "vvenc-v${VER_VVENC}.tar.gz" "https://github.com/fraunhoferhhi/vvenc/archive/refs/tags/v${VER_VVENC}.tar.gz"
+    tar xf vvenc-v${VER_VVENC}.tar.gz
 fi
 
 if should_build SVT_AV1 && [ ! -d "svt-av1" ]; then
-    download_archive "SVT-AV1-v3.1.0.tar.gz" "https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v3.1.0/SVT-AV1-v3.1.0.tar.gz"
-    tar xf SVT-AV1-v3.1.0.tar.gz
-    mv SVT-AV1-v3.1.0 svt-av1
+    download_archive "SVT-AV1-v${VER_SVT_AV1}.tar.gz" "https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v${VER_SVT_AV1}/SVT-AV1-v${VER_SVT_AV1}.tar.gz"
+    tar xf SVT-AV1-v${VER_SVT_AV1}.tar.gz
+    mv SVT-AV1-v${VER_SVT_AV1} svt-av1
 fi
 
 if should_build XVIDCORE && [ ! -d "xvidcore" ]; then
-    download_archive "xvidcore-1.3.7.tar.gz" "https://downloads.xvid.com/downloads/xvidcore-1.3.7.tar.gz"
-    tar xf xvidcore-1.3.7.tar.gz
+    download_archive "xvidcore-${VER_XVIDCORE}.tar.gz" "https://downloads.xvid.com/downloads/xvidcore-${VER_XVIDCORE}.tar.gz"
+    tar xf xvidcore-${VER_XVIDCORE}.tar.gz
 fi
 if should_build X264 && [ ! -d "x264" ]; then
     git clone --depth 1 https://code.videolan.org/videolan/x264.git
@@ -1079,7 +1125,7 @@ if should_build LIBICONV && [ ! -d "libiconv" ]; then
     start_build "libiconv"
     cd ./libiconv
     if [ "$MINGWDIR" != "" ]; then
-        gzip -dc $PATCHES_DIR/libiconv-1.16-ja-1.patch.gz | patch -p1
+        gzip -dc $PATCHES_DIR/libiconv-${VER_LIBICONV}-ja-1.patch.gz | patch -p1
     fi
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
     CFLAGS="${BUILD_CCFLAGS_SMALL} -std=gnu17" \
@@ -1196,7 +1242,7 @@ fi
 
 cd $BUILD_DIR/$TARGET_ARCH
 if should_build LIBASS && [ ! -d "libass" ]; then
-    find "${SRC_DIR}" -type d -name "libass-${LIBASS_VERSION}" | xargs -i cp -r {} ./libass
+    find "${SRC_DIR}" -type d -name "libass-${VER_LIBASS}" | xargs -i cp -r {} ./libass
     start_build "libass"
     cd ./libass
     autoreconf -fvi
@@ -1212,7 +1258,7 @@ if should_build LIBASS && [ ! -d "libass" ]; then
 fi
 
 if should_build LIBASS_DLL && [ ! -d "libass_dll" ]; then
-    find "${SRC_DIR}" -type d -name "libass-${LIBASS_VERSION}" | xargs -i cp -r {} ./libass_dll
+    find "${SRC_DIR}" -type d -name "libass-${VER_LIBASS}" | xargs -i cp -r {} ./libass_dll
     start_build "libass_dll"
     cd $BUILD_DIR/$TARGET_ARCH/libass_dll
     autoreconf -fvi
@@ -1328,7 +1374,7 @@ if should_build LAME && [ ! -d "lame" ]; then
     start_build "lame"
     cd ./lame
     if [ "$MINGWDIR" != "" ]; then
-        patch -p1 < $PATCHES_DIR/lame-3.100-parse_c.diff
+        patch -p1 < $PATCHES_DIR/lame-${VER_LAME}-parse_c.diff
     fi
     CFLAGS="${BUILD_CCFLAGS}" \
     CPPFLAGS="${BUILD_CCFLAGS}" \
@@ -1363,7 +1409,7 @@ if should_build TWOLAME && [ ! -d "twolame" ]; then
     start_build "twolame"
     cd ./twolame
     if [ "$MINGWDIR" != "" ]; then
-        patch -p1 < $PATCHES_DIR/twolame-0.4.0-mingw.diff
+        patch -p1 < $PATCHES_DIR/twolame-${VER_TWOLAME}-mingw.diff
     fi
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
     CFLAGS="${BUILD_CCFLAGS}" \

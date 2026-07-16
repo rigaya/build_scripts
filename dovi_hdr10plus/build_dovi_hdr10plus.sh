@@ -1,6 +1,11 @@
 #!/bin/bash
-#dovi.lib,hdr10plus-rs.libビルドスクリプト(MSVC向け/MT静的リンク用ライブラリ)
+#MSYS2用ffmpeg dllビルドスクリプト
+# dovi / hdr10plus-rs の DLL は絶対に作らないこと（MSVC /MT 静的リンク用 .lib のみ）
+# 下記インストールでgcc13系を持つmsys2を導入する (updateしてgcc14にしないこと、なぜか動作しないバイナリができる)
+# https://repo.msys2.org/distrib/x86_64/msys2-x86_64-20230526.exe
 #Visual Studioへの環境変数を通して起動する
+#pacman -S base-devel mingw-w64-i686-toolchain mingw-w64-x86_64-toolchain autotools autogen
+#pacman -S p7zip git nasm yasm python unzip
 #libdoviに必要
 # curl -o rustup-init.exe -sSL https://win.rustup.rs/
 # ./rustup-init.exe -y --default-host=x86_64-pc-windows-gnu
@@ -17,7 +22,7 @@ NJOBS=$NUMBER_OF_PROCESSORS
 UPDATE_CARGO=0
 
 
-BUILD_DIR=$HOME/build_dovi
+BUILD_DIR="$(cd "$(dirname "$0")" && pwd)/build_dovi"
 
 mkdir -p $BUILD_DIR
 mkdir -p $BUILD_DIR/src
@@ -47,14 +52,14 @@ if [ $UPDATE_CARGO != 0 ]; then
 fi
 
 #--- ソースのダウンロード ---------------------------------------
-if [ ! -d "dovi_tool-2.3.1" ]; then
-    wget -O dovi_tool-2.3.1.tar.gz https://github.com/quietvoid/dovi_tool/archive/refs/tags/2.3.1.tar.gz
-    tar xf dovi_tool-2.3.1.tar.gz
+if [ ! -d "dovi_tool-2.3.3" ]; then
+    curl -L -o dovi_tool-2.3.3.tar.gz https://github.com/quietvoid/dovi_tool/archive/refs/tags/2.3.3.tar.gz
+    tar xf dovi_tool-2.3.3.tar.gz
 fi
 
-if [ ! -d "hdr10plus_tool-1.7.1" ]; then
-    wget -O hdr10plus_tool-1.7.1.tar.gz https://github.com/quietvoid/hdr10plus_tool/archive/refs/tags/1.7.1.tar.gz
-    tar xf hdr10plus_tool-1.7.1.tar.gz
+if [ ! -d "hdr10plus_tool-1.7.2" ]; then
+    curl -L -o hdr10plus_tool-1.7.2.tar.gz https://github.com/quietvoid/hdr10plus_tool/archive/refs/tags/1.7.2.tar.gz
+    tar xf hdr10plus_tool-1.7.2.tar.gz
 fi
 
 # --- 出力先を準備 --------------------------------------
@@ -76,7 +81,7 @@ rustflags = ["-C", "target-feature=+crt-static"]
 [target.x86_64-pc-windows-msvc]
 rustflags = ["-C", "target-feature=+crt-static"]
 EOF
-    cargo cinstall --target ${FFMPEG_ARCH}-pc-windows-msvc --release --prefix=msvc_${TARGET_ARCH}
+    cargo cinstall --target ${FFMPEG_ARCH}-pc-windows-msvc --release --library-type staticlib --prefix=msvc_${TARGET_ARCH}
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
@@ -93,5 +98,5 @@ rustflags = ["-C", "target-feature=+crt-static"]
 rustflags = ["-C", "target-feature=+crt-static"]
 EOF
     cd ./hdr10plus_tool/hdr10plus
-    cargo cinstall --target ${FFMPEG_ARCH}-pc-windows-msvc --release --prefix=msvc_${TARGET_ARCH}
+    cargo cinstall --target ${FFMPEG_ARCH}-pc-windows-msvc --release --library-type staticlib --prefix=msvc_${TARGET_ARCH}
 fi

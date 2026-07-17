@@ -173,6 +173,7 @@ if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
 fi
 
 INSTALL_DIR=$BUILD_DIR/$TARGET_ARCH/build
+RELEASE_DIR=$BUILD_DIR/$TARGET_ARCH/build_release
 PKG_CONFIG_PATH_FFMPEG=${INSTALL_DIR}/lib/pkgconfig
 FFMPEG_WORK_DIR=$BUILD_DIR/$TARGET_ARCH/ffmpeg
 FFMPEG_TMP_DIR=${FFMPEG_WORK_DIR}/tmp/$TARGET_ARCH
@@ -291,6 +292,9 @@ echo ENABLE_SWSCALE=$ENABLE_SWSCALE
 echo FFMPEG_DIR_NAME=$FFMPEG_DIR_NAME
 echo BUILD_EXE=$BUILD_EXE
 echo ENABLE_LTO=$ENABLE_LTO
+echo INSTALL_DIR=$INSTALL_DIR
+echo RELEASE_DIR=$RELEASE_DIR
+echo FFMPEG_WORK_DIR=$FFMPEG_WORK_DIR
 
 # ============================================================
 # ライブラリごとのビルドフラグ設定
@@ -646,28 +650,15 @@ if [ "$FOR_FFMPEG4" = "TRUE" ]; then
 else
     if [ ! -d "ffmpeg" ]; then
         UPDATE_FFMPEG="TRUE"
+    elif [ $UPDATE_FFMPEG != "FALSE" ]; then
+        rm -rf ffmpeg
     fi
     if [ $UPDATE_FFMPEG != "FALSE" ]; then
-        #if [ ! -d "ffmpeg" ] || [ ! -d "ffmpeg/.git" ]; then
-        #    if [ -d "ffmpeg" ]; then
-        #        rm -rf ffmpeg
-        #    fi
-        #    git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
-        #else
-        #    cd ffmpeg
-        #    make uninstall && make distclean &> /dev/null
-        #    cd ..
-        #fi
-        #cd ffmpeg
-        #git fetch
-        #git reset --hard
-        #git checkout -b build 9d15fe77e33b757c75a4186fa049857462737713
-        #cd ..
-        download_archive "ffmpeg-${VER_FFMPEG}.tar.xz" "https://ffmpeg.org/releases/ffmpeg-${VER_FFMPEG}.tar.xz"
-        tar xf ffmpeg-${VER_FFMPEG}.tar.xz
-        mv ffmpeg-${VER_FFMPEG} ffmpeg
-        #wget https://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2
-        #tar xf ffmpeg-snapshot.tar.bz2
+        git clone --depth 1 --branch release/9.0 --single-branch \
+            https://github.com/FFmpeg/FFmpeg.git ffmpeg
+        #download_archive "ffmpeg-${VER_FFMPEG}.tar.xz" "https://ffmpeg.org/releases/ffmpeg-${VER_FFMPEG}.tar.xz"
+        #tar xf ffmpeg-${VER_FFMPEG}.tar.xz
+        #mv ffmpeg-${VER_FFMPEG} ffmpeg
     fi
 fi
 
@@ -1321,24 +1312,46 @@ if should_build LIBASS_DLL && [ ! -d "libass_dll" ]; then
     # libtool は静的依存のみだと DLL を諦めるため、オブジェクト生成まで make し、DLL は手動リンクする
     make -j$NJOBS || true
     cd libass
+    # libass 0.17+ は noinst の libass_internal.a を生成する。
+    # x86向け 0.14 には無いため、コンパイル済み .o から同等のアーカイブを作る。
+    if [ ! -f .libs/libass_internal.a ]; then
+        LIBASS_OBJS=$(find . -name '*.o' -path '*/.libs/*' 2>/dev/null | sort)
+        if [ -z "${LIBASS_OBJS}" ]; then
+            echo "libass object files were not produced."
+            exit 1
+        fi
+        mkdir -p .libs
+        ar cr .libs/libass_internal.a ${LIBASS_OBJS}
+        ranlib .libs/libass_internal.a
+    fi
     if [ ! -f .libs/libass_internal.a ]; then
         echo "libass_internal.a was not produced."
         exit 1
     fi
+    # harfbuzz/libunibreak は x86 ではビルドしない
+    LIBASS_STATIC_DEPS=""
+    if [ "${BUILD_LIB_HARFBUZZ}" = "TRUE" ]; then
+        LIBASS_STATIC_DEPS="${LIBASS_STATIC_DEPS} -lharfbuzz"
+    fi
+    if [ "${BUILD_LIB_LIBUNIBREAK}" = "TRUE" ]; then
+        LIBASS_STATIC_DEPS="${LIBASS_STATIC_DEPS} -lunibreak"
+    fi
+    LIBASS_STATIC_DEPS="${LIBASS_STATIC_DEPS} -lfribidi -lfontconfig -lexpat -lfreetype -lpng16 -lbz2 -lz -liconv"
     gcc -shared -o .libs/libass-0.dll \
       -Wl,--whole-archive .libs/libass_internal.a -Wl,--no-whole-archive \
       -Wl,--output-def,.libs/libass-0.dll.def \
       -Wl,--enable-auto-image-base \
       -static-libgcc \
       -L${INSTALL_DIR}/lib \
-      -Wl,-Bstatic -lharfbuzz -lunibreak -lfribidi -lfontconfig -lexpat -lfreetype -lpng16 -lbz2 -lz -liconv \
+      -Wl,-Bstatic ${LIBASS_STATIC_DEPS} \
       -Wl,-Bdynamic -lm -lgdi32 -ldwrite
 
     LIBASS_DLL_PATH=.libs/libass-0.dll
     LIBASS_DEF_FILENAME=.libs/libass-0.dll.def
     cp -f "${LIBASS_DEF_FILENAME}" ./libass-0.def
     LIBASS_DEF_FILENAME=libass-0.def
-    sed -i -e "s/ @[^ ]*//" "${LIBASS_DEF_FILENAME}"
+    # ordinal のみ除去 (x86 の stdcall 装飾 @N や @Symbol@N を壊さない)
+    sed -i -e 's/ @[0-9][0-9]*//g' "${LIBASS_DEF_FILENAME}"
     LIBASS_LIB_FILENAME=libass-0.lib
     if [ -n "${MSVC_LIB_EXE:-}" ]; then
         "${MSVC_LIB_EXE}" -machine:$TARGET_ARCH -def:$LIBASS_DEF_FILENAME -out:$LIBASS_LIB_FILENAME
@@ -1635,18 +1648,12 @@ if should_build LIBVPL && [ ! -d "libvpl" ]; then
     start_build "libvpl"
     cd libvpl
     #script/bootstrap
-    cmake -G "${CMAKE_GENERATOR}" -B _build -D CMAKE_INSTALL_LIBDIR=lib -DBUILD_SHARED_LIBS=OFF -DUSE_MSVC_STATIC_RUNTIME=ON -DCMAKE_BUILD_TYPE=Release -DINSTALL_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
+    # MinGW32(32bit)では CMAKE_INSTALL_LIBDIR=lib がソースツリー内の lib/ への絶対パスに
+    # 解決されてしまうため、インストール先を明示する
+    cmake -G "${CMAKE_GENERATOR}" -B _build -D CMAKE_INSTALL_LIBDIR=$INSTALL_DIR/lib -DBUILD_SHARED_LIBS=OFF -DUSE_MSVC_STATIC_RUNTIME=ON -DCMAKE_BUILD_TYPE=Release -DINSTALL_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
     cmake --build _build --config Release
     cmake --install _build --config Release
     LIBVPL_PC_DIR=$INSTALL_DIR/lib/pkgconfig
-    # x86版の場合、$INSTALL_DIR/libに入るべきものが$INSTALL_DIR/lib/x86に入ってしまう
-    # あとから強制的に移動する
-    # vpl.pcのパスも移動に合わせる
-    if [ $TARGET_ARCH = "x86" ]; then
-        cp -r $INSTALL_DIR/lib/x86/* $INSTALL_DIR/lib/
-        rm -rf $INSTALL_DIR/lib/x86
-        sed -i -e 's/${pcfiledir}\/../${pcfiledir}/g' $LIBVPL_PC_DIR/vpl.pc
-    fi
     if [ "$MINGWDIR" = "" ] && [ -f "$LIBSTDCXX_A" ]; then
         sed -i -e "s#^Libs:.*#Libs: -L\${libdir} -lvpl ${LIBSTDCXX_STATIC_FLAGS} -lpthread -ldl#g" $LIBVPL_PC_DIR/vpl.pc
     else
@@ -2609,9 +2616,18 @@ if [ "$FOR_TSREPLACE" = "TRUE" ]; then
 else
     start_build "FFmpeg for Library"
 fi
-FFMPEG_INSTALL_DIR=${FFMPEG_TMP_DIR}
-if [ "$MINGWDIR" = "" ]; then
-    FFMPEG_INSTALL_DIR=$INSTALL_DIR
+# Linux: 従来どおり INSTALL_DIR へ静的ライブラリを install
+# MinGW: RELEASE_DIR へ共有 DLL を install
+FFMPEG_INSTALL_DIR=$INSTALL_DIR
+FFMPEG_LIBRARY_TYPE_FLAGS="--enable-static --disable-shared"
+FFMPEG_EXTRA_LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib"
+if [ "$MINGWDIR" != "" ]; then
+    FFMPEG_INSTALL_DIR=$RELEASE_DIR
+    FFMPEG_LIBRARY_TYPE_FLAGS="--enable-shared --disable-static"
+    # DLL 生成時は完全静的リンク (-static) を外す（-static-libgcc/-static-libstdc++ は残す）
+    FFMPEG_EXTRA_LDFLAGS=$(printf '%s' " ${FFMPEG_EXTRA_LDFLAGS} " | sed -E 's/ -static / /g' | sed -E 's/^ +//;s/ +$//')
+    rm -rf "${FFMPEG_INSTALL_DIR}"
+    mkdir -p "${FFMPEG_INSTALL_DIR}"
 fi
 PKG_CONFIG_PATH=${PKG_CONFIG_PATH_FFMPEG} \
 ./configure \
@@ -2627,7 +2643,7 @@ $GPL_LIBS \
 $ENCODER_LIBS \
 --disable-outdevs \
 --disable-debug \
---enable-static \
+$FFMPEG_LIBRARY_TYPE_FLAGS \
 $FFMPEG_X86_DISABLE_FLAGS \
 --disable-w32threads \
 --disable-dxva2 \
@@ -2637,7 +2653,6 @@ $FFMPEG_TSREPLACE_FLAGS \
 --enable-pthreads \
 --enable-bsfs \
 --enable-swresample \
---disable-shared \
 --disable-decoder=vorbis \
 $FFMPEG_LIBVORBIS_FLAGS \
 $FFMPEG_LIBSPEEX_FLAGS \
@@ -2658,33 +2673,41 @@ ${FFMPEG_NV_CODEC_FLAGS} \
 --pkg-config-flags="--static" \
 $ARIB_LIBS \
 --extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_ARCH_CFLAGS}" \
---extra-ldflags="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib" \
+--extra-ldflags="${FFMPEG_EXTRA_LDFLAGS}" \
 $FFMPEG_EXTRA_LIBS
 fi
 make clean && make -j$NJOBS && make install
 
 if [ "$MINGWDIR" != "" ]; then
-    mkdir -p ${FFMPEG_WORK_DIR}/include
-    mkdir -p ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
-    cp -f -r ${FFMPEG_TMP_DIR}/include/* ${FFMPEG_WORK_DIR}/include
-    if [ -d "${FFMPEG_TMP_DIR}/bin" ]; then
-    cp -f -r ${FFMPEG_TMP_DIR}/bin/*     ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
-    fi
-    cp -f -r ${FFMPEG_TMP_DIR}/lib/*     ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
-    rm -rf   ${FFMPEG_WORK_DIR}/tmp
+    if [ "$BUILD_EXE" = "FALSE" ] && [ "$FOR_AUDENC" = "FALSE" ]; then
+        # ライブラリ(DLL)ビルド: RELEASE_DIR (= FFMPEG_INSTALL_DIR) に成果物を集約
+        mkdir -p ${FFMPEG_INSTALL_DIR}/bin
+        mkdir -p ${FFMPEG_INSTALL_DIR}/lib
+        mkdir -p ${FFMPEG_INSTALL_DIR}/include
 
-    if should_build LIBASS_DLL; then
-        cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.dll ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
-        cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.def ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
-        cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.lib ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
-        cp -f -r $INSTALL_DIR/include/ass ${FFMPEG_WORK_DIR}/include
-    fi
+        if should_build LIBASS_DLL; then
+            cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.dll ${FFMPEG_INSTALL_DIR}/bin
+            cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.def ${FFMPEG_INSTALL_DIR}/lib
+            cp -f -r $BUILD_DIR/$TARGET_ARCH/libass_dll/libass/libass-*.lib ${FFMPEG_INSTALL_DIR}/lib
+            cp -f -r $INSTALL_DIR/include/ass ${FFMPEG_INSTALL_DIR}/include
+        fi
 
-    if should_build LIBPLACEBO_DLL; then
-        cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.dll ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
-        cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.def ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
-        cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.lib ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
-        cp -f -r $INSTALL_DIR/include/libplacebo ${FFMPEG_WORK_DIR}/include
+        if should_build LIBPLACEBO_DLL; then
+            cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.dll ${FFMPEG_INSTALL_DIR}/bin
+            cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.def ${FFMPEG_INSTALL_DIR}/lib
+            cp -f -r $BUILD_DIR/$TARGET_ARCH/libplacebo_dll/build/src/libplacebo-*.lib ${FFMPEG_INSTALL_DIR}/lib
+            cp -f -r $INSTALL_DIR/include/libplacebo ${FFMPEG_INSTALL_DIR}/include
+        fi
+    else
+        # audenc/exe: 従来どおり FFMPEG_TMP_DIR から FFMPEG_WORK_DIR へ配置
+        mkdir -p ${FFMPEG_WORK_DIR}/include
+        mkdir -p ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
+        cp -f -r ${FFMPEG_TMP_DIR}/include/* ${FFMPEG_WORK_DIR}/include
+        if [ -d "${FFMPEG_TMP_DIR}/bin" ]; then
+            cp -f -r ${FFMPEG_TMP_DIR}/bin/*     ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
+        fi
+        cp -f -r ${FFMPEG_TMP_DIR}/lib/*     ${FFMPEG_WORK_DIR}/lib/$VC_ARCH
+        rm -rf   ${FFMPEG_WORK_DIR}/tmp
     fi
 fi
 

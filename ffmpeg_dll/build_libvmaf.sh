@@ -463,13 +463,32 @@ apply_cuda_diagnostic_patches() {
 
     local helper_file="${LIBVMAF_DIR}/src/cuda/cuda_helper.cuh"
     [ -f "${helper_file}" ] || die "libvmafのCUDAヘルパーが見つかりません: ${helper_file}"
-    if grep -q 'libvmaf CUDA error:' "${helper_file}"; then
+    if grep -q 'libvmaf CUDA error: %s at %s:%d' "${helper_file}"; then
         return 0
     fi
 
     log "libvmaf CUDAエラーの診断出力を強化します。"
     (
         cd "${LIBVMAF_DIR}"
+        if grep -q 'libvmaf CUDA error:' src/cuda/cuda_helper.cuh; then
+            patch --batch --forward -p1 <<'PATCH'
+diff --git a/src/cuda/cuda_helper.cuh b/src/cuda/cuda_helper.cuh
+--- a/src/cuda/cuda_helper.cuh
++++ b/src/cuda/cuda_helper.cuh
+@@ -41,8 +41,8 @@
+         if (CUDA_SUCCESS != cu_err) {                                           \
+             const char *err_txt;                                                \
+             funcs->cuGetErrorName(cu_err, &err_txt);                            \
+-            fprintf(stderr, "libvmaf CUDA error: code: %d; description: %s\n",  \
+-                    (int)cu_err, err_txt);                                      \
++            fprintf(stderr, "libvmaf CUDA error: %s at %s:%d: code: %d; description: %s\n", \
++                    #CALL, __FILE__, __LINE__, (int)cu_err, err_txt);           \
+             fflush(stderr);                                                     \
+             assert(0);                                                          \
+         }                                                                       \
+PATCH
+            return 0
+        fi
         patch --batch --forward -p1 <<'PATCH'
 diff --git a/src/cuda/cuda_helper.cuh b/src/cuda/cuda_helper.cuh
 --- a/src/cuda/cuda_helper.cuh
@@ -479,8 +498,8 @@ diff --git a/src/cuda/cuda_helper.cuh b/src/cuda/cuda_helper.cuh
              const char *err_txt;                                                \
              funcs->cuGetErrorName(cu_err, &err_txt);                            \
 -            printf("code: %d; description: %s\n", (int)cu_err, err_txt);        \
-+            fprintf(stderr, "libvmaf CUDA error: code: %d; description: %s\n",  \
-+                    (int)cu_err, err_txt);                                      \
++            fprintf(stderr, "libvmaf CUDA error: %s at %s:%d: code: %d; description: %s\n", \
++                    #CALL, __FILE__, __LINE__, (int)cu_err, err_txt);           \
 +            fflush(stderr);                                                     \
              assert(0);                                                          \
          }                                                                       \

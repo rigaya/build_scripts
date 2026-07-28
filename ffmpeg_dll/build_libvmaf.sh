@@ -458,6 +458,37 @@ PATCH
     )
 }
 
+apply_cuda_diagnostic_patches() {
+    [ "${ENABLE_CUDA}" = "TRUE" ] || return 0
+
+    local helper_file="${LIBVMAF_DIR}/src/cuda/cuda_helper.cuh"
+    [ -f "${helper_file}" ] || die "libvmafのCUDAヘルパーが見つかりません: ${helper_file}"
+    if grep -q 'libvmaf CUDA error:' "${helper_file}"; then
+        return 0
+    fi
+
+    log "libvmaf CUDAエラーの診断出力を強化します。"
+    (
+        cd "${LIBVMAF_DIR}"
+        patch --batch --forward -p1 <<'PATCH'
+diff --git a/src/cuda/cuda_helper.cuh b/src/cuda/cuda_helper.cuh
+--- a/src/cuda/cuda_helper.cuh
++++ b/src/cuda/cuda_helper.cuh
+@@ -41,7 +41,9 @@
+         if (CUDA_SUCCESS != cu_err) {                                           \
+             const char *err_txt;                                                \
+             funcs->cuGetErrorName(cu_err, &err_txt);                            \
+-            printf("code: %d; description: %s\n", (int)cu_err, err_txt);        \
++            fprintf(stderr, "libvmaf CUDA error: code: %d; description: %s\n",  \
++                    (int)cu_err, err_txt);                                      \
++            fflush(stderr);                                                     \
+             assert(0);                                                          \
+         }                                                                       \
+     } while (0)
+PATCH
+    )
+}
+
 maybe_archive_sources() {
     if [ "${SKIP_SRC_ARCHIVE}" = "TRUE" ]; then
         return 0
@@ -641,6 +672,7 @@ copy_vmaf_source "${VMAF_COPY_DIR}"
 prepare_nv_codec_headers
 apply_windows_cuda_patches
 apply_cuda_arch_patches
+apply_cuda_diagnostic_patches
 write_windows_cuda_native_file
 setup_build_flags
 build_libvmaf

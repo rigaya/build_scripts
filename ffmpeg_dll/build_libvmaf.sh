@@ -378,6 +378,86 @@ apply_windows_cuda_patches() {
     fi
 }
 
+apply_cuda_arch_patches() {
+    [ "${ENABLE_CUDA}" = "TRUE" ] || return 0
+
+    local meson_file="${LIBVMAF_DIR}/src/meson.build"
+    [ -f "${meson_file}" ] || die "libvmafのMeson定義が見つかりません: ${meson_file}"
+    if grep -q "compute_89,code=\[compute_89,sm_89\]" "${meson_file}"; then
+        return 0
+    fi
+
+    log "CUDA 11.8向けにlibvmafのfatbin生成対象を拡張します。"
+    (
+        cd "${LIBVMAF_DIR}"
+        patch --batch --forward -p1 <<'PATCH'
+diff --git a/src/meson.build b/src/meson.build
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -367,27 +367,37 @@ if is_cuda_enabled
+         cuda_compiler = meson.get_compiler('cuda')
+         nvcc_exe = find_program('nvcc')
+ 
+-        gencode = [
+-            '--fatbin',
+-            '-gencode=arch=compute_75,code=sm_75',
+-            '-gencode=arch=compute_80,code=sm_80',
+-        ]
++        gencode = [ '--fatbin' ]
+         message('Found CUDA version = @0@'.format(cuda_compiler.version()))
+-        if cuda_compiler.version().version_compare('<13')
+-            gencode += '-gencode=arch=compute_50,code=compute_50'
+-        endif
+-        # always compile device code to enable quick startup on newer GPUs, for the last supported GPU also generate PTX for future compatibility
+-        if cuda_compiler.version().version_compare('>11.8')
+-            gencode += '-gencode=arch=compute_90,code=sm_90'
+-            if cuda_compiler.version().version_compare('>12.8')
+-                gencode += [
+-                    '-gencode=arch=compute_100,code=sm_100',
+-                    '-gencode=arch=compute_120,code=sm_120',
+-                    '-gencode=arch=compute_120,code=compute_120'
+-                ]
++        if cuda_compiler.version().version_compare('>=11.8') and cuda_compiler.version().version_compare('<12')
++            gencode += [
++                '-gencode=arch=compute_50,code=[compute_50,sm_50]',
++                '-gencode=arch=compute_61,code=[compute_61,sm_61]',
++                '-gencode=arch=compute_75,code=[compute_75,sm_75]',
++                '-gencode=arch=compute_86,code=[compute_86,sm_86]',
++                '-gencode=arch=compute_89,code=[compute_89,sm_89]',
++            ]
++        else
++            gencode += [
++                '-gencode=arch=compute_75,code=sm_75',
++                '-gencode=arch=compute_80,code=sm_80',
++            ]
++            if cuda_compiler.version().version_compare('<13')
++                gencode += '-gencode=arch=compute_50,code=compute_50'
++            endif
++            # always compile device code to enable quick startup on newer GPUs, for the last supported GPU also generate PTX for future compatibility
++            if cuda_compiler.version().version_compare('>11.8')
++                gencode += '-gencode=arch=compute_90,code=sm_90'
++                if cuda_compiler.version().version_compare('>12.8')
++                    gencode += [
++                        '-gencode=arch=compute_100,code=sm_100',
++                        '-gencode=arch=compute_120,code=sm_120',
++                        '-gencode=arch=compute_120,code=compute_120'
++                    ]
++                else
++                    gencode += '-gencode=arch=compute_90,code=compute_90'
++                endif
+             else
+-                gencode += '-gencode=arch=compute_90,code=compute_90'
++                gencode += '-gencode=arch=compute_80,code=compute_80'
+             endif
+-        else
+-            gencode += '-gencode=arch=compute_80,code=compute_80'
+         endif
+ 
+     else
+PATCH
+    )
+}
+
 maybe_archive_sources() {
     if [ "${SKIP_SRC_ARCHIVE}" = "TRUE" ]; then
         return 0
@@ -560,6 +640,7 @@ mkdir -p "${BUILD_DIR}/${TARGET_ARCH}"
 copy_vmaf_source "${VMAF_COPY_DIR}"
 prepare_nv_codec_headers
 apply_windows_cuda_patches
+apply_cuda_arch_patches
 write_windows_cuda_native_file
 setup_build_flags
 build_libvmaf

@@ -508,6 +508,35 @@ PATCH
     )
 }
 
+apply_cuda_correctness_patches() {
+    [ "${ENABLE_CUDA}" = "TRUE" ] || return 0
+
+    local motion_file="${LIBVMAF_DIR}/src/feature/cuda/integer_motion/motion_score.cu"
+    [ -f "${motion_file}" ] || die "libvmafのCUDA motion実装が見つかりません: ${motion_file}"
+    if grep -q 'src_stride / sizeof(uint16_t)' "${motion_file}"; then
+        return 0
+    fi
+
+    log "libvmaf CUDA motionの10bit以上でのstride計算を修正します。"
+    (
+        cd "${LIBVMAF_DIR}"
+        patch --batch --forward -p1 <<'PATCH'
+diff --git a/src/feature/cuda/integer_motion/motion_score.cu b/src/feature/cuda/integer_motion/motion_score.cu
+--- a/src/feature/cuda/integer_motion/motion_score.cu
++++ b/src/feature/cuda/integer_motion/motion_score.cu
+@@ -90,7 +90,7 @@ __global__ void calculate_motion_score_kernel_16bpc(const VmafPicture src, VmafC
+             uint32_t blurred_y = 0u;
+ #pragma unroll
+             for (int yf=0; yf < filter_width_d; ++yf) {
+-                blurred_y += filter_d[yf] * (reinterpret_cast<const uint16_t*>(src.data[0]) + mirror(y-radius+yf, height) * src.stride[0])[mirror(x-radius+xf, width)];
++                blurred_y += filter_d[yf] * (reinterpret_cast<const uint16_t*>(src.data[0]) + mirror(y-radius+yf, height) * (src_stride / sizeof(uint16_t)))[mirror(x-radius+xf, width)];
+             }
+             blurred += filter_d[xf]*((blurred_y + add_before_shift_y) >> shift_var_y);
+         }
+PATCH
+    )
+}
+
 maybe_archive_sources() {
     if [ "${SKIP_SRC_ARCHIVE}" = "TRUE" ]; then
         return 0
@@ -691,6 +720,7 @@ copy_vmaf_source "${VMAF_COPY_DIR}"
 prepare_nv_codec_headers
 apply_windows_cuda_patches
 apply_cuda_arch_patches
+apply_cuda_correctness_patches
 apply_cuda_diagnostic_patches
 write_windows_cuda_native_file
 setup_build_flags

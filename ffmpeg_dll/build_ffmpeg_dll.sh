@@ -1759,11 +1759,12 @@ if should_build GLSLANG; then
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
-if should_build LIBJPEG_TURBO && [ ! -d "libjpeg-turbo" ]; then
-    find "${SRC_DIR}" -type d -name "libjpeg-*" | xargs -i cp -r {} ./libjpeg-turbo
+if should_build LIBJPEG_TURBO && [ ! -f "libjpeg-turbo/CMakeLists.txt" ]; then
+    mkdir -p ./libjpeg-turbo
+    cp -r "${SRC_DIR}/libjpeg-turbo-${VER_LIBJPEG_TURBO}/." ./libjpeg-turbo/
     start_build "libjpeg-turbo"
     cd ./libjpeg-turbo
-    mkdir build && cd build
+    mkdir -p build && cd build
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
     CFLAGS="${BUILD_CCFLAGS}" \
     CPPFLAGS="${BUILD_CCFLAGS}" \

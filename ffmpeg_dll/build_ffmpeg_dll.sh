@@ -1274,6 +1274,7 @@ if should_build LIBUNIBREAK; then
         find "${SRC_DIR}" -type d -name "libunibreak-*" | xargs -i cp -r {} ./libunibreak
         start_build "libunibreak"
         cd ./libunibreak
+        autoreconf -fvi
         CFLAGS="${BUILD_CCFLAGS_SMALL}" \
         CPPFLAGS="${BUILD_CCFLAGS_SMALL}" \
         LDFLAGS="${BUILD_LDFLAGS}" \

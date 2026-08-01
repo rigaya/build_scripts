@@ -1876,6 +1876,7 @@ if should_build VULKAN_LOADER && [ ! -d "Vulkan-Loader" ]; then
     make -j$NJOBS && make install
     if [ "$MINGWDIR" = "" ]; then
         # 静的リンク用途では libvulkan.a を優先させるため共有ライブラリを除去
+        test -f "${INSTALL_DIR}/lib/libvulkan.a"
         rm -f ${INSTALL_DIR}/lib/libvulkan.so*
     fi
 fi

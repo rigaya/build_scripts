@@ -43,11 +43,16 @@
 +    #    endif()
 +    #endif()
  
-     if(MSVC AND ENABLE_WIN10_ONECORE)
-         target_link_libraries(vulkan PRIVATE OneCoreUAP.lib LIBCMT.LIB LIBCMTD.LIB LIBVCRUNTIME.LIB LIBUCRT.LIB)
+    if(MSVC AND ENABLE_WIN10_ONECORE)
+        target_link_libraries(vulkan PRIVATE OneCoreUAP.lib LIBCMT.LIB LIBCMTD.LIB LIBVCRUNTIME.LIB LIBUCRT.LIB)
+@@ -426,3 +426,3 @@
+    else()
+-        add_library(vulkan SHARED)
++        add_library(vulkan STATIC)
+    endif()
 @@ -524,7 +524,7 @@
  endif()
- 
+
  # common attributes of the vulkan library
 -target_link_libraries(vulkan PRIVATE loader_specific_options)
 +target_link_libraries(vulkan PRIVATE $<BUILD_INTERFACE:loader_specific_options>)

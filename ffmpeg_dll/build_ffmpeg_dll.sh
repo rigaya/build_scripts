@@ -592,7 +592,7 @@ done
 
 #--- ライブラリバージョン (更新時はここを変更) -----------------
 # git clone で最新取得するもの (aribb24 / SPIRV-Cross / x264 / x265) は含めない
-VER_FFMPEG="8.1.2"
+VER_FFMPEG="9.0"
 VER_FFMPEG4="4.4.8"
 VER_ZLIB="1.3.2"
 VER_LIBPNG="1.6.58"
@@ -1759,12 +1759,11 @@ if should_build GLSLANG; then
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
-if should_build LIBJPEG_TURBO && [ ! -f "libjpeg-turbo/CMakeLists.txt" ]; then
-    mkdir -p ./libjpeg-turbo
-    cp -r "${SRC_DIR}/libjpeg-turbo-${VER_LIBJPEG_TURBO}/." ./libjpeg-turbo/
+if should_build LIBJPEG_TURBO && [ ! -d "libjpeg-turbo" ]; then
+    find "${SRC_DIR}" -type d -name "libjpeg-*" | xargs -i cp -r {} ./libjpeg-turbo
     start_build "libjpeg-turbo"
     cd ./libjpeg-turbo
-    mkdir -p build && cd build
+    mkdir build && cd build
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
     CFLAGS="${BUILD_CCFLAGS}" \
     CPPFLAGS="${BUILD_CCFLAGS}" \

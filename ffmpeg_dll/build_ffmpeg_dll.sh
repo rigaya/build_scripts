@@ -28,7 +28,14 @@
 # cargo install cargo-c
 # Vulkan
 # pacman -S mingw-w64-i686-uasm mingw-w64-x86_64-uasm
-NJOBS=$NUMBER_OF_PROCESSORS
+if [ -n "${NUMBER_OF_PROCESSORS:-}" ]; then
+    NJOBS=$NUMBER_OF_PROCESSORS
+elif command -v nproc >/dev/null 2>&1; then
+    # Linux/WSL2ではWindows由来のNUMBER_OF_PROCESSORSが設定されないことがある。
+    NJOBS=$(nproc)
+else
+    NJOBS=1
+fi
 WORK_DIR=`pwd`
 PATCHES_DIR=${WORK_DIR}/patches
 YUVFILE=${WORK_DIR}/test.yuv
@@ -1461,7 +1468,7 @@ if should_build LAME && [ ! -d "lame" ]; then
      --enable-static \
      --disable-decoder \
      --disable-frontend
-    make install -j$NJOBS
+    make -j$NJOBS && make install
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
@@ -1696,7 +1703,10 @@ if should_build LIBVPX && [ ! -d "libvpx" ]; then
      --disable-unit-tests \
      --enable-vp9-highbitdepth \
      --enable-runtime-cpu-detect
-    make install -j$NJOBS
+    # libvpxのinstallはビルド成果物とヘッダを独立した依存関係として扱うため、
+    # ビルドとインストールを同じ並列makeで実行するとヘッダのコピーが競合する。
+    make -j$NJOBS
+    make install
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
@@ -1774,11 +1784,12 @@ if should_build GLSLANG; then
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
-if should_build LIBJPEG_TURBO && [ ! -d "libjpeg-turbo" ]; then
-    find "${SRC_DIR}" -type d -name "libjpeg-*" | xargs -i cp -r {} ./libjpeg-turbo
+if should_build LIBJPEG_TURBO && [ ! -f "libjpeg-turbo/CMakeLists.txt" ]; then
+    mkdir -p ./libjpeg-turbo
+    cp -r "${SRC_DIR}/libjpeg-turbo-${VER_LIBJPEG_TURBO}/." ./libjpeg-turbo/
     start_build "libjpeg-turbo"
     cd ./libjpeg-turbo
-    mkdir build && cd build
+    mkdir -p build && cd build
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
     CFLAGS="${BUILD_CCFLAGS}" \
     CPPFLAGS="${BUILD_CCFLAGS}" \
@@ -2163,7 +2174,7 @@ if should_build XVIDCORE; then
         CPPFLAGS=${BUILD_CCFLAGS} \
         LDFLAGS=${BUILD_LDFLAGS} \
         ./configure --prefix=$INSTALL_DIR
-        make -j${NUMBER_OF_PROCESSORS}
+        make -j${NJOBS}
         cp ../../src/xvid.h $INSTALL_DIR/include/
         cp '=build/xvidcore.a' $INSTALL_DIR/lib/libxvidcore.a
     fi
@@ -2266,7 +2277,7 @@ if should_build SVT_AV1; then
                 -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_GEN_CC} ${PROFILE_SVTAV1}" \
                 -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_GEN_LD} ${PROFILE_SVTAV1}" \
                 ../..
-            make -j${NUMBER_OF_PROCESSORS}
+            make -j${NJOBS}
 
             SVTAV1_ENC_APP="../../Bin/Release/SvtAv1EncApp"
             if [ -x "${SVTAV1_ENC_APP}.exe" ]; then
@@ -2306,7 +2317,7 @@ if should_build SVT_AV1; then
                 -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS} ${PROFILE_USE_CC} ${PROFILE_SVTAV1}" \
                 -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS} ${PROFILE_USE_LD} ${PROFILE_SVTAV1}" \
                 ../..
-            make -j${NUMBER_OF_PROCESSORS} && make install
+            make -j${NJOBS} && make install
         else
             cmake -G "${CMAKE_GENERATOR}" \
                 -DCMAKE_BUILD_TYPE=Release \
@@ -2321,7 +2332,7 @@ if should_build SVT_AV1; then
                 -DCMAKE_CXX_FLAGS="${BUILD_CCFLAGS}" \
                 -DCMAKE_EXE_LINKER_FLAGS="${BUILD_LDFLAGS}" \
                 ../..
-            make -j${NUMBER_OF_PROCESSORS} && make install
+            make -j${NJOBS} && make install
         fi
     fi
 fi

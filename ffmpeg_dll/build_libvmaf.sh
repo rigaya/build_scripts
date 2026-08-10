@@ -59,14 +59,16 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-WORK_DIR="${SCRIPT_DIR}"
-SRC_DIR="${WORK_DIR}/src"
-BUILD_DIR="${WORK_DIR}"
+# WORK_DIR / SRC_DIR / BUILD_DIR は呼び出し元から上書き可能
+# (build_ffmpeg_dll.sh の exe ビルドなど、別プレフィックスへインストールするため)
+WORK_DIR="${WORK_DIR:-${SCRIPT_DIR}}"
+SRC_DIR="${SRC_DIR:-${WORK_DIR}/src}"
+BUILD_DIR="${BUILD_DIR:-${WORK_DIR}}"
 VMAF_VERSION="${VMAF_VERSION:-3.2.0}"
 VMAF_ARCHIVE="v${VMAF_VERSION}.tar.gz"
 VMAF_URL="https://github.com/Netflix/vmaf/archive/refs/tags/${VMAF_ARCHIVE}"
 VMAF_SRC_STAMP_DIR="vmaf-${VMAF_VERSION}"
-LOCAL_VMAF_SRC="${REPO_ROOT}/vmaf"
+LOCAL_VMAF_SRC="${LOCAL_VMAF_SRC:-${REPO_ROOT}/vmaf}"
 NV_CODEC_HEADERS_REPO="${NV_CODEC_HEADERS_REPO:-https://github.com/FFmpeg/nv-codec-headers.git}"
 NV_CODEC_HEADERS_REF="${NV_CODEC_HEADERS_REF:-master}"
 NV_CODEC_HEADERS_DIR="${NV_CODEC_HEADERS_DIR:-${WORK_DIR}/nv-codec-headers}"
@@ -79,6 +81,8 @@ EMBED_MINGW_RUNTIME="${EMBED_MINGW_RUNTIME:-1}"
 VCVARS_BAT="${VCVARS_BAT:-/c/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/Build/vcvars64.bat}"
 CUDA_PATH="${CUDA_PATH:-}"
 NVCC_PREPEND_FLAGS="${NVCC_PREPEND_FLAGS:--allow-unsupported-compiler -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH}"
+# 1=静的リンク向けに libvmaf.pc へ -lstdc++ を追加する
+PATCH_PC_LIBSTDCXX="${PATCH_PC_LIBSTDCXX:-1}"
 
 mkdir -p "${BUILD_DIR}"
 mkdir -p "${SRC_DIR}"
@@ -680,6 +684,21 @@ cleanup_non_target_libraries() {
     fi
 }
 
+patch_libvmaf_pc_libstdcxx() {
+    [ "${PATCH_PC_LIBSTDCXX}" = "1" ] || return 0
+    local pc="${PKG_CONFIG_DIR}/libvmaf.pc"
+    [ -f "${pc}" ] || return 0
+    if grep -q -- '-lstdc++' "${pc}"; then
+        return 0
+    fi
+    if grep -q '^Libs\.private:' "${pc}"; then
+        sed -i -E 's/^(Libs\.private:.*)$/\1 -lstdc++/' "${pc}"
+    else
+        printf '\nLibs.private: -lstdc++\n' >> "${pc}"
+    fi
+    log "patched ${pc}: added -lstdc++ for static link"
+}
+
 print_results() {
     log "TARGET_ARCH=${TARGET_ARCH}"
     log "BUILD_MODE=${BUILD_MODE}"
@@ -727,5 +746,6 @@ setup_build_flags
 build_libvmaf
 create_windows_import_lib
 cleanup_non_target_libraries
+patch_libvmaf_pc_libstdcxx
 maybe_archive_sources
 print_results

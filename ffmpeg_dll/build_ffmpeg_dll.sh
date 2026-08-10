@@ -974,6 +974,12 @@ if [ "$ENABLE_V4L2_MULTIPLANAR" = "TRUE" ]; then
     echo "Patch v4l2_multiplanar.patch..."
     patch -p1 < $PATCHES_DIR/v4l2_multiplanar.patch
 fi
+
+if [ "${BUILD_LIB_LIBVMAF}" = "TRUE" ]; then
+    cd "$FFMPEG_WORK_DIR"
+    echo "Patch ffmpeg_libvmaf_cuda_yuv420p10le.diff..."
+    patch -p1 < "$PATCHES_DIR/ffmpeg_libvmaf_cuda_yuv420p10le.diff"
+fi
   
   #$BUILD_DIR/src/soxr* $BUILD_DIR/src/nettle* $BUILD_DIR/src/gnutls*
 

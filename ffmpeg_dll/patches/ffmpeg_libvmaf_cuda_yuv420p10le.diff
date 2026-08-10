@@ -1,0 +1,11 @@
+diff --git a/libavfilter/vf_libvmaf.c b/libavfilter/vf_libvmaf.c
+--- a/libavfilter/vf_libvmaf.c
++++ b/libavfilter/vf_libvmaf.c
+@@ -634,6 +634,7 @@
+ #if CONFIG_LIBVMAF_CUDA_FILTER
+ static const enum AVPixelFormat supported_formats[] = {
+     AV_PIX_FMT_YUV420P,
++    AV_PIX_FMT_YUV420P10LE,
+     AV_PIX_FMT_YUV444P16,
+ };
+ 

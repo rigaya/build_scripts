@@ -463,6 +463,7 @@ BUILD_LIB_SVT_AV1="FALSE"
 BUILD_LIB_XVIDCORE="FALSE"
 BUILD_LIB_X264="FALSE"
 BUILD_LIB_X265="FALSE"
+BUILD_LIB_LIBVMAF="FALSE"
 
 # --- tsreplace向け最小構成 ---
 if [ "$FOR_TSREPLACE" = "TRUE" ]; then
@@ -568,6 +569,12 @@ if [ "$FOR_AUDENC" != "TRUE" ] && [ "$FOR_TSREPLACE" != "TRUE" ]; then
         BUILD_LIB_X264="TRUE"
         BUILD_LIB_X265="TRUE"
     fi
+
+    # exe向け: CUDA対応libvmaf (build_libvmaf.sh 相当)
+    # audencは音声専用のため不要。x64ではCUDA必須、それ以外はCPU版。
+    if [ "$BUILD_EXE" = "TRUE" ] && [ "$FOR_AUDENC" != "TRUE" ]; then
+        BUILD_LIB_LIBVMAF="TRUE"
+    fi
 fi
 
 # Linux静的リンク用途では、DLL専用ターゲットのみ無効化する
@@ -584,7 +591,7 @@ fi
 
 # --- ビルドフラグの表示 ---
 echo "--- Library build flags (TRUE only) ---"
-for flag in BUILD_LIB_ZLIB BUILD_LIB_BZIP2 BUILD_LIB_LZMA BUILD_LIB_LIBPNG BUILD_LIB_EXPAT BUILD_LIB_FREETYPE BUILD_LIB_LIBICONV BUILD_LIB_FONTCONFIG BUILD_LIB_FRIBIDI BUILD_LIB_HARFBUZZ BUILD_LIB_LIBUNIBREAK BUILD_LIB_LIBASS BUILD_LIB_LIBASS_DLL BUILD_LIB_OPUS BUILD_LIB_LIBOGG BUILD_LIB_LIBVORBIS BUILD_LIB_SPEEX BUILD_LIB_LAME BUILD_LIB_LIBSNDFILE BUILD_LIB_TWOLAME BUILD_LIB_SOXR BUILD_LIB_LIBXML2 BUILD_LIB_LIBBLURAY BUILD_LIB_ARIBB24 BUILD_LIB_LIBARIBCAPTION BUILD_LIB_DAV1D BUILD_LIB_LIBVPL BUILD_LIB_LIBVPX BUILD_LIB_NV_CODEC_HEADERS BUILD_LIB_LIBXXHASH BUILD_LIB_DOVI_TOOL BUILD_LIB_GLSLANG BUILD_LIB_LIBJPEG_TURBO BUILD_LIB_LCMS2 BUILD_LIB_SHADERC BUILD_LIB_SPIRV_CROSS BUILD_LIB_VULKAN_LOADER BUILD_LIB_LIBPLACEBO BUILD_LIB_LIBPLACEBO_DLL BUILD_LIB_ZIMG BUILD_LIB_VVENC BUILD_LIB_SVT_AV1 BUILD_LIB_XVIDCORE BUILD_LIB_X264 BUILD_LIB_X265; do
+for flag in BUILD_LIB_ZLIB BUILD_LIB_BZIP2 BUILD_LIB_LZMA BUILD_LIB_LIBPNG BUILD_LIB_EXPAT BUILD_LIB_FREETYPE BUILD_LIB_LIBICONV BUILD_LIB_FONTCONFIG BUILD_LIB_FRIBIDI BUILD_LIB_HARFBUZZ BUILD_LIB_LIBUNIBREAK BUILD_LIB_LIBASS BUILD_LIB_LIBASS_DLL BUILD_LIB_OPUS BUILD_LIB_LIBOGG BUILD_LIB_LIBVORBIS BUILD_LIB_SPEEX BUILD_LIB_LAME BUILD_LIB_LIBSNDFILE BUILD_LIB_TWOLAME BUILD_LIB_SOXR BUILD_LIB_LIBXML2 BUILD_LIB_LIBBLURAY BUILD_LIB_ARIBB24 BUILD_LIB_LIBARIBCAPTION BUILD_LIB_DAV1D BUILD_LIB_LIBVPL BUILD_LIB_LIBVPX BUILD_LIB_NV_CODEC_HEADERS BUILD_LIB_LIBXXHASH BUILD_LIB_DOVI_TOOL BUILD_LIB_GLSLANG BUILD_LIB_LIBJPEG_TURBO BUILD_LIB_LCMS2 BUILD_LIB_SHADERC BUILD_LIB_SPIRV_CROSS BUILD_LIB_VULKAN_LOADER BUILD_LIB_LIBPLACEBO BUILD_LIB_LIBPLACEBO_DLL BUILD_LIB_ZIMG BUILD_LIB_VVENC BUILD_LIB_SVT_AV1 BUILD_LIB_XVIDCORE BUILD_LIB_X264 BUILD_LIB_X265 BUILD_LIB_LIBVMAF; do
     if [ "${!flag}" = "TRUE" ]; then
         echo "  $flag"
     fi
@@ -635,6 +642,7 @@ VER_LIBPLACEBO="7.360.1"
 VER_VVENC="1.14.0"
 VER_SVT_AV1="4.1.0"
 VER_XVIDCORE="1.3.7"
+VER_VMAF="3.2.0"
 
 if [ "$TARGET_ARCH" = "x86" ]; then
     VER_LIBASS="${VER_LIBASS_X86}"
@@ -1990,6 +1998,11 @@ if should_build X265; then
         find "${SRC_DIR}" -type d -name "x265*" | xargs -i cp -r {} ./x265
         start_build "x265"
         cd x265
+        # shallow clone では tag 祖先が無く Version.cmake が空タグで失敗するため、
+        # タグ解決できない場合は x265Version.txt 経路を使う
+        if [ -f x265Version.txt ] && ! git describe --abbrev=0 --tags >/dev/null 2>&1; then
+            rm -rf .git
+        fi
         patch -p 1 < $HOME/patches/x265_version.diff
         patch -p 1 < $HOME/patches/x265_zone_param.diff
         patch -p 0 < $HOME/patches/x265_json11.diff
@@ -2049,21 +2062,22 @@ if should_build X265; then
         make -j${NJOBS}
 
         #profileのための実行はシングルスレッドで行う
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE}" --preset faster
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE}" --preset fast
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE}"
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE}" --preset slow
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE}" --preset slower
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset faster
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset fast
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 10
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset slow
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset slower
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset faster
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset fast
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 12
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset slow
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset slower
+        # 新しいx265は raw YUV で --fps 指定が必須
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE}" --preset faster
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE}" --preset fast
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE}"
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE}" --preset slow
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE}" --preset slower
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset faster
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset fast
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 10
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset slow
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset slower
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset faster
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset fast
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 12
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset slow
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset slower
         
         cd ../12bit
         cmake -G "${CMAKE_GENERATOR}" ../../../source \
@@ -2142,7 +2156,7 @@ if should_build XVIDCORE; then
         LDFLAGS=${BUILD_LDFLAGS} \
         ./configure --prefix=$INSTALL_DIR
         make -j${NUMBER_OF_PROCESSORS}
-        cp "${SRC_DIR}/xvid.h" $INSTALL_DIR/include/
+        cp ../../src/xvid.h $INSTALL_DIR/include/
         cp '=build/xvidcore.a' $INSTALL_DIR/lib/libxvidcore.a
     fi
 fi
@@ -2304,6 +2318,42 @@ if should_build SVT_AV1; then
     fi
 fi
 
+# CUDA対応libvmaf (exe向け)。実装は build_libvmaf.sh に委譲する。
+if should_build LIBVMAF; then
+    cd "$BUILD_DIR/$TARGET_ARCH"
+    if [ ! -d "vmaf" ] || [ ! -f "${INSTALL_DIR}/lib/pkgconfig/libvmaf.pc" ]; then
+        start_build "libvmaf"
+        if [ ! -x "${WORK_DIR}/build_libvmaf.sh" ]; then
+            echo "build_libvmaf.sh not found: ${WORK_DIR}/build_libvmaf.sh"
+            exit 1
+        fi
+        LIBVMAF_ARGS=(--skip-src-archive)
+        if [ "$TARGET_ARCH" = "x64" ]; then
+            LIBVMAF_ARGS+=(--enable-cuda)
+        else
+            LIBVMAF_ARGS+=(--disable-cuda)
+        fi
+        # BUILD_DIR/SRC_DIR を共有し、exe/x64/build へインストールさせる
+        VMAF_VERSION="${VER_VMAF}" BUILD_DIR="$BUILD_DIR" SRC_DIR="$SRC_DIR" \
+            "${WORK_DIR}/build_libvmaf.sh" "${LIBVMAF_ARGS[@]}"
+        if [ ! -f "${INSTALL_DIR}/lib/pkgconfig/libvmaf.pc" ]; then
+            echo "libvmaf.pc was not installed: ${INSTALL_DIR}/lib/pkgconfig/libvmaf.pc"
+            exit 1
+        fi
+        if [ "$TARGET_ARCH" = "x64" ]; then
+            if [ ! -f "${INSTALL_DIR}/include/libvmaf/libvmaf_cuda.h" ]; then
+                echo "CUDA-enabled libvmaf headers missing: ${INSTALL_DIR}/include/libvmaf/libvmaf_cuda.h"
+                exit 1
+            fi
+            if ! grep -q 'HAVE_CUDA 1' "${BUILD_DIR}/${TARGET_ARCH}/vmaf/libvmaf/build/src/config.h" 2>/dev/null; then
+                echo "libvmaf was built without HAVE_CUDA."
+                exit 1
+            fi
+        fi
+        normalize_static_libstdcxx_pc_dir "${INSTALL_DIR}/lib/pkgconfig"
+    fi
+fi
+
 # cd $BUILD_DIR/$TARGET_ARCH
 # if [ ! -d "gmp" ]; then
     # find ../src/ -type d -name "gmp-*" | xargs -i cp -r {} ./gmp
@@ -2432,7 +2482,9 @@ if [ "${BUILD_LIB_LIBPLACEBO}" = "TRUE" ]; then
 fi
 
 FFMPEG_GLSLANG_FLAGS=""
-if [ "${BUILD_LIB_GLSLANG}" = "TRUE" ]; then
+# FFmpeg 9 以降は --enable-libglslang が削除済み。
+# glslang 自体は libplacebo/shaderc 依存としてビルドするが、configure には渡さない。
+if [ "${BUILD_LIB_GLSLANG}" = "TRUE" ] && [ "$FOR_FFMPEG4" = "TRUE" ]; then
     FFMPEG_GLSLANG_FLAGS="--enable-libglslang"
 fi
 
@@ -2489,6 +2541,11 @@ fi
 FFMPEG_LIBZIMG_FLAGS=""
 if [ "${BUILD_LIB_ZIMG}" = "TRUE" ]; then
     FFMPEG_LIBZIMG_FLAGS="--enable-libzimg"
+fi
+
+FFMPEG_LIBVMAF_FLAGS=""
+if [ "${BUILD_LIB_LIBVMAF}" = "TRUE" ]; then
+    FFMPEG_LIBVMAF_FLAGS="--enable-libvmaf"
 fi
 
 FFMPEG_TSREPLACE_FLAGS=""
@@ -2602,6 +2659,7 @@ ${FFMPEG_LIBVPL_FLAGS} \
 $FFMPEG_LIBVPX_FLAGS \
 ${FFMPEG_GLSLANG_FLAGS} \
 $FFMPEG_LIBZIMG_FLAGS \
+$FFMPEG_LIBVMAF_FLAGS \
 ${FFMPEG_LIBPLACEBO_FLAGS} \
 ${FFMPEG_NV_CODEC_FLAGS} \
 --disable-mediafoundation \
@@ -2747,6 +2805,11 @@ if [ ${SKIP_SRC_ARCHIVE} = "FALSE" ]; then
         eval "$out_var=(\"\${files[@]}\")"
     }
     
+    SRC_VMAF_LIBS=
+    if [ "${BUILD_LIB_LIBVMAF}" = "TRUE" ]; then
+        SRC_VMAF_LIBS="$SRC_DIR/vmaf*"
+    fi
+
     collect_existing_paths SRC_ARCHIVE_PATHS \
         "$SRC_DIR/ffmpeg*" "$SRC_DIR/opus*" "$SRC_DIR/libogg*" "$SRC_DIR/libvorbis*" \
         "$SRC_DIR/lame*" "$SRC_DIR/libsndfile*" "$SRC_DIR/twolame*" "$SRC_DIR/soxr*" "$SRC_DIR/speex*" \
@@ -2758,7 +2821,7 @@ if [ ${SKIP_SRC_ARCHIVE} = "FALSE" ]; then
         "$SRC_DIR/libvpl*" "$SRC_DIR/libvpx*" "$SRC_DIR/nv-codec-headers*" \
         "$SRC_DIR/libxxhash*" "$SRC_DIR/shaderc*" "$SRC_DIR/SPIRV-Cross*" \
         "$SRC_DIR/dovi_tool*" "$SRC_DIR/libjpeg-*" "$SRC_DIR/lcms2*" "$SRC_DIR/libplacebo*" "$SRC_DIR/Vulkan-Loader*" \
-        "$SRC_GPL_LIBS" "$SRC_EXE_LIBS" "$SRC_ENCODER_LIBS" \
+        "$SRC_GPL_LIBS" "$SRC_EXE_LIBS" "$SRC_ENCODER_LIBS" "$SRC_VMAF_LIBS" \
         "$PATCHES_DIR/*"
     
     if command -v 7z >/dev/null 2>&1; then

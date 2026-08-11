@@ -337,6 +337,21 @@ normalize_static_libstdcxx_pc_dir() {
     shopt -u nullglob
 }
 
+# Linux の静的 FFmpeg を利用する側で共有 liblzma が選ばれないよう、
+# pkg-config の指定を liblzma.a の完全一致検索へ正規化する。
+normalize_static_liblzma_pc_dir() {
+    local pc_dir="$1"
+    [ -d "$pc_dir" ] || return 0
+    shopt -s nullglob
+    local pc=
+    for pc in "$pc_dir"/*.pc; do
+        sed -E -i \
+            -e 's/(^|[[:space:]])-llzma([[:space:]]|$)/\1-l:liblzma.a\2/g' \
+            "$pc"
+    done
+    shopt -u nullglob
+}
+
 start_build() {
     echo "=== Building $1 ======================================="
 }
@@ -1060,6 +1075,14 @@ if should_build LZMA && [ ! -d "xz" ]; then
     fi
     make -j$NJOBS
     make install
+fi
+
+if [ "$MINGWDIR" = "" ] && should_build LZMA; then
+    if [ ! -f "${INSTALL_DIR}/lib/liblzma.a" ]; then
+        echo "静的 liblzma アーカイブが見つかりません: ${INSTALL_DIR}/lib/liblzma.a"
+        exit 1
+    fi
+    normalize_static_liblzma_pc_dir "${INSTALL_DIR}/lib/pkgconfig"
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
@@ -2754,6 +2777,14 @@ $ARIB_LIBS \
 $FFMPEG_EXTRA_LIBS
 fi
 make clean && make -j$NJOBS && make install
+
+if [ "$MINGWDIR" = "" ] && should_build LZMA; then
+    FFMPEG_INSTALLED_PC_DIR="${FFMPEG_TMP_DIR}/lib/pkgconfig"
+    if [ "$BUILD_EXE" = "FALSE" ] && [ "$FOR_AUDENC" = "FALSE" ]; then
+        FFMPEG_INSTALLED_PC_DIR="${FFMPEG_INSTALL_DIR}/lib/pkgconfig"
+    fi
+    normalize_static_liblzma_pc_dir "${FFMPEG_INSTALLED_PC_DIR}"
+fi
 
 if [ "$MINGWDIR" != "" ]; then
     if [ "$BUILD_EXE" = "FALSE" ] && [ "$FOR_AUDENC" = "FALSE" ]; then

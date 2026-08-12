@@ -1396,28 +1396,30 @@ if should_build LIBASS_DLL && [ ! -d "libass_dll" ]; then
         LIBASS_STATIC_DEPS="${LIBASS_STATIC_DEPS} -lunibreak"
     fi
     LIBASS_STATIC_DEPS="${LIBASS_STATIC_DEPS} -lfribidi -lfontconfig -lexpat -lfreetype -lpng16 -lbz2 -lz -liconv"
-    gcc -shared -o .libs/libass-0.dll \
+    # DLL 番号は libtool の current-age (0.17.5: 13-4=9, 0.14.0: 9-0=9)
+    LIBASS_DLL_SONAME=libass-9
+    gcc -shared -o .libs/${LIBASS_DLL_SONAME}.dll \
       -Wl,--whole-archive .libs/libass_internal.a -Wl,--no-whole-archive \
-      -Wl,--output-def,.libs/libass-0.dll.def \
+      -Wl,--output-def,.libs/${LIBASS_DLL_SONAME}.dll.def \
       -Wl,--enable-auto-image-base \
       -static-libgcc \
       -L${INSTALL_DIR}/lib \
       -Wl,-Bstatic ${LIBASS_STATIC_DEPS} \
       -Wl,-Bdynamic -lm -lgdi32 -ldwrite
 
-    LIBASS_DLL_PATH=.libs/libass-0.dll
-    LIBASS_DEF_FILENAME=.libs/libass-0.dll.def
-    cp -f "${LIBASS_DEF_FILENAME}" ./libass-0.def
-    LIBASS_DEF_FILENAME=libass-0.def
+    LIBASS_DLL_PATH=.libs/${LIBASS_DLL_SONAME}.dll
+    LIBASS_DEF_FILENAME=.libs/${LIBASS_DLL_SONAME}.dll.def
+    cp -f "${LIBASS_DEF_FILENAME}" ./${LIBASS_DLL_SONAME}.def
+    LIBASS_DEF_FILENAME=${LIBASS_DLL_SONAME}.def
     # ordinal のみ除去 (x86 の stdcall 装飾 @N や @Symbol@N を壊さない)
     sed -i -e 's/ @[0-9][0-9]*//g' "${LIBASS_DEF_FILENAME}"
-    LIBASS_LIB_FILENAME=libass-0.lib
+    LIBASS_LIB_FILENAME=${LIBASS_DLL_SONAME}.lib
     if [ -n "${MSVC_LIB_EXE:-}" ]; then
         "${MSVC_LIB_EXE}" -machine:$TARGET_ARCH -def:$LIBASS_DEF_FILENAME -out:$LIBASS_LIB_FILENAME
     elif command -v lib.exe >/dev/null 2>&1; then
         lib.exe -machine:$TARGET_ARCH -def:$LIBASS_DEF_FILENAME -out:$LIBASS_LIB_FILENAME
     else
-        dlltool -d "$LIBASS_DEF_FILENAME" -l "$LIBASS_LIB_FILENAME" -D "libass-0.dll"
+        dlltool -d "$LIBASS_DEF_FILENAME" -l "$LIBASS_LIB_FILENAME" -D "${LIBASS_DLL_SONAME}.dll"
     fi
     cp "${LIBASS_DLL_PATH}" .
 fi

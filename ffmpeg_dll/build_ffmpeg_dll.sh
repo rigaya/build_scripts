@@ -629,7 +629,7 @@ done
 
 #--- ライブラリバージョン (更新時はここを変更) -----------------
 # git clone で最新取得するもの (aribb24 / SPIRV-Cross / x264 / x265) は含めない
-VER_FFMPEG="9.0"
+VER_FFMPEG="9.0.1"
 VER_FFMPEG4="4.4.8"
 VER_ZLIB="1.3.2"
 VER_LIBPNG="1.6.58"

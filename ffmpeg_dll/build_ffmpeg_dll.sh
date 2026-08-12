@@ -56,6 +56,7 @@ ENABLE_GPL="FALSE"
 ENABLE_LTO="FALSE"
 ENABLE_PGO="FALSE"
 SKIP_SRC_ARCHIVE="FALSE"
+SRC_ARCHIVE_ONLY="FALSE"
 ENABLE_V4L2_MULTIPLANAR="FALSE"
 
 set -e
@@ -66,6 +67,7 @@ TARGET_BUILD=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-src-archive) SKIP_SRC_ARCHIVE="TRUE"; shift ;;
+    --src-archive-only) SRC_ARCHIVE_ONLY="TRUE"; shift ;;
     --enable-gpl) ENABLE_GPL="TRUE"; shift ;;
     --enable-swscale) ENABLE_SWSCALE="TRUE"; shift ;;
     --disable-pgo) ENABLE_PGO="FALSE"; shift ;;
@@ -78,6 +80,11 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
+
+if [ "$SRC_ARCHIVE_ONLY" = "TRUE" ] && [ "$SKIP_SRC_ARCHIVE" = "TRUE" ]; then
+    echo "--src-archive-only and --skip-src-archive cannot be used together."
+    exit 1
+fi
 
 if [ "$TARGET_BUILD" = "audenc" ]; then
     FOR_AUDENC="TRUE"
@@ -109,7 +116,7 @@ mkdir -p $SRC_DIR
 cd $SRC_DIR
 
 if [ "$ENABLE_GPL" != "FALSE" ]; then
-  if [ "$BUILD_EXE" = "FALSE" ]; then
+  if [ "$BUILD_EXE" = "FALSE" ] && [ "$SRC_ARCHIVE_ONLY" != "TRUE" ]; then
     echo "--enable-gpl can be only used when --target exe is set."
     exit 1
   fi
@@ -359,6 +366,58 @@ normalize_static_liblzma_pc_dir() {
     done
     shopt -u nullglob
 }
+
+# MinGW shared DLL リンク時、iconv/winpthread を DLL ではなく静的 .a へ強制する。
+# -liconv / -lpthread は同名の .dll.a が優先され libiconv-2.dll / libwinpthread-1.dll 依存になる。
+force_mingw_static_iconv_pthread_flags() {
+    local file="$1"
+    [ -f "$file" ] || return 0
+    sed -E -i \
+        -e 's/-liconv\b/-l:libiconv.a/g' \
+        -e 's/-lpthread\b/-l:libwinpthread.a/g' \
+        -e 's/-lwinpthread\b/-l:libwinpthread.a/g' \
+        "$file"
+}
+
+normalize_mingw_static_iconv_pthread_pc_dir() {
+    local pc_dir="$1"
+    [ -d "$pc_dir" ] || return 0
+    shopt -s nullglob
+    local pc=
+    for pc in "$pc_dir"/*.pc; do
+        force_mingw_static_iconv_pthread_flags "$pc"
+    done
+    shopt -u nullglob
+}
+
+# FFmpeg configure 後の EXTRALIBS から動的 iconv/pthread 参照を除去する。
+# -pthread はコンパイルフラグでも使われるため EXTRALIBS 行のみ置換する。
+# あわせて libstdc++/libatomic/nanosleep 由来の winpthread 参照を静的リンクで解消する。
+force_mingw_static_iconv_pthread_in_ffmpeg_config() {
+    local ffmpeg_dir="$1"
+    local config_mak="${ffmpeg_dir}/ffbuild/config.mak"
+    local config_sh="${ffmpeg_dir}/ffbuild/config.sh"
+    if [ -f "$config_mak" ]; then
+        force_mingw_static_iconv_pthread_flags "$config_mak"
+        sed -E -i \
+            -e '/^EXTRALIBS/s/(^|[[:space:]])-pthread\b/\1-l:libwinpthread.a/g' \
+            "$config_mak"
+        # w32threads でも time.o の nanosleep/clock_gettime や libstdc++ が winpthread を要求する
+        sed -E -i \
+            -e '/^EXTRALIBS(-[^=]+)?=/{ /-l:libwinpthread\.a/! s/$/ -l:libwinpthread.a/; }' \
+            "$config_mak"
+    fi
+    if [ -f "$config_sh" ]; then
+        force_mingw_static_iconv_pthread_flags "$config_sh"
+        sed -E -i \
+            -e '/^extralibs_/s/(^|[[:space:]])-pthread\b/\1-l:libwinpthread.a/g' \
+            "$config_sh"
+        sed -E -i \
+            -e '/^extralibs_/{ /-l:libwinpthread\.a/! s/"$/ -l:libwinpthread.a"/; }' \
+            "$config_sh"
+    fi
+}
+
 
 start_build() {
     echo "=== Building $1 ======================================="
@@ -626,6 +685,92 @@ for flag in BUILD_LIB_ZLIB BUILD_LIB_BZIP2 BUILD_LIB_LZMA BUILD_LIB_LIBPNG BUILD
         echo "  $flag"
     fi
 done
+
+#--- src圧縮 (ビルド末尾 / --src-archive-only 共通) -----------
+create_src_archive() {
+    cd "$SRC_DIR"
+    SRC_7Z_FILENAME=ffmpeg_lgpl_src.7z
+    SRC_GPL_LIBS=
+    SRC_EXE_LIBS=
+    SRC_ENCODER_LIBS=
+    SRC_VMAF_LIBS=
+    if [ "${ENABLE_GPL}" != "FALSE" ]; then
+        SRC_7Z_FILENAME=ffmpeg_gpl_src.7z
+        SRC_GPL_LIBS="$SRC_DIR/x264* $SRC_DIR/x265* $SRC_DIR/xvidcore*"
+    fi
+    if [ "$TARGET_ARCH" != "x86" ]; then
+        SRC_ENCODER_LIBS="$SRC_DIR/svt-av1* $SRC_DIR/vvenc*"
+    fi
+    if [ "${BUILD_LIB_LIBVMAF}" = "TRUE" ]; then
+        SRC_VMAF_LIBS="$SRC_DIR/vmaf*"
+    fi
+
+    rm -f "${SRC_7Z_FILENAME}"
+    echo "compressing src file -> ${SRC_DIR}/${SRC_7Z_FILENAME} ..."
+
+    collect_existing_paths() {
+        local out_var="$1"
+        shift
+        local files=()
+        local pattern
+        local matched
+        for pattern in "$@"; do
+            matched=()
+            for f in $pattern; do
+                if [ -e "$f" ]; then
+                    matched+=("$f")
+                fi
+            done
+            if [ ${#matched[@]} -gt 0 ]; then
+                files+=("${matched[@]}")
+            fi
+        done
+        eval "$out_var=(\"\${files[@]}\")"
+    }
+
+    collect_existing_paths SRC_ARCHIVE_PATHS \
+        "$SRC_DIR/ffmpeg*" "$SRC_DIR/opus*" "$SRC_DIR/libogg*" "$SRC_DIR/libvorbis*" \
+        "$SRC_DIR/lame*" "$SRC_DIR/libsndfile*" "$SRC_DIR/twolame*" "$SRC_DIR/soxr*" "$SRC_DIR/speex*" \
+        "$SRC_DIR/expat*" "$SRC_DIR/freetype*" "$SRC_DIR/harfbuzz*" "$SRC_DIR/libunibreak*" \
+        "$SRC_DIR/libiconv*" "$SRC_DIR/fontconfig*" \
+        "$SRC_DIR/libpng*" "$SRC_DIR/libass*" "$SRC_DIR/bzip2*" "$SRC_DIR/libbluray*" \
+        "$SRC_DIR/glslang*" "$SRC_DIR/zimg*" \
+        "$SRC_DIR/aribb24*" "$SRC_DIR/libaribcaption*" "$SRC_DIR/libxml2*" "$SRC_DIR/dav1d*" \
+        "$SRC_DIR/libvpl*" "$SRC_DIR/libvpx*" "$SRC_DIR/nv-codec-headers*" \
+        "$SRC_DIR/libxxhash*" "$SRC_DIR/shaderc*" "$SRC_DIR/SPIRV-Cross*" \
+        "$SRC_DIR/dovi_tool*" "$SRC_DIR/libjpeg-*" "$SRC_DIR/lcms2*" "$SRC_DIR/libplacebo*" "$SRC_DIR/Vulkan-Loader*" \
+        $SRC_GPL_LIBS $SRC_EXE_LIBS $SRC_ENCODER_LIBS $SRC_VMAF_LIBS \
+        "$PATCHES_DIR"/*
+
+    if [ ${#SRC_ARCHIVE_PATHS[@]} -eq 0 ]; then
+        echo "No source paths found to archive under ${SRC_DIR}."
+        exit 1
+    fi
+    echo "archive paths: ${#SRC_ARCHIVE_PATHS[@]}"
+
+    if command -v 7z >/dev/null 2>&1; then
+        7z a -y -t7z -mx=9 -mmt=off -x\!'*.tar.gz' -x\!'*.tar.bz2' -x\!'*.zip' -x\!'*.tar.xz' -xr\!'.git' "${SRC_7Z_FILENAME}" \
+            "${SRC_ARCHIVE_PATHS[@]}" \
+            > /dev/null
+        ls -lh "${SRC_DIR}/${SRC_7Z_FILENAME}"
+    else
+        TAR_FILENAME=${SRC_7Z_FILENAME%.7z}.tar.xz
+        echo "7z is not installed; creating ${TAR_FILENAME} (.tar.xz) with tar + xz..."
+        rm -f "${TAR_FILENAME}"
+        tar -cJf "${TAR_FILENAME}" \
+            --exclude='*.tar.gz' --exclude='*.tar.bz2' --exclude='*.zip' --exclude='*.tar.xz' \
+            --exclude='.git' --exclude='.git/*' \
+            "${SRC_ARCHIVE_PATHS[@]}" \
+            > /dev/null || { echo "tar failed"; exit 1; }
+        ls -lh "${SRC_DIR}/${TAR_FILENAME}"
+    fi
+}
+
+if [ "$SRC_ARCHIVE_ONLY" = "TRUE" ]; then
+    echo "SRC_ARCHIVE_ONLY=TRUE (skip download/build)"
+    create_src_archive
+    exit 0
+fi
 
 #--- ライブラリバージョン (更新時はここを変更) -----------------
 # git clone で最新取得するもの (aribb24 / SPIRV-Cross / x264 / x265) は含めない
@@ -2607,6 +2752,10 @@ fi
 # 既存成果物を再利用する場合でも、libstdc++ を静的かつリンク順が崩れない
 # -l:libstdc++.a 形式へ正規化する
 normalize_static_libstdcxx_pc_dir "$INSTALL_DIR/lib/pkgconfig"
+if [ "$MINGWDIR" != "" ]; then
+    # MinGW: shared DLL でも libiconv/libwinpthread を静的リンクさせる
+    normalize_mingw_static_iconv_pthread_pc_dir "$INSTALL_DIR/lib/pkgconfig"
+fi
 
 # FFmpeg configure用pkg-config探索パス
 PKG_CONFIG_PATH_FFMPEG=${INSTALL_DIR}/lib/pkgconfig
@@ -2616,6 +2765,13 @@ if [ "$MINGWDIR" = "" ]; then
             PKG_CONFIG_PATH_FFMPEG="${pcdir}:${PKG_CONFIG_PATH_FFMPEG}"
         fi
     done
+fi
+
+# MinGW では w32threads を使い libwinpthread-1.dll 依存を避ける。
+# 依存ライブラリ(libvpx/libvvenc等)が要求する pthread は静的 libwinpthread.a で解消する。
+FFMPEG_THREAD_FLAGS="--enable-pthreads"
+if [ "$MINGWDIR" != "" ]; then
+    FFMPEG_THREAD_FLAGS="--enable-w32threads --disable-pthreads"
 fi
 
 cd "$FFMPEG_WORK_DIR"
@@ -2685,9 +2841,8 @@ $ENCODER_LIBS \
 $GPL_LIBS \
 --disable-outdevs \
 $FFMPEG_X86_DISABLE_FLAGS \
---disable-w32threads \
+$FFMPEG_THREAD_FLAGS \
 $FFMPEG5_CUDA_DISABLE_FLAGS \
---enable-pthreads \
 --enable-bsfs \
 --enable-filters \
 --enable-swresample \
@@ -2751,12 +2906,11 @@ $ENCODER_LIBS \
 --disable-debug \
 $FFMPEG_LIBRARY_TYPE_FLAGS \
 $FFMPEG_X86_DISABLE_FLAGS \
---disable-w32threads \
+$FFMPEG_THREAD_FLAGS \
 --disable-dxva2 \
 --disable-d3d11va \
 $FFMPEG5_CUDA_DISABLE_FLAGS \
 $FFMPEG_TSREPLACE_FLAGS \
---enable-pthreads \
 --enable-bsfs \
 --enable-swresample \
 --disable-decoder=vorbis \
@@ -2781,6 +2935,9 @@ $ARIB_LIBS \
 --extra-cflags="${BUILD_CCFLAGS} -I${INSTALL_DIR}/include ${FFMPEG_ARCH_CFLAGS}" \
 --extra-ldflags="${FFMPEG_EXTRA_LDFLAGS}" \
 $FFMPEG_EXTRA_LIBS
+fi
+if [ "$MINGWDIR" != "" ]; then
+    force_mingw_static_iconv_pthread_in_ffmpeg_config "$FFMPEG_WORK_DIR"
 fi
 make clean && make -j$NJOBS && make install
 
@@ -2826,72 +2983,5 @@ if [ "$MINGWDIR" != "" ]; then
 fi
 
 if [ ${SKIP_SRC_ARCHIVE} = "FALSE" ]; then
-    cd $SRC_DIR
-    SRC_7Z_FILENAME=ffmpeg_lgpl_src.7z
-    SRC_GPL_LIBS=
-    SRC_EXE_LIBS=
-    SRC_ENCODER_LIBS=
-    if [ ${ENABLE_GPL} != "FALSE" ]; then
-    SRC_7Z_FILENAME=ffmpeg_gpl_src.7z
-    SRC_GPL_LIBS="$SRC_DIR/x264* $SRC_DIR/x265* $SRC_DIR/xvidcore*"
-    fi
-    if [ $TARGET_ARCH != "x86" ]; then
-        SRC_ENCODER_LIBS="$SRC_DIR/svt-av1* $SRC_DIR/vvenc*"
-    fi
-    rm -f ${SRC_7Z_FILENAME}
-    echo "compressing src file..."
-    
-    collect_existing_paths() {
-        local out_var="$1"
-        shift
-        local files=()
-        local pattern
-        local matched
-        for pattern in "$@"; do
-            matched=()
-            for f in $pattern; do
-                if [ -e "$f" ]; then
-                    matched+=("$f")
-                fi
-            done
-            if [ ${#matched[@]} -gt 0 ]; then
-                files+=("${matched[@]}")
-            fi
-        done
-        eval "$out_var=(\"\${files[@]}\")"
-    }
-    
-    SRC_VMAF_LIBS=
-    if [ "${BUILD_LIB_LIBVMAF}" = "TRUE" ]; then
-        SRC_VMAF_LIBS="$SRC_DIR/vmaf*"
-    fi
-
-    collect_existing_paths SRC_ARCHIVE_PATHS \
-        "$SRC_DIR/ffmpeg*" "$SRC_DIR/opus*" "$SRC_DIR/libogg*" "$SRC_DIR/libvorbis*" \
-        "$SRC_DIR/lame*" "$SRC_DIR/libsndfile*" "$SRC_DIR/twolame*" "$SRC_DIR/soxr*" "$SRC_DIR/speex*" \
-        "$SRC_DIR/expat*" "$SRC_DIR/freetype*" "$SRC_DIR/harfbuzz*" "$SRC_DIR/libunibreak*" \
-        "$SRC_DIR/libiconv*" "$SRC_DIR/fontconfig*" \
-        "$SRC_DIR/libpng*" "$SRC_DIR/libass*" "$SRC_DIR/bzip2*" "$SRC_DIR/libbluray*" \
-        "$SRC_DIR/glslang*" "$SRC_DIR/zimg*" \
-        "$SRC_DIR/aribb24*" "$SRC_DIR/libaribcaption*" "$SRC_DIR/libxml2*" "$SRC_DIR/dav1d*" \
-        "$SRC_DIR/libvpl*" "$SRC_DIR/libvpx*" "$SRC_DIR/nv-codec-headers*" \
-        "$SRC_DIR/libxxhash*" "$SRC_DIR/shaderc*" "$SRC_DIR/SPIRV-Cross*" \
-        "$SRC_DIR/dovi_tool*" "$SRC_DIR/libjpeg-*" "$SRC_DIR/lcms2*" "$SRC_DIR/libplacebo*" "$SRC_DIR/Vulkan-Loader*" \
-        "$SRC_GPL_LIBS" "$SRC_EXE_LIBS" "$SRC_ENCODER_LIBS" "$SRC_VMAF_LIBS" \
-        "$PATCHES_DIR/*"
-    
-    if command -v 7z >/dev/null 2>&1; then
-        7z a -y -t7z -mx=9 -mmt=off -x\!'*.tar.gz' -x\!'*.tar.bz2' -x\!'*.zip' -x\!'*.tar.xz' -xr\!'.git' ${SRC_7Z_FILENAME} \
-        "${SRC_ARCHIVE_PATHS[@]}" \
-        > /dev/null
-    else
-        TAR_FILENAME=${SRC_7Z_FILENAME%.7z}.tar.xz
-        echo "7z is not installed; creating ${TAR_FILENAME} (.tar.xz) with tar + xz..."
-        rm -f "${TAR_FILENAME}"
-        tar -cJf "${TAR_FILENAME}" \
-            --exclude='*.tar.gz' --exclude='*.tar.bz2' --exclude='*.zip' --exclude='*.tar.xz' \
-            --exclude='.git' --exclude='.git/*' \
-            "${SRC_ARCHIVE_PATHS[@]}" \
-            > /dev/null || { echo "tar failed"; exit 1; }
-    fi
+    create_src_archive
 fi

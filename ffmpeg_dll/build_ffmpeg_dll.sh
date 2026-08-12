@@ -837,11 +837,11 @@ else
         rm -rf ffmpeg
     fi
     if [ $UPDATE_FFMPEG != "FALSE" ]; then
-        git clone --depth 1 --branch release/9.0 --single-branch \
-            https://github.com/FFmpeg/FFmpeg.git ffmpeg
-        #download_archive "ffmpeg-${VER_FFMPEG}.tar.xz" "https://ffmpeg.org/releases/ffmpeg-${VER_FFMPEG}.tar.xz"
-        #tar xf ffmpeg-${VER_FFMPEG}.tar.xz
-        #mv ffmpeg-${VER_FFMPEG} ffmpeg
+        #git clone --depth 1 --branch release/9.0 --single-branch \
+        #    https://github.com/FFmpeg/FFmpeg.git ffmpeg
+        download_archive "ffmpeg-${VER_FFMPEG}.tar.xz" "https://ffmpeg.org/releases/ffmpeg-${VER_FFMPEG}.tar.xz"
+        tar xf ffmpeg-${VER_FFMPEG}.tar.xz
+        mv ffmpeg-${VER_FFMPEG} ffmpeg
     fi
 fi
 

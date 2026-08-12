@@ -188,14 +188,16 @@ FFMPEG_TMP_DIR=${FFMPEG_WORK_DIR}/tmp/$TARGET_ARCH
 
 LIBSTDCXX_A=
 LIBSTDCXX_DIR=
-if [ "$MINGWDIR" = "" ]; then
-    LIBSTDCXX_A=`gcc -print-file-name=libstdc++.a`
+# -lstdc++ だと MinGW で libstdc++-6.dll が選ばれる。
+# 絶対パスの .a は FFmpeg configure が -l より前に並べ替えリンクに失敗する。
+# -l:libstdc++.a なら静的 .a を明示でき、かつ -l 形式のためリンク順も崩れない。
+LIBSTDCXX_A=`gcc -print-file-name=libstdc++.a 2>/dev/null || true`
+if [ -n "$LIBSTDCXX_A" ] && [ -f "$LIBSTDCXX_A" ]; then
     LIBSTDCXX_DIR=`dirname "$LIBSTDCXX_A"`
 fi
 LIBSTDCXX_STATIC_FLAGS="-Wl,-Bstatic -lstdc++ -Wl,-Bdynamic"
-if [ "$MINGWDIR" = "" ] && [ -n "$LIBSTDCXX_A" ] && [ -f "$LIBSTDCXX_A" ]; then
-    # ビルド中/ビルド後で同じ指定に統一するため、libstdc++.a を -l: 形式で指定する。
-    LIBSTDCXX_STATIC_FLAGS="-L${LIBSTDCXX_DIR} -l:libstdc++.a"
+if [ -n "$LIBSTDCXX_A" ] && [ -f "$LIBSTDCXX_A" ]; then
+    LIBSTDCXX_STATIC_FLAGS="-l:libstdc++.a"
 fi
 
 TUNE_FLAG=""
@@ -319,6 +321,9 @@ should_build() {
 normalize_static_libstdcxx_pc_dir() {
     local pc_dir="$1"
     [ -d "$pc_dir" ] || return 0
+    # -lstdc++ は MinGW で DLL が選ばれることがある。
+    # 絶対パスの .a は FFmpeg configure がリンク順を崩す。
+    # どちらも避け、静的 libstdc++.a を -l: で明示する。
     local replacement="$LIBSTDCXX_STATIC_FLAGS"
     local replacement_escaped=
     replacement_escaped=$(printf '%s' "$replacement" | sed -e 's/[\/&]/\\&/g')
@@ -328,8 +333,11 @@ normalize_static_libstdcxx_pc_dir() {
         sed -E -i \
             -e "s|-Wl,-Bstatic[[:space:]]+-lstdc\\+\\+[[:space:]]+-Wl,-Bdynamic|${replacement_escaped}|g" \
             -e "s|-L[^[:space:]]+[[:space:]]+-l:libstdc\\+\\+\\.a|${replacement_escaped}|g" \
+            -e "s|-l[A-Z]:/[^[:space:]]*/libstdc\\+\\+\\.a|${replacement_escaped}|g" \
+            -e "s|[A-Z]:/[^[:space:]]*/libstdc\\+\\+\\.a|${replacement_escaped}|g" \
             -e "s|/usr/lib/gcc/[^[:space:]]+/[0-9.]+/libstdc\\+\\+\\.a|${replacement_escaped}|g" \
             -e "s|-static-libstdc\\+\\+|${replacement_escaped}|g" \
+            -e "s#(^|[[:space:]])-lstdc\\+\\+([[:space:]]|$)#\\1${replacement_escaped}\\2#g" \
             -e 's/-Wl,-Bstatic[[:space:]]+-Wl,-Bstatic/-Wl,-Bstatic/g' \
             -e 's/-Wl,-Bdynamic[[:space:]]+-Wl,-Bdynamic/-Wl,-Bdynamic/g' \
             "$pc"
@@ -627,13 +635,13 @@ VER_ZLIB="1.3.2"
 VER_LIBPNG="1.6.58"
 VER_BZIP2="1.0.8"
 VER_XZ="5.8.3"
-VER_EXPAT="2.8.2"
+VER_EXPAT="2.8.3"
 VER_FREETYPE="2.11.0"          # 2.12.1はダメ
 VER_LIBICONV="1.16"
 VER_FONTCONFIG="2.12.6"        # 2.12.6でないといろいろ面倒 -> 2.12.1もだめ, 2.13.0もだめ
 VER_FONTCONFIG_SHA256="064b9ebf060c9e77011733ac9dc0e2ce92870b574cca2405e11f5353a683c334"
 VER_FRIBIDI="1.0.16"
-VER_HARFBUZZ="11.4.4"
+VER_HARFBUZZ="14.3.0"
 VER_LIBUNIBREAK="7.0"
 VER_LIBASS="0.17.5"
 VER_LIBASS_X86="0.14.0"        # x86向け
@@ -646,23 +654,23 @@ VER_TWOLAME="0.4.0"
 VER_LIBSNDFILE="1.2.2"
 VER_SOXR="0.1.3"
 VER_LIBXML2="2.15.3"
-VER_LIBBLURAY="1.4.1"
-VER_LIBARIBCAPTION="1.1.1"
+VER_LIBBLURAY="1.5.0"
+VER_LIBARIBCAPTION="1.1.2"
 VER_LIBVPL="2.17.0"
-VER_NV_CODEC_HEADERS="13.0.19.0"
+VER_NV_CODEC_HEADERS="13.1.15.0"
 VER_LIBVPX="1.16.0"
-VER_DAV1D="1.5.3"
+VER_DAV1D="1.5.4"
 VER_LIBXXHASH="0.8.3"
-VER_GLSLANG="16.3.0"
-VER_SHADERC="2026.2"
+VER_GLSLANG="16.5.0"
+VER_SHADERC="2026.3"
 VER_DOVI_TOOL="2.3.3"
 VER_LIBJPEG_TURBO="3.2.0"
 VER_LCMS2="2.19.1"
-VER_VULKAN_LOADER="1.4.356"
+VER_VULKAN_LOADER="1.4.359"
 VER_ZIMG="3.0.6"
 VER_LIBPLACEBO="7.360.1"
 VER_VVENC="1.14.0"
-VER_SVT_AV1="4.1.0"
+VER_SVT_AV1="4.2.0"
 VER_XVIDCORE="1.3.7"
 VER_VMAF="3.2.0"
 
@@ -810,7 +818,13 @@ fi
 
 if should_build SOXR && [ ! -d "soxr-${VER_SOXR}-Source" ]; then
     download_archive "soxr-${VER_SOXR}-Source.tar.xz" "https://download.sourceforge.net/project/soxr/soxr-${VER_SOXR}-Source.tar.xz"
-    tar xf soxr-${VER_SOXR}-Source.tar.xz
+    # MinGW/Windows: archive contains symlink inst-check-soxr-lsr -> inst-check-soxr
+    # (symlink appears before its target; tar fails and set -e aborts the script)
+    tar xf "soxr-${VER_SOXR}-Source.tar.xz" --exclude="soxr-${VER_SOXR}-Source/inst-check-soxr-lsr"
+    # optional install-check helper only; copy instead of symlink
+    if [ -f "soxr-${VER_SOXR}-Source/inst-check-soxr" ]; then
+        cp -f "soxr-${VER_SOXR}-Source/inst-check-soxr" "soxr-${VER_SOXR}-Source/inst-check-soxr-lsr"
+    fi
 fi
 
 if should_build LIBXML2 && [ ! -d "libxml2-${VER_LIBXML2}" ]; then
@@ -1583,9 +1597,8 @@ if should_build LIBBLURAY && [ ! -d "libbluray" ]; then
     find "${SRC_DIR}" -type d -name "libbluray-*" | xargs -i cp -r {} ./libbluray
     start_build "libbluray"
     cd ./libbluray
-    # Linux static link時にFFmpeg本体のdec_initと衝突するため、libbluray側を名前空間化する
-    sed -i 's/\bdec_init\b/bluray_dec_init/g' src/libbluray/disc/dec.h src/libbluray/disc/dec.c src/libbluray/disc/disc.c
     # 1.4系からAutotools廃止・Mesonのみ
+    # 1.5.0で dec_init は bdpriv_dec_init に改名済み（FFmpeg本体との衝突対策不要）
     CC=gcc \
     CXX=g++ \
     PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
@@ -1648,22 +1661,8 @@ if should_build LIBARIBCAPTION && [ ! -d "libaribcaption" ]; then
     cmake --build . -j$NJOBS
     cmake --install .
     LIBARIBCAPTION_PC=${INSTALL_DIR}/lib/pkgconfig/libaribcaption.pc
-    #sed -i -e 's/-lC:\//-l\/c\//g' ${INSTALL_DIR}/lib/pkgconfig/libaribcaption.pc
-    # 下記のような絶対パス指定だとFFmpegの検出でリンク順が崩れるため、静的リンク指定へ正規化する
-    #   -lC:/mingw64/.../libstdc++.a
-    #   /usr/lib/gcc/x86_64-linux-gnu/*/libstdc++.a
-    if [ "$MINGWDIR" = "" ] && [ -f "$LIBSTDCXX_A" ]; then
-        sed -i -E \
-            -e "s#-l[A-Z]:/.*/libstdc\\+\\+\\.a#${LIBSTDCXX_STATIC_FLAGS}#g" \
-            -e "s#/usr/lib/gcc/[^ ]+/[0-9.]+/libstdc\\+\\+\\.a#${LIBSTDCXX_STATIC_FLAGS}#g" \
-            -e "s#-lstdc\\+\\+#${LIBSTDCXX_STATIC_FLAGS}#g" \
-            ${LIBARIBCAPTION_PC}
-    else
-        sed -i -E \
-            -e 's#-l[A-Z]:/.*/libstdc\+\+\.a#-lstdc++#g' \
-            -e 's#/usr/lib/gcc/[^ ]+/[0-9.]+/libstdc\+\+\.a#-lstdc++#g' \
-            ${LIBARIBCAPTION_PC}
-    fi
+    # 絶対パス指定だとFFmpeg検出でリンク順が崩れるため、-l:libstdc++.a へ正規化
+    normalize_static_libstdcxx_pc_dir "$(dirname "$LIBARIBCAPTION_PC")"
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
@@ -1702,7 +1701,8 @@ if should_build LIBVPL && [ ! -d "libvpl" ]; then
     if [ "$MINGWDIR" = "" ] && [ -f "$LIBSTDCXX_A" ]; then
         sed -i -e "s#^Libs:.*#Libs: -L\${libdir} -lvpl ${LIBSTDCXX_STATIC_FLAGS} -lpthread -ldl#g" $LIBVPL_PC_DIR/vpl.pc
     else
-        sed -i -e 's/-lvpl/-lvpl -lstdc++/g' $LIBVPL_PC_DIR/vpl.pc
+        # -lstdc++ は DLL が選ばれるため -l:libstdc++.a を使う
+        sed -i -e "s/-lvpl/-lvpl ${LIBSTDCXX_STATIC_FLAGS}/g" $LIBVPL_PC_DIR/vpl.pc
     fi
     # ffmpegで参照するpkg-configをここで正規化しておく
     normalize_static_libstdcxx_pc_dir "$LIBVPL_PC_DIR"
@@ -1880,7 +1880,8 @@ if should_build SPIRV_CROSS && [ ! -d "SPIRV-Cross" ]; then
     LDFLAGS="${BUILD_LDFLAGS}" \
     cmake -G "${CMAKE_GENERATOR}" -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -D CMAKE_INSTALL_LIBDIR=lib -DCMAKE_BUILD_TYPE=Release -DSPIRV_CROSS_ENABLE_TESTS=OFF -DSPIRV_CROSS_SHARED=OFF -DSPIRV_CROSS_CLI=OFF ..
     make -j$NJOBS && make install
-    sed -i -e 's/-lspirv-cross-c/-lspirv-cross-c -lspirv-cross-msl -lspirv-cross-hlsl -lspirv-cross-cpp -lspirv-cross-glsl -lspirv-cross-util -lspirv-cross-core -lspirv-cross-reflect -lstdc++/g' ${INSTALL_DIR}/lib/pkgconfig/spirv-cross-c.pc
+    sed -i -e "s/-lspirv-cross-c/-lspirv-cross-c -lspirv-cross-msl -lspirv-cross-hlsl -lspirv-cross-cpp -lspirv-cross-glsl -lspirv-cross-util -lspirv-cross-core -lspirv-cross-reflect ${LIBSTDCXX_STATIC_FLAGS}/g" ${INSTALL_DIR}/lib/pkgconfig/spirv-cross-c.pc
+    normalize_static_libstdcxx_pc_dir "${INSTALL_DIR}/lib/pkgconfig"
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
@@ -2180,8 +2181,8 @@ if should_build X265; then
         mv libx265.a libx265_main.a
         echo -n -e "create libx265.a\naddlib libx265_main.a\naddlib libx265_main10.a\naddlib libx265_main12.a\nsave\nend" | ar -M
         make install
-        # static linkがうまくいくように書き換え
-        sed -i -e 's/^Libs.private:.*/Libs.private: -lstdc++/g' $INSTALL_DIR/lib/pkgconfig/x265.pc
+        # static linkがうまくいくように書き換え（-lstdc++ は DLL が選ばれる）
+        sed -i -e "s/^Libs.private:.*/Libs.private: ${LIBSTDCXX_STATIC_FLAGS}/g" $INSTALL_DIR/lib/pkgconfig/x265.pc
     fi
 fi
 
@@ -2261,12 +2262,14 @@ if should_build VVENC; then
             exit 1
         fi
         # static linkがうまくいくように書き換え
+        # -lstdc++ は MinGW で DLL が選ばれ、Libs.private の -l:libstdc++.a と二重リンクになる
         if [ "$MINGWDIR" = "" ] && [ -f "$LIBSTDCXX_A" ]; then
             sed -i -e "s#^Libs:.*#Libs: -L\${libdir} -lvvenc ${LIBSTDCXX_STATIC_FLAGS}#g" "$VVENC_PC_FILE"
             sed -i -e 's#^Libs.private:.*#Libs.private: -lm -lgcc -lgcc#g' "$VVENC_PC_FILE"
         else
-            sed -i -e 's/-lvvenc/-lvvenc -lstdc++/g' "$VVENC_PC_FILE"
+            sed -i -e "s#^Libs:.*#Libs: -L\${libdir} -lvvenc ${LIBSTDCXX_STATIC_FLAGS}#g" "$VVENC_PC_FILE"
         fi
+        normalize_static_libstdcxx_pc_dir "$(dirname "$VVENC_PC_FILE")"
     fi
 fi
 
@@ -2598,9 +2601,10 @@ fi
 # Linuxではlibiconvが不要/存在しないため、過去ビルド由来の-likonv混入を除去
 if [ "$MINGWDIR" = "" ]; then
     sed -i 's/ -liconv//g' ${INSTALL_DIR}/lib/pkgconfig/*.pc 2>/dev/null || true
-    # 既存成果物を再利用する場合でも、-static-libstdc++ を確実に静的libstdc++指定へ正規化
-    normalize_static_libstdcxx_pc_dir "$INSTALL_DIR/lib/pkgconfig"
 fi
+# 既存成果物を再利用する場合でも、libstdc++ を静的かつリンク順が崩れない
+# -l:libstdc++.a 形式へ正規化する
+normalize_static_libstdcxx_pc_dir "$INSTALL_DIR/lib/pkgconfig"
 
 # FFmpeg configure用pkg-config探索パス
 PKG_CONFIG_PATH_FFMPEG=${INSTALL_DIR}/lib/pkgconfig

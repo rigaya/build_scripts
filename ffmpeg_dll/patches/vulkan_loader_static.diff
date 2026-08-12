@@ -1,6 +1,6 @@
 --- a/loader/CMakeLists.txt
 +++ b/loader/CMakeLists.txt
-@@ -387,29 +387,29 @@
+@@ -387,29 +387,29 @@ if(WIN32)
      endif()
  
      add_library(vulkan
@@ -43,23 +43,27 @@
 +    #    endif()
 +    #endif()
  
-    if(MSVC AND ENABLE_WIN10_ONECORE)
-        target_link_libraries(vulkan PRIVATE OneCoreUAP.lib LIBCMT.LIB LIBCMTD.LIB LIBVCRUNTIME.LIB LIBUCRT.LIB)
-@@ -426,3 +426,3 @@
-    else()
+     if(MSVC AND ENABLE_WIN10_ONECORE)
+         target_link_libraries(vulkan PRIVATE OneCoreUAP.lib LIBCMT.LIB LIBCMTD.LIB LIBVCRUNTIME.LIB LIBUCRT.LIB)
+@@ -431,7 +431,7 @@ else()
+         message(WARNING "The APPLE_STATIC_LOADER option has been set. Note that this will only work on MacOS and is not supported "
+                 "or tested as part of the loader. Use it at your own risk.")
+     else()
 -        add_library(vulkan SHARED)
 +        add_library(vulkan STATIC)
-    endif()
-@@ -524,7 +524,7 @@
+     endif()
+ 
+     target_sources(vulkan PRIVATE ${NORMAL_LOADER_SRCS})
+@@ -524,7 +524,7 @@ if (LOADER_USE_UNSAFE_FILE_SEARCH)
  endif()
-
+ 
  # common attributes of the vulkan library
 -target_link_libraries(vulkan PRIVATE loader_specific_options)
 +target_link_libraries(vulkan PRIVATE $<BUILD_INTERFACE:loader_specific_options>)
  
  target_link_libraries(vulkan PRIVATE Vulkan::Headers)
  add_library(Vulkan::Loader ALIAS vulkan)
-@@ -561,14 +561,27 @@
+@@ -561,14 +561,27 @@ install(FILES "${version_config}" DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Vulk
  # https://gitlab.kitware.com/cmake/cmake/-/issues/22621
  find_package(PkgConfig)
  if (PKG_CONFIG_FOUND)
@@ -94,7 +98,7 @@
      #
 --- a/loader/loader_windows.c
 +++ b/loader/loader_windows.c
-@@ -95,6 +95,7 @@
+@@ -95,6 +95,7 @@ void windows_initialization(void) {
  #endif
  }
  
@@ -102,7 +106,7 @@
  BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, LPVOID reserved) {
      (void)hinst;
      switch (reason) {
-@@ -115,6 +116,8 @@
+@@ -115,6 +116,8 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, LPVOID reserved) {
      }
      return TRUE;
  }
@@ -113,7 +117,7 @@
                                  LPCSTR key_name,  // key name - used for debug prints - i.e. VulkanDriverName
 --- a/loader/vulkan.pc.in
 +++ b/loader/vulkan.pc.in
-@@ -6,5 +6,5 @@
+@@ -6,5 +6,5 @@ includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR_PC@
  Name: Vulkan-Loader
  Description: Vulkan Loader
  Version: @VULKAN_LOADER_VERSION@

@@ -1034,7 +1034,7 @@ fi
 # fi
 
 if should_build DAV1D && [ ! -d "dav1d-${VER_DAV1D}" ]; then
-    download_archive "dav1d-${VER_DAV1D}.tar.gz" "https://code.videolan.org/videolan/dav1d/-/archive/${VER_DAV1D}/dav1d-${VER_DAV1D}.tar.gz"
+    download_archive "dav1d-${VER_DAV1D}.tar.gz" "https://github.com/videolan/dav1d/archive/refs/tags/${VER_DAV1D}.tar.gz" "https://code.videolan.org/videolan/dav1d/-/archive/${VER_DAV1D}/dav1d-${VER_DAV1D}.tar.gz"
     tar xf dav1d-${VER_DAV1D}.tar.gz
 fi
 

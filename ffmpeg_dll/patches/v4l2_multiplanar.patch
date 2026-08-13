@@ -1,59 +1,73 @@
-diff --git a/libavdevice/v4l2.c b/libavdevice/v4l2.c
 --- a/libavdevice/v4l2.c
 +++ b/libavdevice/v4l2.c
-@@ -89,6 +89,7 @@
-     int interlaced;
-     int top_field_first;
+@@ -81,8 +81,8 @@
+ #define V4L_TS_CONVERT_READY V4L_TS_DEFAULT
+ 
+ struct buf_data {
+-    void *start;
+-    unsigned int len;
++    void **start;
++    unsigned int *len;
+ };
+ 
+ struct video_data {
+@@ -96,11 +96,13 @@
      int ts_mode;
-+    int ignore_input_error;
      TimeFilter *timefilter;
      int64_t last_time_m;
++    int ignore_input_error;
  
-@@ -96,9 +97,10 @@
+     int multiplanar;
      enum v4l2_buf_type buf_type;
  
      int buffers;
 +    int plane_count;
      atomic_int buffers_queued;
--    void **buf_start;
--    unsigned int *buf_len;
-+    void ***buf_start;
-+    unsigned int **buf_len;
+     struct buf_data *buf_data;
      char *standard;
-     v4l2_std_id std_id;
-     int channel;
-@@ -126,6 +128,12 @@
-     int index;
- };
+@@ -362,9 +364,29 @@
  
+ static void mmap_free(struct video_data *s, int n)
+ {
+-    for (int i = 0; i < n; i++)
+-        v4l2_munmap(s->buf_data[i].start, s->buf_data[i].len);
++    for (int i = 0; i < n; i++) {
++        if (s->buf_data && s->buf_data[i].start && s->buf_data[i].len) {
++            for (int plane = 0; plane < s->plane_count; plane++) {
++                if (s->buf_data[i].start[plane] &&
++                    s->buf_data[i].start[plane] != MAP_FAILED &&
++                    s->buf_data[i].len[plane] > 0) {
++                    v4l2_munmap(s->buf_data[i].start[plane], s->buf_data[i].len[plane]);
++                }
++            }
++        }
++        if (s->buf_data) {
++            av_freep(&s->buf_data[i].start);
++            av_freep(&s->buf_data[i].len);
++        }
++    }
+     av_freep(&s->buf_data);
++    s->plane_count = 0;
++}
++
 +static unsigned int v4l2_get_plane_bytesused(const struct v4l2_plane *plane)
 +{
 +    return plane->bytesused > plane->data_offset ?
 +           plane->bytesused - plane->data_offset : 0;
-+}
-+
- static int device_open(AVFormatContext *ctx, const char* device_path)
- {
-     struct video_data *s = ctx->priv_data;
-@@ -377,20 +385,22 @@
+ }
+ 
+ static int mmap_init(AVFormatContext *ctx)
+@@ -388,14 +410,15 @@
          return AVERROR(ENOMEM);
      }
      s->buffers = req.count;
--    s->buf_start = av_malloc_array(s->buffers, sizeof(void *));
-+    s->buf_start = av_calloc(s->buffers, sizeof(*s->buf_start));
-     if (!s->buf_start) {
-         av_log(ctx, AV_LOG_ERROR, "Cannot allocate buffer pointers\n");
-         return AVERROR(ENOMEM);
-     }
--    s->buf_len = av_malloc_array(s->buffers, sizeof(unsigned int));
-+    s->buf_len = av_calloc(s->buffers, sizeof(*s->buf_len));
-     if (!s->buf_len) {
-         av_log(ctx, AV_LOG_ERROR, "Cannot allocate buffer sizes\n");
-         av_freep(&s->buf_start);
+-    s->buf_data = av_malloc_array(s->buffers, sizeof(struct buf_data));
++    s->buf_data = av_calloc(s->buffers, sizeof(*s->buf_data));
+     if (!s->buf_data) {
+         av_log(ctx, AV_LOG_ERROR, "Cannot allocate buffer data\n");
          return AVERROR(ENOMEM);
      }
  
-+    s->plane_count = 0;
      for (i = 0; i < req.count; i++) {
 -        unsigned int buf_length, buf_offset;
 +        int plane_count;
@@ -61,22 +75,17 @@ diff --git a/libavdevice/v4l2.c b/libavdevice/v4l2.c
          struct v4l2_plane planes[VIDEO_MAX_PLANES];
          struct v4l2_buffer buf = {
              .type   = s->buf_type,
-@@ -402,40 +412,89 @@
-         if (v4l2_ioctl(s->fd, VIDIOC_QUERYBUF, &buf) < 0) {
-             res = AVERROR(errno);
-             av_log(ctx, AV_LOG_ERROR, "ioctl(VIDIOC_QUERYBUF): %s\n", av_err2str(res));
--            return res;
-+            goto fail;
+@@ -411,33 +434,58 @@
          }
  
          if (s->multiplanar) {
 -            if (buf.length != 1) {
 -                av_log(ctx, AV_LOG_ERROR, "multiplanar only supported when buf.length == 1\n");
--                return AVERROR_PATCHWELCOME;
+-                res = AVERROR_PATCHWELCOME;
 +            if (buf.length < 1 || buf.length > VIDEO_MAX_PLANES) {
 +                av_log(ctx, AV_LOG_ERROR, "invalid multiplanar plane count: %u\n", buf.length);
 +                res = AVERROR(EINVAL);
-+                goto fail;
+                 goto fail;
              }
 -            buf_length = buf.m.planes[0].length;
 -            buf_offset = buf.m.planes[0].m.mem_offset;
@@ -85,8 +94,13 @@ diff --git a/libavdevice/v4l2.c b/libavdevice/v4l2.c
 -            buf_length = buf.length;
 -            buf_offset = buf.m.offset;
 +            plane_count = 1;
-+        }
-+
+         }
+ 
+-        s->buf_data[i].len = buf_length;
+-        if (s->frame_size > 0 && s->buf_data[i].len < s->frame_size) {
+-            av_log(ctx, AV_LOG_ERROR,
+-                   "buf_data[%d].len = %d < expected frame size %d\n",
+-                   i, buf_length, s->frame_size);
 +        if (s->plane_count && s->plane_count != plane_count) {
 +            av_log(ctx, AV_LOG_ERROR, "Plane count differed between buffers\n");
 +            res = AVERROR(EINVAL);
@@ -94,85 +108,60 @@ diff --git a/libavdevice/v4l2.c b/libavdevice/v4l2.c
 +        }
 +        s->plane_count = plane_count;
 +
-+        s->buf_start[i] = av_calloc(s->plane_count, sizeof(*s->buf_start[i]));
-+        if (!s->buf_start[i]) {
++        s->buf_data[i].start = av_calloc(s->plane_count, sizeof(*s->buf_data[i].start));
++        if (!s->buf_data[i].start) {
 +            av_log(ctx, AV_LOG_ERROR, "Cannot allocate plane buffer pointers\n");
 +            res = AVERROR(ENOMEM);
 +            goto fail;
 +        }
-+        s->buf_len[i] = av_calloc(s->plane_count, sizeof(*s->buf_len[i]));
-+        if (!s->buf_len[i]) {
++        s->buf_data[i].len = av_calloc(s->plane_count, sizeof(*s->buf_data[i].len));
++        if (!s->buf_data[i].len) {
 +            av_log(ctx, AV_LOG_ERROR, "Cannot allocate plane buffer sizes\n");
-+            res = AVERROR(ENOMEM);
-+            goto fail;
-+        }
-+
+             res = AVERROR(ENOMEM);
+             goto fail;
+         }
+-        s->buf_data[i].start = v4l2_mmap(NULL, buf_length,
+-                                         PROT_READ | PROT_WRITE, MAP_SHARED,
+-                                         s->fd, buf_offset);
+ 
+-        if (s->buf_data[i].start == MAP_FAILED) {
+-            res = AVERROR(errno);
+-            av_log(ctx, AV_LOG_ERROR, "mmap: %s\n", av_err2str(res));
 +        for (int plane = 0; plane < s->plane_count; plane++) {
 +            unsigned int buf_length = s->multiplanar ? buf.m.planes[plane].length : buf.length;
 +            unsigned int buf_offset = s->multiplanar ? buf.m.planes[plane].m.mem_offset : buf.m.offset;
 +
-+            s->buf_len[i][plane] = buf_length;
++            s->buf_data[i].len[plane] = buf_length;
 +            total_length += buf_length;
-+            s->buf_start[i][plane] = v4l2_mmap(NULL, buf_length,
-+                                               PROT_READ | PROT_WRITE, MAP_SHARED,
-+                                               s->fd, buf_offset);
++            s->buf_data[i].start[plane] = v4l2_mmap(NULL, buf_length,
++                                                    PROT_READ | PROT_WRITE, MAP_SHARED,
++                                                    s->fd, buf_offset);
 +
-+            if (s->buf_start[i][plane] == MAP_FAILED) {
++            if (s->buf_data[i].start[plane] == MAP_FAILED) {
 +                res = AVERROR(errno);
 +                av_log(ctx, AV_LOG_ERROR, "mmap: %s\n", av_err2str(res));
 +                goto fail;
 +            }
-         }
- 
--        s->buf_len[i] = buf_length;
--        if (s->frame_size > 0 && s->buf_len[i] < s->frame_size) {
++        }
++
 +        if (s->frame_size > 0 && total_length < s->frame_size) {
-             av_log(ctx, AV_LOG_ERROR,
-                    "buf_len[%d] = %d < expected frame size %d\n",
--                   i, s->buf_len[i], s->frame_size);
--            return AVERROR(ENOMEM);
++            av_log(ctx, AV_LOG_ERROR,
++                   "buf_data[%d].len = %d < expected frame size %d\n",
 +                   i, total_length, s->frame_size);
 +            res = AVERROR(ENOMEM);
-+            goto fail;
+             goto fail;
          }
--        s->buf_start[i] = v4l2_mmap(NULL, buf_length,
--                               PROT_READ | PROT_WRITE, MAP_SHARED,
--                               s->fd, buf_offset);
--
--        if (s->buf_start[i] == MAP_FAILED) {
--            res = AVERROR(errno);
--            av_log(ctx, AV_LOG_ERROR, "mmap: %s\n", av_err2str(res));
--            return res;
-+    }
-+
-+    return 0;
-+
-+fail:
-+    for (int buffer = 0; buffer < s->buffers; buffer++) {
-+        if (s->buf_start && s->buf_start[buffer] && s->buf_len && s->buf_len[buffer]) {
-+            for (int plane = 0; plane < s->plane_count; plane++) {
-+                if (s->buf_start[buffer][plane] &&
-+                    s->buf_start[buffer][plane] != MAP_FAILED &&
-+                    s->buf_len[buffer][plane] > 0) {
-+                    v4l2_munmap(s->buf_start[buffer][plane], s->buf_len[buffer][plane]);
-+                }
-+            }
-         }
-+        if (s->buf_start)
-+            av_freep(&s->buf_start[buffer]);
-+        if (s->buf_len)
-+            av_freep(&s->buf_len[buffer]);
      }
-+    av_freep(&s->buf_start);
-+    av_freep(&s->buf_len);
-+    s->plane_count = 0;
+@@ -445,7 +493,7 @@
+     return 0;
  
--    return 0;
-+    return res;
+ fail:
+-    mmap_free(s, i);
++    mmap_free(s, i + 1);
+     return res;
  }
  
- static int enqueue_buffer(struct video_data *s, struct v4l2_buffer *buf)
-@@ -568,7 +627,13 @@
+@@ -579,7 +627,13 @@
      // always keep at least one buffer queued
      av_assert0(atomic_load(&s->buffers_queued) >= 1);
  
@@ -187,21 +176,21 @@ diff --git a/libavdevice/v4l2.c b/libavdevice/v4l2.c
  
  #ifdef V4L2_BUF_FLAG_ERROR
      if (buf.flags & V4L2_BUF_FLAG_ERROR) {
-@@ -593,15 +658,28 @@
+@@ -604,15 +658,28 @@
      }
  
-     /* Image is at s->buff_start[buf.index] */
+     /* Image is at s->buf_data[buf.index].start */
 -    if (atomic_load(&s->buffers_queued) == FFMAX(s->buffers / 8, 1)) {
 -        /* when we start getting low on queued buffers, fall back on copying data */
 +    if (s->multiplanar || atomic_load(&s->buffers_queued) == FFMAX(s->buffers / 8, 1)) {
-+        /* Multiplanar capture uses one mmap region per plane, so flatten into a packet. */
++        /* マルチプレーンではプレーンごとにmmapされるため、パケットへ平坦化する。 */
          res = av_new_packet(pkt, bytesused);
          if (res < 0) {
              av_log(ctx, AV_LOG_ERROR, "Error allocating a packet.\n");
              enqueue_buffer(s, &buf);
              return res;
          }
--        memcpy(pkt->data, s->buf_start[buf.index], bytesused);
+-        memcpy(pkt->data, s->buf_data[buf.index].start, bytesused);
 +        if (s->multiplanar) {
 +            unsigned int offset = 0;
 +            for (int plane = 0; plane < FFMIN((int)buf.length, s->plane_count); plane++) {
@@ -209,49 +198,26 @@ diff --git a/libavdevice/v4l2.c b/libavdevice/v4l2.c
 +                if (!plane_bytesused)
 +                    continue;
 +                memcpy(pkt->data + offset,
-+                       (const uint8_t *)s->buf_start[buf.index][plane] + buf.m.planes[plane].data_offset,
++                       (const uint8_t *)s->buf_data[buf.index].start[plane] + buf.m.planes[plane].data_offset,
 +                       plane_bytesused);
 +                offset += plane_bytesused;
 +            }
 +        } else {
-+            memcpy(pkt->data, s->buf_start[buf.index][0], bytesused);
++            memcpy(pkt->data, s->buf_data[buf.index].start[0], bytesused);
 +        }
  
          res = enqueue_buffer(s, &buf);
          if (res) {
-@@ -611,7 +689,7 @@
+@@ -622,7 +689,7 @@
      } else {
-         struct buff_data *buf_descriptor;
+         struct buf_desc *buf_descriptor;
  
--        pkt->data     = s->buf_start[buf.index];
-+        pkt->data     = s->buf_start[buf.index][0];
+-        pkt->data     = s->buf_data[buf.index].start;
++        pkt->data     = s->buf_data[buf.index].start[0];
          pkt->size     = bytesused;
  
-         buf_descriptor = av_malloc(sizeof(struct buff_data));
-@@ -689,10 +767,21 @@
-      */
-     v4l2_ioctl(s->fd, VIDIOC_STREAMOFF, &type);
-     for (i = 0; i < s->buffers; i++) {
--        v4l2_munmap(s->buf_start[i], s->buf_len[i]);
-+        if (s->buf_start[i] && s->buf_len[i]) {
-+            for (int plane = 0; plane < s->plane_count; plane++) {
-+                if (s->buf_start[i][plane] &&
-+                    s->buf_start[i][plane] != MAP_FAILED &&
-+                    s->buf_len[i][plane] > 0) {
-+                    v4l2_munmap(s->buf_start[i][plane], s->buf_len[i][plane]);
-+                }
-+            }
-+        }
-+        av_freep(&s->buf_start[i]);
-+        av_freep(&s->buf_len[i]);
-     }
-     av_freep(&s->buf_start);
-     av_freep(&s->buf_len);
-+    s->plane_count = 0;
- }
- 
- static int v4l2_set_parameters(AVFormatContext *ctx)
-@@ -772,8 +861,55 @@
+         buf_descriptor = av_malloc(sizeof(struct buf_desc));
+@@ -778,8 +845,55 @@
  
      streamparm.type = s->buf_type;
      if (v4l2_ioctl(s->fd, VIDIOC_G_PARM, &streamparm) < 0) {
@@ -308,7 +274,7 @@ diff --git a/libavdevice/v4l2.c b/libavdevice/v4l2.c
      } else if (framerate_q.num && framerate_q.den) {
          if (streamparm.parm.capture.capability & V4L2_CAP_TIMEPERFRAME) {
              tpf = &streamparm.parm.capture.timeperframe;
-@@ -903,8 +1039,10 @@
+@@ -909,8 +1023,10 @@
          av_log(ctx, AV_LOG_DEBUG, "Selecting input_channel: %d\n", s->channel);
          if (v4l2_ioctl(s->fd, VIDIOC_S_INPUT, &s->channel) < 0) {
              res = AVERROR(errno);
@@ -321,7 +287,7 @@ diff --git a/libavdevice/v4l2.c b/libavdevice/v4l2.c
          }
      } else {
          /* get current video input */
-@@ -1146,6 +1284,7 @@
+@@ -1152,6 +1268,7 @@
      { "pixel_format", "set preferred pixel format",                               OFFSET(pixel_format), AV_OPT_TYPE_STRING, {.str = NULL},  0, 0,       DEC },
      { "input_format", "set preferred pixel format (for raw video) or codec name", OFFSET(pixel_format), AV_OPT_TYPE_STRING, {.str = NULL},  0, 0,       DEC },
      { "framerate",    "set frame rate",                                           OFFSET(framerate),    AV_OPT_TYPE_STRING, {.str = NULL},  0, 0,       DEC },

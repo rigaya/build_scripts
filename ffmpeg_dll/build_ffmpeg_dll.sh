@@ -26,6 +26,7 @@
 # デフォルトをgnuのほうにしておかないとlinkエラーが出る
 # rustup default stable-x86_64-pc-windows-gnu
 # cargo install cargo-c
+# CUDAフィルタ (exe, scale_cuda等): --enable-nonfree で nvcc を使う
 # Vulkan
 # pacman -S mingw-w64-i686-uasm mingw-w64-x86_64-uasm
 if [ -n "${NUMBER_OF_PROCESSORS:-}" ]; then
@@ -53,6 +54,7 @@ FOR_TSREPLACE="FALSE"
 ADD_TLVMMT="FALSE"
 BUILD_EXE="FALSE"
 ENABLE_GPL="FALSE"
+ENABLE_NONFREE="FALSE"
 ENABLE_LTO="FALSE"
 ENABLE_PGO="FALSE"
 SKIP_SRC_ARCHIVE="FALSE"
@@ -69,6 +71,7 @@ while [[ $# -gt 0 ]]; do
     --skip-src-archive) SKIP_SRC_ARCHIVE="TRUE"; shift ;;
     --src-archive-only) SRC_ARCHIVE_ONLY="TRUE"; shift ;;
     --enable-gpl) ENABLE_GPL="TRUE"; shift ;;
+    --enable-nonfree) ENABLE_NONFREE="TRUE"; shift ;;
     --enable-swscale) ENABLE_SWSCALE="TRUE"; shift ;;
     --disable-pgo) ENABLE_PGO="FALSE"; shift ;;
     --lto) ENABLE_LTO="TRUE"; shift ;;
@@ -110,6 +113,8 @@ echo FOR_FFMPEG4=$FOR_FFMPEG4
 echo SRC_DIR=$SRC_DIR
 echo TARGET_DIR=$TARGET_DIR
 echo ENABLE_V4L2_MULTIPLANAR=$ENABLE_V4L2_MULTIPLANAR
+echo ENABLE_GPL=$ENABLE_GPL
+echo ENABLE_NONFREE=$ENABLE_NONFREE
 
 mkdir -p $BUILD_DIR
 mkdir -p $SRC_DIR
@@ -118,6 +123,13 @@ cd $SRC_DIR
 if [ "$ENABLE_GPL" != "FALSE" ]; then
   if [ "$BUILD_EXE" = "FALSE" ] && [ "$SRC_ARCHIVE_ONLY" != "TRUE" ]; then
     echo "--enable-gpl can be only used when --target exe is set."
+    exit 1
+  fi
+fi
+
+if [ "$ENABLE_NONFREE" != "FALSE" ]; then
+  if [ "$BUILD_EXE" = "FALSE" ] && [ "$SRC_ARCHIVE_ONLY" != "TRUE" ]; then
+    echo "--enable-nonfree can be only used when --target exe is set."
     exit 1
   fi
 fi
@@ -323,6 +335,73 @@ should_build() {
     [ "${!flag_name}" = "TRUE" ]
 }
 
+# FFmpeg CUDAフィルタ (scale_cuda 等) は cuda-nvcc のみ。
+# cuda-llvm は MinGW では使わない。cuda-nvcc は --enable-nonfree が必要。
+# nvcc 用 CUDA Toolkit 探索 (build_libvmaf.sh と同じ候補)
+find_ffmpeg_cuda_path() {
+    if [ -n "${CUDA_PATH:-}" ]; then
+        if [ "$MINGWDIR" != "" ]; then
+            case "${CUDA_PATH}" in
+                *:*) CUDA_PATH="$(cygpath -u "${CUDA_PATH}")" ;;
+            esac
+        fi
+        [ -d "${CUDA_PATH}" ] && return 0
+    fi
+    if [ "$MINGWDIR" != "" ]; then
+        local candidate
+        for candidate in \
+            /c/ProgramAnother/CUDA/v12.9 \
+            /c/ProgramAnother/CUDA/v12.8 \
+            /c/ProgramAnother/CUDA/v12.4 \
+            /c/ProgramAnother/CUDA/v11.8 \
+            "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9" \
+            "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8" \
+            "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.4" \
+            "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.8"
+        do
+            if [ -d "$candidate" ]; then
+                CUDA_PATH="$candidate"
+                return 0
+            fi
+        done
+    else
+        local candidate
+        for candidate in /usr/local/cuda /opt/cuda; do
+            if [ -d "$candidate" ]; then
+                CUDA_PATH="$candidate"
+                return 0
+            fi
+        done
+        if command -v nvcc >/dev/null 2>&1; then
+            CUDA_PATH="$(cd "$(dirname "$(dirname "$(command -v nvcc)")")" && pwd)"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+find_ffmpeg_cuda_nvcc() {
+    FFMPEG_CUDA_NVCC=""
+    local candidate
+    for candidate in \
+        "$(command -v nvcc 2>/dev/null || true)" \
+        "$(command -v nvcc.exe 2>/dev/null || true)" \
+        "${CUDA_PATH:+$CUDA_PATH/bin/nvcc}" \
+        "${CUDA_PATH:+$CUDA_PATH/bin/nvcc.exe}"
+    do
+        [ -n "$candidate" ] || continue
+        if [ -x "$candidate" ]; then
+            FFMPEG_CUDA_NVCC="$candidate"
+            return 0
+        fi
+        if [ -x "${candidate}.exe" ]; then
+            FFMPEG_CUDA_NVCC="${candidate}.exe"
+            return 0
+        fi
+    done
+    return 1
+}
+
 # Normalize .pc files to force static libstdc++ linkage in a way that works
 # with FFmpeg configure checks driven by `cc`.
 normalize_static_libstdcxx_pc_dir() {
@@ -439,22 +518,34 @@ download_archive() {
         return 1
     fi
 
+    if [ -f "${output}" ] && [ -s "${output}" ]; then
+        echo "Already have ${output}, skipping download."
+        return 0
+    fi
+
     local tmp="${output}.part"
     local url=
+    local curl_status=0
 
     rm -f "${tmp}"
     for url in "$@"; do
         echo "Downloading ${output} from ${url}"
         rm -f "${tmp}"
+        # ffmpeg.org などは遅い/途切れやすいので、低速切断でリトライを促す
         if curl -fL \
             --retry 5 \
             --retry-delay 5 \
             ${CURL_RETRY_ALL_ERRORS} \
             --connect-timeout 30 \
+            --speed-limit 1000 \
+            --speed-time 60 \
             -o "${tmp}" \
             "${url}"; then
             mv "${tmp}" "${output}"
             return 0
+        else
+            curl_status=$?
+            echo "curl failed for ${url} (exit=${curl_status})"
         fi
     done
 
@@ -834,12 +925,15 @@ else
     if [ ! -d "ffmpeg" ]; then
         UPDATE_FFMPEG="TRUE"
     elif [ $UPDATE_FFMPEG != "FALSE" ]; then
-        rm -rf ffmpeg
+        # -u 指定時のみ再ダウンロード（既存 tar を捨てる）
+        rm -f "ffmpeg-${VER_FFMPEG}.tar.xz"
     fi
     if [ $UPDATE_FFMPEG != "FALSE" ]; then
         #git clone --depth 1 --branch release/9.0 --single-branch \
         #    https://github.com/FFmpeg/FFmpeg.git ffmpeg
+        # ダウンロード成功後に差し替える（失敗時に既存ソースを消さない）
         download_archive "ffmpeg-${VER_FFMPEG}.tar.xz" "https://ffmpeg.org/releases/ffmpeg-${VER_FFMPEG}.tar.xz"
+        rm -rf ffmpeg
         tar xf ffmpeg-${VER_FFMPEG}.tar.xz
         mv ffmpeg-${VER_FFMPEG} ffmpeg
     fi
@@ -1034,7 +1128,7 @@ fi
 # fi
 
 if should_build DAV1D && [ ! -d "dav1d-${VER_DAV1D}" ]; then
-    download_archive "dav1d-${VER_DAV1D}.tar.gz" "https://github.com/videolan/dav1d/archive/refs/tags/${VER_DAV1D}.tar.gz" "https://code.videolan.org/videolan/dav1d/-/archive/${VER_DAV1D}/dav1d-${VER_DAV1D}.tar.gz"
+    download_archive "dav1d-${VER_DAV1D}.tar.gz" "https://code.videolan.org/videolan/dav1d/-/archive/${VER_DAV1D}/dav1d-${VER_DAV1D}.tar.gz"
     tar xf dav1d-${VER_DAV1D}.tar.gz
 fi
 
@@ -2606,6 +2700,30 @@ else
     FFMPEG5_CUDA_DISABLE_FLAGS=" --disable-cuda-nvcc --disable-cuda-llvm"
 fi
 
+# --target exe (x64) + --enable-nonfree: nvcc で scale_cuda 等を有効化する。
+# DLL/audenc、および nonfree なしでは CUDA カーネルコンパイルは無効。
+FFMPEG_CUDA_ENABLE_FLAGS=""
+if [ "$BUILD_EXE" = "TRUE" ] && [ "$FOR_AUDENC" != "TRUE" ] && [ "$TARGET_ARCH" = "x64" ] && [ "$ENABLE_NONFREE" = "TRUE" ]; then
+    if find_ffmpeg_cuda_path; then
+        export CUDA_PATH
+        export PATH="${CUDA_PATH}/bin:${PATH}"
+    fi
+    if find_ffmpeg_cuda_nvcc; then
+        FFMPEG5_CUDA_DISABLE_FLAGS=""
+        FFMPEG_CUDA_ENABLE_FLAGS="--enable-cuda-nvcc --disable-cuda-llvm --nvcc=${FFMPEG_CUDA_NVCC}"
+        # CUDA 11.8 + 新しい MSVC ではホストコンパイラ検査で落ちる。
+        # libvmaf と同じ NVCC_PREPEND_FLAGS を configure/make に渡す。
+        export NVCC_PREPEND_FLAGS="${NVCC_PREPEND_FLAGS:--allow-unsupported-compiler -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH}"
+        echo "FFmpeg CUDA filters: enabled (nvcc=${FFMPEG_CUDA_NVCC}, CUDA_PATH=${CUDA_PATH:-})"
+        echo "NVCC_PREPEND_FLAGS=${NVCC_PREPEND_FLAGS}"
+    fi
+    if [ -z "$FFMPEG_CUDA_ENABLE_FLAGS" ]; then
+        echo "FFmpeg CUDA filters with --enable-nonfree require CUDA Toolkit (nvcc) for --target exe on x64."
+        echo "Set CUDA_PATH or install CUDA Toolkit."
+        exit 1
+    fi
+fi
+
 FFMPEG_X86_DISABLE_FLAGS=""
 if [ "$TARGET_ARCH" = "x86" ] || [ "$TARGET_ARCH" = "x64" ]; then
     FFMPEG_X86_DISABLE_FLAGS="--disable-amd3dnow --disable-amd3dnowext --disable-xop --disable-fma4 --disable-aesni"
@@ -2627,6 +2745,11 @@ if [ $ENABLE_GPL = "TRUE" ]; then
   GPL_LIBS="--enable-gpl --enable-libx264 --enable-libx265 --enable-libxvid"
 else
   GPL_LIBS=""
+fi
+
+NONFREE_LIBS=""
+if [ "$ENABLE_NONFREE" = "TRUE" ]; then
+  NONFREE_LIBS="--enable-nonfree"
 fi
 
 ARIB_LIBS=""
@@ -2839,10 +2962,12 @@ $SWSCALE_ARG \
 $FFMPEG_DISABLE_ASM \
 $ENCODER_LIBS \
 $GPL_LIBS \
+$NONFREE_LIBS \
 --disable-outdevs \
 $FFMPEG_X86_DISABLE_FLAGS \
 $FFMPEG_THREAD_FLAGS \
 $FFMPEG5_CUDA_DISABLE_FLAGS \
+$FFMPEG_CUDA_ENABLE_FLAGS \
 --enable-bsfs \
 --enable-filters \
 --enable-swresample \

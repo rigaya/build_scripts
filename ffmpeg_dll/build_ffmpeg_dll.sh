@@ -38,6 +38,8 @@ else
     NJOBS=1
 fi
 WORK_DIR=`pwd`
+SCRIPT_PATH=$(readlink -f "${BASH_SOURCE[0]}")
+SCRIPT_DIR=$(dirname -- "${SCRIPT_PATH}")
 PATCHES_DIR=${WORK_DIR}/patches
 YUVFILE=${WORK_DIR}/test.yuv
 YUVFILE_10=${WORK_DIR}/test_10.yuv
@@ -57,6 +59,7 @@ ENABLE_GPL="FALSE"
 ENABLE_NONFREE="FALSE"
 ENABLE_LTO="FALSE"
 ENABLE_PGO="FALSE"
+DISABLE_LIBVMAF="FALSE"
 SKIP_SRC_ARCHIVE="FALSE"
 SRC_ARCHIVE_ONLY="FALSE"
 ENABLE_V4L2_MULTIPLANAR="FALSE"
@@ -73,6 +76,7 @@ while [[ $# -gt 0 ]]; do
     --enable-gpl) ENABLE_GPL="TRUE"; shift ;;
     --enable-nonfree) ENABLE_NONFREE="TRUE"; shift ;;
     --enable-swscale) ENABLE_SWSCALE="TRUE"; shift ;;
+    --disable-libvmaf) DISABLE_LIBVMAF="TRUE"; shift ;;
     --disable-pgo) ENABLE_PGO="FALSE"; shift ;;
     --lto) ENABLE_LTO="TRUE"; shift ;;
     --v4l2-multiplanar) ENABLE_V4L2_MULTIPLANAR="TRUE"; shift ;;
@@ -752,7 +756,7 @@ if [ "$FOR_AUDENC" != "TRUE" ] && [ "$FOR_TSREPLACE" != "TRUE" ]; then
 
     # exe向け: CUDA対応libvmaf (build_libvmaf.sh 相当)
     # audencは音声専用のため不要。x64ではCUDA必須、それ以外はCPU版。
-    if [ "$BUILD_EXE" = "TRUE" ] && [ "$FOR_AUDENC" != "TRUE" ]; then
+    if [ "$BUILD_EXE" = "TRUE" ] && [ "$FOR_AUDENC" != "TRUE" ] && [ "$DISABLE_LIBVMAF" != "TRUE" ]; then
         BUILD_LIB_LIBVMAF="TRUE"
     fi
 fi
@@ -2253,7 +2257,7 @@ if should_build X264; then
         if [ $ENABLE_LTO = "TRUE" ]; then
             X264_ENABLE_LTO=--enable-lto
         fi
-        patch < $HOME/patches/x264_makefile.diff
+        patch < ${PATCHES_DIR}/x264_makefile.diff
         PKG_CONFIG_PATH=${INSTALL_DIR}/lib/pkgconfig \
         ./configure \
          --prefix=$INSTALL_DIR \
@@ -2287,9 +2291,9 @@ if should_build X265; then
         if [ -f x265Version.txt ] && ! git describe --abbrev=0 --tags >/dev/null 2>&1; then
             rm -rf .git
         fi
-        patch -p 1 < $HOME/patches/x265_version.diff
-        patch -p 1 < $HOME/patches/x265_zone_param.diff
-        patch -p 0 < $HOME/patches/x265_json11.diff
+        patch -p 1 < ${PATCHES_DIR}/x265_version.diff
+        patch -p 1 < ${PATCHES_DIR}/x265_zone_param.diff
+        patch -p 0 < ${PATCHES_DIR}/x265_json11.diff
         mkdir build/msys2 && cd build/msys2
         mkdir 8bit
         mkdir 12bit && cd 12bit
@@ -2352,16 +2356,16 @@ if should_build X265; then
         ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE}"
         ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE}" --preset slow
         ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE}" --preset slower
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset faster
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset fast
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 10
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset slow
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset slower
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset faster
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset fast
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 12
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset slow
-        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset slower
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --input-depth 10 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset faster
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --input-depth 10 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset fast
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --input-depth 10 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 10
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --input-depth 10 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset slow
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --input-depth 10 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 10 --preset slower
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --input-depth 10 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset faster
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --input-depth 10 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset fast
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --input-depth 10 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 12
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --input-depth 10 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset slow
+        ./x265 --pools none --frame-threads 1 --lookahead-slices 0 --input-res 1280x720 --input-depth 10 --fps 30 -o /dev/null --input "${YUVFILE_10}" --output-depth 12 --preset slower
         
         cd ../12bit
         cmake -G "${CMAKE_GENERATOR}" ../../../source \
@@ -2441,7 +2445,7 @@ if should_build XVIDCORE; then
         ./configure --prefix=$INSTALL_DIR
         make -j${NJOBS}
         cp ../../src/xvid.h $INSTALL_DIR/include/
-        cp '=build/xvidcore.a' $INSTALL_DIR/lib/libxvidcore.a
+        cp '=build/libxvidcore.a' $INSTALL_DIR/lib/libxvidcore.a
     fi
 fi
 
@@ -2609,8 +2613,8 @@ if should_build LIBVMAF; then
     cd "$BUILD_DIR/$TARGET_ARCH"
     if [ ! -d "vmaf" ] || [ ! -f "${INSTALL_DIR}/lib/pkgconfig/libvmaf.pc" ]; then
         start_build "libvmaf"
-        if [ ! -x "${WORK_DIR}/build_libvmaf.sh" ]; then
-            echo "build_libvmaf.sh not found: ${WORK_DIR}/build_libvmaf.sh"
+        if [ ! -f "${SCRIPT_DIR}/build_libvmaf.sh" ]; then
+            echo "build_libvmaf.sh not found: ${SCRIPT_DIR}/build_libvmaf.sh"
             exit 1
         fi
         LIBVMAF_ARGS=(--skip-src-archive)
@@ -2621,7 +2625,7 @@ if should_build LIBVMAF; then
         fi
         # BUILD_DIR/SRC_DIR を共有し、exe/x64/build へインストールさせる
         VMAF_VERSION="${VER_VMAF}" BUILD_DIR="$BUILD_DIR" SRC_DIR="$SRC_DIR" \
-            "${WORK_DIR}/build_libvmaf.sh" "${LIBVMAF_ARGS[@]}"
+            bash "${SCRIPT_DIR}/build_libvmaf.sh" "${LIBVMAF_ARGS[@]}"
         if [ ! -f "${INSTALL_DIR}/lib/pkgconfig/libvmaf.pc" ]; then
             echo "libvmaf.pc was not installed: ${INSTALL_DIR}/lib/pkgconfig/libvmaf.pc"
             exit 1
@@ -2773,7 +2777,7 @@ fi
 # Linux静的リンク時、libsoxr等が要求するlibmを明示的に末尾へ渡す
 FFMPEG_EXTRA_LIBS=""
 if [ "$MINGWDIR" = "" ]; then
-    FFMPEG_EXTRA_LIBS="--extra-libs=-lm"
+    FFMPEG_EXTRA_LIBS="--extra-libs=-lm --extra-libs=${LIBSTDCXX_STATIC_FLAGS}"
 fi
 
 TWOLAME_LIBS=""

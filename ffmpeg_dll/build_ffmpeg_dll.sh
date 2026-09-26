@@ -1259,6 +1259,12 @@ if [ "${BUILD_LIB_LIBVMAF}" = "TRUE" ]; then
     echo "Patch ffmpeg_libvmaf_cuda_yuv420p10le.diff..."
     patch -p1 < "$PATCHES_DIR/ffmpeg_libvmaf_cuda_yuv420p10le.diff"
 fi
+
+if [ "$MINGWDIR" = "" ] && [ -n "${LIBVA_BUILD_PREFIX:-}" ]; then
+    cd "$FFMPEG_WORK_DIR"
+    # 新しい libva のヘッダでビルドしても、古い実行時 libva の未提供関数を直接参照しない。
+    patch -p1 < "$PATCHES_DIR/ffmpeg_libva_legacy_runtime.diff"
+fi
   
   #$BUILD_DIR/src/soxr* $BUILD_DIR/src/nettle* $BUILD_DIR/src/gnutls*
 
@@ -2778,6 +2784,9 @@ fi
 FFMPEG_EXTRA_LIBS=""
 if [ "$MINGWDIR" = "" ]; then
     FFMPEG_EXTRA_LIBS="--extra-libs=-lm --extra-libs=${LIBSTDCXX_STATIC_FLAGS}"
+    if [ -n "${LIBVA_BUILD_PREFIX:-}" ]; then
+        FFMPEG_EXTRA_LIBS="${FFMPEG_EXTRA_LIBS} --extra-libs=-ldl"
+    fi
 fi
 
 TWOLAME_LIBS=""
@@ -2886,6 +2895,9 @@ fi
 
 # FFmpeg configure用pkg-config探索パス
 PKG_CONFIG_PATH_FFMPEG=${INSTALL_DIR}/lib/pkgconfig
+if [ "$MINGWDIR" = "" ] && [ -n "${LIBVA_BUILD_PREFIX:-}" ]; then
+    PKG_CONFIG_PATH_FFMPEG="${LIBVA_BUILD_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH_FFMPEG}"
+fi
 if [ "$MINGWDIR" = "" ]; then
     for pcdir in "${INSTALL_DIR}"/lib/*-linux-gnu/pkgconfig; do
         if [ -d "$pcdir" ]; then

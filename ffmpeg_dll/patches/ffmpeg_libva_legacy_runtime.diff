@@ -1,0 +1,83 @@
+diff --git a/libavcodec/vaapi_encode.c b/libavcodec/vaapi_encode.c
+index 0e50602..5c31100 100644
+--- a/libavcodec/vaapi_encode.c
++++ b/libavcodec/vaapi_encode.c
+@@ -16,8 +16,12 @@
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+  */
+ 
++#ifndef _GNU_SOURCE
++#define _GNU_SOURCE
++#endif
+ #include <inttypes.h>
+ #include <string.h>
++#include <dlfcn.h>
+ 
+ #include "config.h"
+ 
+@@ -38,6 +42,15 @@ const AVCodecHWConfigInternal *const ff_vaapi_encode_hw_configs[] = {
+     NULL,
+ };
+ 
++static VAStatus vaapi_sync_buffer_compat(VADisplay display, VABufferID buffer,
++                                         uint64_t timeout)
++{
++    VAStatus (*sync_buffer)(VADisplay, VABufferID, uint64_t) =
++        dlsym(RTLD_DEFAULT, "vaSyncBuffer");
++    return sync_buffer ? sync_buffer(display, buffer, timeout)
++                       : VA_STATUS_ERROR_UNIMPLEMENTED;
++}
++
+ static int vaapi_encode_make_packed_header(AVCodecContext *avctx,
+                                            VAAPIEncodePicture *pic,
+                                            int type, char *data, size_t bit_len)
+@@ -157,7 +170,7 @@ static int vaapi_encode_wait(AVCodecContext *avctx, FFHWBaseEncodePicture *base_
+ 
+ #if VA_CHECK_VERSION(1, 9, 0)
+     if (base_ctx->async_encode) {
+-        vas = vaSyncBuffer(ctx->hwctx->display,
++        vas = vaapi_sync_buffer_compat(ctx->hwctx->display,
+                            pic->output_buffer,
+                            VA_TIMEOUT_INFINITE);
+         if (vas != VA_STATUS_SUCCESS) {
+@@ -2325,7 +2338,7 @@ av_cold int ff_vaapi_encode_init(AVCodecContext *avctx)
+ 
+ #if VA_CHECK_VERSION(1, 9, 0)
+     // check vaSyncBuffer function
+-    vas = vaSyncBuffer(ctx->hwctx->display, VA_INVALID_ID, 0);
++    vas = vaapi_sync_buffer_compat(ctx->hwctx->display, VA_INVALID_ID, 0);
+     if (vas != VA_STATUS_ERROR_UNIMPLEMENTED) {
+         base_ctx->async_encode = 1;
+         base_ctx->encode_fifo = av_fifo_alloc2(base_ctx->async_depth,
+diff --git a/libavutil/hwcontext_vaapi.c b/libavutil/hwcontext_vaapi.c
+index 98130f9..027389f 100644
+--- a/libavutil/hwcontext_vaapi.c
++++ b/libavutil/hwcontext_vaapi.c
+@@ -16,7 +16,11 @@
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+  */
+ 
++#ifndef _GNU_SOURCE
++#define _GNU_SOURCE
++#endif
+ #include "config.h"
++#include <dlfcn.h>
+ 
+ #if HAVE_VAAPI_WIN32
+ #   include <windows.h>
+@@ -925,7 +929,14 @@ static int vaapi_map_frame(AVHWFramesContext *hwfc,
+     if (flags & AV_HWFRAME_MAP_WRITE)
+         vaflags |= VA_MAPBUFFER_FLAG_WRITE;
+     // On drivers not implementing vaMapBuffer2 libva calls vaMapBuffer instead.
+-    vas = vaMapBuffer2(hwctx->display, map->image.buf, &address, vaflags);
++    {
++        VAStatus (*map_buffer2)(VADisplay, VABufferID, void **, uint32_t) =
++            dlsym(RTLD_DEFAULT, "vaMapBuffer2");
++        if (map_buffer2)
++            vas = map_buffer2(hwctx->display, map->image.buf, &address, vaflags);
++        else
++            vas = vaMapBuffer(hwctx->display, map->image.buf, &address);
++    }
+ #else
+     vas = vaMapBuffer(hwctx->display, map->image.buf, &address);
+ #endif

@@ -57,6 +57,7 @@ ADD_TLVMMT="FALSE"
 BUILD_EXE="FALSE"
 ENABLE_GPL="FALSE"
 ENABLE_NONFREE="FALSE"
+DISABLE_CUDA="FALSE"
 ENABLE_LTO="FALSE"
 ENABLE_PGO="FALSE"
 DISABLE_LIBVMAF="FALSE"
@@ -75,6 +76,7 @@ while [[ $# -gt 0 ]]; do
     --src-archive-only) SRC_ARCHIVE_ONLY="TRUE"; shift ;;
     --enable-gpl) ENABLE_GPL="TRUE"; shift ;;
     --enable-nonfree) ENABLE_NONFREE="TRUE"; shift ;;
+    --disable-cuda) DISABLE_CUDA="TRUE"; shift ;;
     --enable-swscale) ENABLE_SWSCALE="TRUE"; shift ;;
     --disable-libvmaf) DISABLE_LIBVMAF="TRUE"; shift ;;
     --disable-pgo) ENABLE_PGO="FALSE"; shift ;;
@@ -119,6 +121,7 @@ echo TARGET_DIR=$TARGET_DIR
 echo ENABLE_V4L2_MULTIPLANAR=$ENABLE_V4L2_MULTIPLANAR
 echo ENABLE_GPL=$ENABLE_GPL
 echo ENABLE_NONFREE=$ENABLE_NONFREE
+echo DISABLE_CUDA=$DISABLE_CUDA
 
 mkdir -p $BUILD_DIR
 mkdir -p $SRC_DIR
@@ -754,8 +757,7 @@ if [ "$FOR_AUDENC" != "TRUE" ] && [ "$FOR_TSREPLACE" != "TRUE" ]; then
         BUILD_LIB_X265="TRUE"
     fi
 
-    # exe向け: CUDA対応libvmaf (build_libvmaf.sh 相当)
-    # audencは音声専用のため不要。x64ではCUDA必須、それ以外はCPU版。
+    # exe向けlibvmaf。x64では既定でCUDA対応、それ以外または--disable-cudaではCPU版。
     if [ "$BUILD_EXE" = "TRUE" ] && [ "$FOR_AUDENC" != "TRUE" ] && [ "$DISABLE_LIBVMAF" != "TRUE" ]; then
         BUILD_LIB_LIBVMAF="TRUE"
     fi
@@ -2614,17 +2616,26 @@ if should_build SVT_AV1; then
     fi
 fi
 
-# CUDA対応libvmaf (exe向け)。実装は build_libvmaf.sh に委譲する。
+# exe向けlibvmaf。実装は build_libvmaf.sh に委譲する。
 if should_build LIBVMAF; then
     cd "$BUILD_DIR/$TARGET_ARCH"
-    if [ ! -d "vmaf" ] || [ ! -f "${INSTALL_DIR}/lib/pkgconfig/libvmaf.pc" ]; then
+    VMAF_EXPECT_CUDA="FALSE"
+    if [ "$TARGET_ARCH" = "x64" ] && [ "$DISABLE_CUDA" != "TRUE" ]; then
+        VMAF_EXPECT_CUDA="TRUE"
+    fi
+    VMAF_CUDA_CONFIG="${BUILD_DIR}/${TARGET_ARCH}/vmaf/libvmaf/build/src/config.h"
+    VMAF_BUILT_WITH_CUDA="FALSE"
+    if grep -q 'HAVE_CUDA 1' "$VMAF_CUDA_CONFIG" 2>/dev/null; then
+        VMAF_BUILT_WITH_CUDA="TRUE"
+    fi
+    if [ ! -d "vmaf" ] || [ ! -f "${INSTALL_DIR}/lib/pkgconfig/libvmaf.pc" ] || [ "$VMAF_EXPECT_CUDA" != "$VMAF_BUILT_WITH_CUDA" ]; then
         start_build "libvmaf"
         if [ ! -f "${SCRIPT_DIR}/build_libvmaf.sh" ]; then
             echo "build_libvmaf.sh not found: ${SCRIPT_DIR}/build_libvmaf.sh"
             exit 1
         fi
         LIBVMAF_ARGS=(--skip-src-archive)
-        if [ "$TARGET_ARCH" = "x64" ]; then
+        if [ "$VMAF_EXPECT_CUDA" = "TRUE" ]; then
             LIBVMAF_ARGS+=(--enable-cuda)
         else
             LIBVMAF_ARGS+=(--disable-cuda)
@@ -2636,12 +2647,12 @@ if should_build LIBVMAF; then
             echo "libvmaf.pc was not installed: ${INSTALL_DIR}/lib/pkgconfig/libvmaf.pc"
             exit 1
         fi
-        if [ "$TARGET_ARCH" = "x64" ]; then
+        if [ "$VMAF_EXPECT_CUDA" = "TRUE" ]; then
             if [ ! -f "${INSTALL_DIR}/include/libvmaf/libvmaf_cuda.h" ]; then
                 echo "CUDA-enabled libvmaf headers missing: ${INSTALL_DIR}/include/libvmaf/libvmaf_cuda.h"
                 exit 1
             fi
-            if ! grep -q 'HAVE_CUDA 1' "${BUILD_DIR}/${TARGET_ARCH}/vmaf/libvmaf/build/src/config.h" 2>/dev/null; then
+            if ! grep -q 'HAVE_CUDA 1' "$VMAF_CUDA_CONFIG" 2>/dev/null; then
                 echo "libvmaf was built without HAVE_CUDA."
                 exit 1
             fi
@@ -2713,7 +2724,7 @@ fi
 # --target exe (x64) + --enable-nonfree: nvcc で scale_cuda 等を有効化する。
 # DLL/audenc、および nonfree なしでは CUDA カーネルコンパイルは無効。
 FFMPEG_CUDA_ENABLE_FLAGS=""
-if [ "$BUILD_EXE" = "TRUE" ] && [ "$FOR_AUDENC" != "TRUE" ] && [ "$TARGET_ARCH" = "x64" ] && [ "$ENABLE_NONFREE" = "TRUE" ]; then
+if [ "$BUILD_EXE" = "TRUE" ] && [ "$FOR_AUDENC" != "TRUE" ] && [ "$TARGET_ARCH" = "x64" ] && [ "$ENABLE_NONFREE" = "TRUE" ] && [ "$DISABLE_CUDA" != "TRUE" ]; then
     if find_ffmpeg_cuda_path; then
         export CUDA_PATH
         export PATH="${CUDA_PATH}/bin:${PATH}"

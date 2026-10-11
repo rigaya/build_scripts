@@ -53,6 +53,7 @@ ENABLE_SWSCALE="FALSE"
 FOR_FFMPEG4="FALSE"
 FOR_AUDENC="FALSE"
 FOR_TSREPLACE="FALSE"
+FOR_AMTK="FALSE"
 ADD_TLVMMT="FALSE"
 BUILD_EXE="FALSE"
 ENABLE_GPL="FALSE"
@@ -67,7 +68,7 @@ ENABLE_V4L2_MULTIPLANAR="FALSE"
 
 set -e
 
-# [ audenc, exe, tsreplace ]
+# [ audenc, exe, tsreplace, amtk ]
 TARGET_BUILD=""
 
 while [[ $# -gt 0 ]]; do
@@ -85,6 +86,7 @@ while [[ $# -gt 0 ]]; do
     -a|--all) BUILD_ALL="TRUE"; shift ;;
     -u|--update-ffmpeg) UPDATE_FFMPEG="TRUE"; shift ;;
     -r) FOR_FFMPEG4="TRUE"; shift ;;
+    -amtk) FOR_AMTK="TRUE"; shift ;;
     -t|--target) TARGET_BUILD="$2"; shift 2 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
@@ -95,7 +97,13 @@ if [ "$SRC_ARCHIVE_ONLY" = "TRUE" ] && [ "$SKIP_SRC_ARCHIVE" = "TRUE" ]; then
     exit 1
 fi
 
-if [ "$TARGET_BUILD" = "audenc" ]; then
+if [ "$FOR_AMTK" = "TRUE" ]; then
+    if [ -n "$TARGET_BUILD" ]; then
+        echo "-amtk cannot be combined with --target."
+        exit 1
+    fi
+    TARGET_DIR_NAME="amtk"
+elif [ "$TARGET_BUILD" = "audenc" ]; then
     FOR_AUDENC="TRUE"
     BUILD_EXE="TRUE"
     TARGET_DIR_NAME="audenc"
@@ -128,6 +136,10 @@ mkdir -p $SRC_DIR
 cd $SRC_DIR
 
 if [ "$ENABLE_GPL" != "FALSE" ]; then
+  if [ "$FOR_AMTK" = "TRUE" ]; then
+    echo "--enable-gpl cannot be combined with -amtk (-amtk enables GPL by itself, without x264/x265/xvid)."
+    exit 1
+  fi
   if [ "$BUILD_EXE" = "FALSE" ] && [ "$SRC_ARCHIVE_ONLY" != "TRUE" ]; then
     echo "--enable-gpl can be only used when --target exe is set."
     exit 1
@@ -135,6 +147,10 @@ if [ "$ENABLE_GPL" != "FALSE" ]; then
 fi
 
 if [ "$ENABLE_NONFREE" != "FALSE" ]; then
+  if [ "$FOR_AMTK" = "TRUE" ]; then
+    echo "--enable-nonfree cannot be combined with -amtk."
+    exit 1
+  fi
   if [ "$BUILD_EXE" = "FALSE" ] && [ "$SRC_ARCHIVE_ONLY" != "TRUE" ]; then
     echo "--enable-nonfree can be only used when --target exe is set."
     exit 1
@@ -187,6 +203,17 @@ if [ "$MINGWDIR" = "" ]; then
     FFMPEG_TARGET_OS="linux"
 else
     FFMPEG_TARGET_OS="mingw32"
+fi
+
+if [ "$FOR_AMTK" = "TRUE" ]; then
+    if [ "${MSYSTEM:-}" != "MINGW64" ] || [ "$TARGET_ARCH" != "x64" ]; then
+        echo "-amtk is only supported for MINGW64 x64."
+        exit 1
+    fi
+    if [ "$FOR_FFMPEG4" = "TRUE" ] || [ "$ENABLE_V4L2_MULTIPLANAR" = "TRUE" ]; then
+        echo "-amtk cannot be combined with -r or --v4l2-multiplanar."
+        exit 1
+    fi
 fi
 
 if [ "$ENABLE_V4L2_MULTIPLANAR" = "TRUE" ]; then
@@ -310,6 +337,9 @@ fi
 if [ $FOR_TSREPLACE = "TRUE" ]; then
     FFMPEG_DIR_NAME="${FFMPEG_DIR_NAME}_tsreplace"
 fi
+if [ $FOR_AMTK = "TRUE" ]; then
+    FFMPEG_DIR_NAME="${FFMPEG_DIR_NAME}_amtk"
+fi
 if [ $BUILD_EXE = "TRUE" ]; then
     FFMPEG_DIR_NAME="${FFMPEG_DIR_NAME}_exe"
 fi
@@ -323,6 +353,7 @@ echo SSE4_2=$SSE4_2
 echo UPDATE_FFMPEG=$UPDATE_FFMPEG
 echo FOR_AUDENC=$FOR_AUDENC
 echo FOR_TSREPLACE=$FOR_TSREPLACE
+echo FOR_AMTK=$FOR_AMTK
 echo ENABLE_SWSCALE=$ENABLE_SWSCALE
 echo FFMPEG_DIR_NAME=$FFMPEG_DIR_NAME
 echo BUILD_EXE=$BUILD_EXE
@@ -504,6 +535,31 @@ force_mingw_static_iconv_pthread_in_ffmpeg_config() {
     fi
 }
 
+# FFmpeg 4.0 は zlib/bzlib/lzma を -lz/-lbz2/-llzma で探す。
+# 自前で入れた静的アーカイブを、MinGW の同名 .dll.a より優先する。
+force_mingw_static_z_bz2_lzma_in_ffmpeg_config() {
+    local ffmpeg_dir="$1"
+    local file
+    for file in "${ffmpeg_dir}/ffbuild/config.mak" "${ffmpeg_dir}/ffbuild/config.sh"; do
+        [ -f "$file" ] || continue
+        sed -E -i \
+            -e 's/-lz\b/-l:libz.a/g' \
+            -e 's/-lbz2\b/-l:libbz2.a/g' \
+            -e 's/-llzma\b/-l:liblzma.a/g' \
+            -e 's/-lmfx\b/-l:libmfx.a/g' \
+            "$file"
+    done
+}
+
+# GCC 14 以降は暗黙宣言やポインタ型の不一致をエラーにする。
+# FFmpeg 4.0.2 向けに、configure が付けた -Werror=* より後で無効化する。
+relax_ffmpeg40_gcc_errors() {
+    local config_mak="$1/ffbuild/config.mak"
+    [ -f "$config_mak" ] || return 0
+    sed -E -i \
+        -e '/^CFLAGS=/s/$/ -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=deprecated-declarations/' \
+        "$config_mak"
+}
 
 start_build() {
     echo "=== Building $1 ======================================="
@@ -632,6 +688,7 @@ BUILD_LIB_ARIBB24="FALSE"
 BUILD_LIB_LIBARIBCAPTION="FALSE"
 BUILD_LIB_DAV1D="FALSE"
 BUILD_LIB_LIBVPL="FALSE"
+BUILD_LIB_LIBMFX="FALSE"
 BUILD_LIB_LIBVPX="FALSE"
 BUILD_LIB_NV_CODEC_HEADERS="FALSE"
 BUILD_LIB_LIBXXHASH="FALSE"
@@ -652,6 +709,21 @@ BUILD_LIB_X264="FALSE"
 BUILD_LIB_X265="FALSE"
 BUILD_LIB_LIBVMAF="FALSE"
 
+# --- amtk (nekopanda/FFmpeg amatsukaze, FFmpeg 4.0.2) 向け ---
+# build_dep.sh の ffmpeg_nekopanda と同じく、zlib / bzip2 / lzma / iconv / nv-codec-headers。
+# QSV デコードは FFmpeg 4.0.2 の --enable-libmfx。libvpl はこの版には無い。
+# bzip2 / lzma / libmfx dispatcher は自前の静的ライブラリを使う。iconv は MinGW 同梱の libiconv.a。
+# xlib / vaapi は MinGW では使わない。
+if [ "$FOR_AMTK" = "TRUE" ]; then
+    BUILD_LIB_ZLIB="TRUE"
+    BUILD_LIB_BZIP2="TRUE"
+    BUILD_LIB_LZMA="TRUE"
+    BUILD_LIB_LIBMFX="TRUE"
+    if [ "$DISABLE_CUDA" != "TRUE" ]; then
+        BUILD_LIB_NV_CODEC_HEADERS="TRUE"
+    fi
+fi
+
 # --- tsreplace向け最小構成 ---
 if [ "$FOR_TSREPLACE" = "TRUE" ]; then
     BUILD_LIB_ZLIB="TRUE"
@@ -661,7 +733,7 @@ if [ "$FOR_TSREPLACE" = "TRUE" ]; then
 fi
 
 # --- 音声系ライブラリ (通常モードで必要) ---
-if [ "$FOR_TSREPLACE" != "TRUE" ]; then
+if [ "$FOR_TSREPLACE" != "TRUE" ] && [ "$FOR_AMTK" != "TRUE" ]; then
     BUILD_LIB_OPUS="TRUE"
     BUILD_LIB_LIBOGG="TRUE"
     BUILD_LIB_LIBVORBIS="TRUE"
@@ -673,7 +745,7 @@ if [ "$FOR_TSREPLACE" != "TRUE" ]; then
 fi
 
 # --- 映像系ライブラリ (audenc以外で必要) ---
-if [ "$FOR_AUDENC" != "TRUE" ] && [ "$FOR_TSREPLACE" != "TRUE" ]; then
+if [ "$FOR_AUDENC" != "TRUE" ] && [ "$FOR_TSREPLACE" != "TRUE" ] && [ "$FOR_AMTK" != "TRUE" ]; then
     # 基本ライブラリ (字幕・フォント描画の依存チェーン)
     # freetype <- zlib, bzip2, libpng
     # fontconfig <- freetype, libiconv, expat, libpng
@@ -777,7 +849,7 @@ fi
 
 # --- ビルドフラグの表示 ---
 echo "--- Library build flags (TRUE only) ---"
-for flag in BUILD_LIB_ZLIB BUILD_LIB_BZIP2 BUILD_LIB_LZMA BUILD_LIB_LIBPNG BUILD_LIB_EXPAT BUILD_LIB_FREETYPE BUILD_LIB_LIBICONV BUILD_LIB_FONTCONFIG BUILD_LIB_FRIBIDI BUILD_LIB_HARFBUZZ BUILD_LIB_LIBUNIBREAK BUILD_LIB_LIBASS BUILD_LIB_LIBASS_DLL BUILD_LIB_OPUS BUILD_LIB_LIBOGG BUILD_LIB_LIBVORBIS BUILD_LIB_SPEEX BUILD_LIB_LAME BUILD_LIB_LIBSNDFILE BUILD_LIB_TWOLAME BUILD_LIB_SOXR BUILD_LIB_LIBXML2 BUILD_LIB_LIBBLURAY BUILD_LIB_ARIBB24 BUILD_LIB_LIBARIBCAPTION BUILD_LIB_DAV1D BUILD_LIB_LIBVPL BUILD_LIB_LIBVPX BUILD_LIB_NV_CODEC_HEADERS BUILD_LIB_LIBXXHASH BUILD_LIB_DOVI_TOOL BUILD_LIB_GLSLANG BUILD_LIB_LIBJPEG_TURBO BUILD_LIB_LCMS2 BUILD_LIB_SHADERC BUILD_LIB_SPIRV_CROSS BUILD_LIB_VULKAN_LOADER BUILD_LIB_LIBPLACEBO BUILD_LIB_LIBPLACEBO_DLL BUILD_LIB_ZIMG BUILD_LIB_VVENC BUILD_LIB_SVT_AV1 BUILD_LIB_XVIDCORE BUILD_LIB_X264 BUILD_LIB_X265 BUILD_LIB_LIBVMAF; do
+for flag in BUILD_LIB_ZLIB BUILD_LIB_BZIP2 BUILD_LIB_LZMA BUILD_LIB_LIBPNG BUILD_LIB_EXPAT BUILD_LIB_FREETYPE BUILD_LIB_LIBICONV BUILD_LIB_FONTCONFIG BUILD_LIB_FRIBIDI BUILD_LIB_HARFBUZZ BUILD_LIB_LIBUNIBREAK BUILD_LIB_LIBASS BUILD_LIB_LIBASS_DLL BUILD_LIB_OPUS BUILD_LIB_LIBOGG BUILD_LIB_LIBVORBIS BUILD_LIB_SPEEX BUILD_LIB_LAME BUILD_LIB_LIBSNDFILE BUILD_LIB_TWOLAME BUILD_LIB_SOXR BUILD_LIB_LIBXML2 BUILD_LIB_LIBBLURAY BUILD_LIB_ARIBB24 BUILD_LIB_LIBARIBCAPTION BUILD_LIB_DAV1D BUILD_LIB_LIBVPL BUILD_LIB_LIBMFX BUILD_LIB_LIBVPX BUILD_LIB_NV_CODEC_HEADERS BUILD_LIB_LIBXXHASH BUILD_LIB_DOVI_TOOL BUILD_LIB_GLSLANG BUILD_LIB_LIBJPEG_TURBO BUILD_LIB_LCMS2 BUILD_LIB_SHADERC BUILD_LIB_SPIRV_CROSS BUILD_LIB_VULKAN_LOADER BUILD_LIB_LIBPLACEBO BUILD_LIB_LIBPLACEBO_DLL BUILD_LIB_ZIMG BUILD_LIB_VVENC BUILD_LIB_SVT_AV1 BUILD_LIB_XVIDCORE BUILD_LIB_X264 BUILD_LIB_X265 BUILD_LIB_LIBVMAF; do
     if [ "${!flag}" = "TRUE" ]; then
         echo "  $flag"
     fi
@@ -833,7 +905,7 @@ create_src_archive() {
         "$SRC_DIR/libpng*" "$SRC_DIR/libass*" "$SRC_DIR/bzip2*" "$SRC_DIR/libbluray*" \
         "$SRC_DIR/glslang*" "$SRC_DIR/zimg*" \
         "$SRC_DIR/aribb24*" "$SRC_DIR/libaribcaption*" "$SRC_DIR/libxml2*" "$SRC_DIR/dav1d*" \
-        "$SRC_DIR/libvpl*" "$SRC_DIR/libvpx*" "$SRC_DIR/nv-codec-headers*" \
+        "$SRC_DIR/libvpl*" "$SRC_DIR/mfx_dispatch*" "$SRC_DIR/libvpx*" "$SRC_DIR/nv-codec-headers*" \
         "$SRC_DIR/libxxhash*" "$SRC_DIR/shaderc*" "$SRC_DIR/SPIRV-Cross*" \
         "$SRC_DIR/dovi_tool*" "$SRC_DIR/libjpeg-*" "$SRC_DIR/lcms2*" "$SRC_DIR/libplacebo*" "$SRC_DIR/Vulkan-Loader*" \
         $SRC_GPL_LIBS $SRC_EXE_LIBS $SRC_ENCODER_LIBS $SRC_VMAF_LIBS \
@@ -899,7 +971,13 @@ VER_LIBXML2="2.15.3"
 VER_LIBBLURAY="1.5.0"
 VER_LIBARIBCAPTION="1.1.2"
 VER_LIBVPL="2.17.0"
+VER_LIBMFX="1.35.1"
 VER_NV_CODEC_HEADERS="13.1.15.0"
+if [ "$FOR_AMTK" = "TRUE" ]; then
+    # FFmpeg 4.0.2 の ffnvcodec 検査は dynlink_cuviddec.h を要求する。
+    # build_dep.sh と同じ n12.2.72.0 を使う。
+    VER_NV_CODEC_HEADERS="12.2.72.0"
+fi
 VER_LIBVPX="1.16.0"
 VER_DAV1D="1.5.4"
 VER_LIBXXHASH="0.8.3"
@@ -921,7 +999,15 @@ if [ "$TARGET_ARCH" = "x86" ]; then
 fi
 
 #--- ソースのダウンロード ---------------------------------------
-if [ "$FOR_FFMPEG4" = "TRUE" ]; then
+if [ "$FOR_AMTK" = "TRUE" ]; then
+    if [ ! -f "ffmpeg_amtk/configure" ]; then
+        rm -rf ffmpeg_amtk
+        git clone --depth 1 -b amatsukaze https://github.com/nekopanda/FFmpeg.git ffmpeg_amtk
+    elif [ "$UPDATE_FFMPEG" != "FALSE" ]; then
+        git -C ffmpeg_amtk fetch --depth 1 origin amatsukaze
+        git -C ffmpeg_amtk reset --hard FETCH_HEAD
+    fi
+elif [ "$FOR_FFMPEG4" = "TRUE" ]; then
     if [ ! -d "ffmpeg" ]; then
         download_archive "ffmpeg-${VER_FFMPEG4}.tar.xz" "https://ffmpeg.org/releases/ffmpeg-${VER_FFMPEG4}.tar.xz"
         tar xf ffmpeg-${VER_FFMPEG4}.tar.xz
@@ -1103,6 +1189,11 @@ if should_build LIBVPL && [ ! -d "libvpl-${VER_LIBVPL}" ]; then
     tar xf libvpl-${VER_LIBVPL}.tar.gz
 fi
 
+if should_build LIBMFX && [ ! -d "mfx_dispatch-${VER_LIBMFX}" ]; then
+    download_archive "mfx_dispatch-${VER_LIBMFX}.tar.gz" "https://github.com/lu-zero/mfx_dispatch/archive/refs/tags/${VER_LIBMFX}.tar.gz"
+    tar xf "mfx_dispatch-${VER_LIBMFX}.tar.gz"
+fi
+
 if should_build NV_CODEC_HEADERS && [ ! -d "nv-codec-headers-${VER_NV_CODEC_HEADERS}" ]; then
     download_archive "nv-codec-headers-${VER_NV_CODEC_HEADERS}.tar.gz" "https://github.com/FFmpeg/nv-codec-headers/releases/download/n${VER_NV_CODEC_HEADERS}/nv-codec-headers-${VER_NV_CODEC_HEADERS}.tar.gz"
     tar xf nv-codec-headers-${VER_NV_CODEC_HEADERS}.tar.gz
@@ -1228,18 +1319,29 @@ if [ ! -d $BUILD_DIR/$TARGET_ARCH ]; then
     mkdir $BUILD_DIR/$TARGET_ARCH
 fi
 cd $BUILD_DIR/$TARGET_ARCH
+FFMPEG_SRC_TREE="$SRC_DIR/ffmpeg"
+if [ "$FOR_AMTK" = "TRUE" ]; then
+    FFMPEG_SRC_TREE="$SRC_DIR/ffmpeg_amtk"
+fi
 # --- 出力先の古いデータを削除 ----------------------
 if [ $UPDATE_FFMPEG != "FALSE" ] && [ -d ffmpeg_test ]; then
     rm -rf ffmpeg_test
 fi
 if [ ! -d ffmpeg_test ]; then
-    cp -r "$SRC_DIR/ffmpeg" ffmpeg_test
+    cp -r "$FFMPEG_SRC_TREE" ffmpeg_test
 fi
 
 if [ -d "$FFMPEG_WORK_DIR" ]; then
     rm -rf "$FFMPEG_WORK_DIR"
 fi
-cp -r "$SRC_DIR/ffmpeg" "$FFMPEG_WORK_DIR"
+cp -r "$FFMPEG_SRC_TREE" "$FFMPEG_WORK_DIR"
+
+if [ "$FOR_AMTK" = "TRUE" ]; then
+    cd "$FFMPEG_WORK_DIR"
+    # binutils 2.41 以降で x86 inline asm の shift 即値が拒否されるため。
+    echo "Patch ffmpeg_amtk_binutils241.diff..."
+    patch -p1 < "$PATCHES_DIR/ffmpeg_amtk_binutils241.diff"
+fi
 
 if [ $ADD_TLVMMT = "TRUE" ]; then
     cd "$FFMPEG_WORK_DIR"
@@ -1986,8 +2088,34 @@ if should_build LIBVPX && [ ! -d "libvpx" ]; then
 fi
 
 cd $BUILD_DIR/$TARGET_ARCH
+if should_build LIBMFX && [ ! -d "libmfx" ]; then
+    cp -a "${SRC_DIR}/mfx_dispatch-${VER_LIBMFX}" ./libmfx
+    start_build "libmfx"
+    cd libmfx
+    autoreconf -fiv
+    # デスクトップ版は libva を見ない。dispatcher は静的にし、実行時にドライバの libmfxhw64.dll を読む。
+    lt_cv_deplibs_check_method=pass_all \
+    PKG_CONFIG_PATH= \
+    CFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    CXXFLAGS="${BUILD_CCFLAGS_SMALL}" \
+    LDFLAGS="${BUILD_LDFLAGS}" \
+    ./configure \
+        --prefix="$INSTALL_DIR" \
+        --disable-shared \
+        --enable-static
+    make -j$NJOBS
+    make install
+    sed -E -i -e 's/-lmfx\b/-l:libmfx.a/g' "$INSTALL_DIR/lib/pkgconfig/libmfx.pc"
+    normalize_static_libstdcxx_pc_dir "$INSTALL_DIR/lib/pkgconfig"
+fi
+
+cd $BUILD_DIR/$TARGET_ARCH
 if should_build NV_CODEC_HEADERS && [ ! -d "nv-codec-headers" ]; then
-    find "${SRC_DIR}" -type d -name "nv-codec-headers-*" | xargs -i cp -r {} ./nv-codec-headers
+    if [ "$FOR_AMTK" = "TRUE" ]; then
+        cp -a "${SRC_DIR}/nv-codec-headers-${VER_NV_CODEC_HEADERS}" ./nv-codec-headers
+    else
+        find "${SRC_DIR}" -type d -name "nv-codec-headers-*" | xargs -i cp -r {} ./nv-codec-headers
+    fi
     start_build "nv-codec-headers"
     cd nv-codec-headers
     make PREFIX=$INSTALL_DIR install
@@ -2925,7 +3053,70 @@ if [ "$MINGWDIR" != "" ]; then
 fi
 
 cd "$FFMPEG_WORK_DIR"
-if [ $FOR_AUDENC = "TRUE" ]; then
+if [ "$FOR_AMTK" = "TRUE" ]; then
+start_build "FFmpeg for Amatsukaze"
+# MinGW DLL。依存 (zlib/bz2/lzma/iconv/libgcc/libstdc++/winpthread) は静的リンクする。
+FFMPEG_INSTALL_DIR=$RELEASE_DIR
+FFMPEG_LIBRARY_TYPE_FLAGS="--enable-shared --disable-static"
+FFMPEG_EXTRA_LDFLAGS="${BUILD_LDFLAGS} -L${INSTALL_DIR}/lib"
+FFMPEG_EXTRA_LDFLAGS=$(printf '%s' " ${FFMPEG_EXTRA_LDFLAGS} " | sed -E 's/ -static / /g' | sed -E 's/^ +//;s/ +$//')
+rm -rf "${FFMPEG_INSTALL_DIR}"
+mkdir -p "${FFMPEG_INSTALL_DIR}"
+if [ "${BUILD_LIB_NV_CODEC_HEADERS}" = "TRUE" ]; then
+    # NV_ENC_PRESET_HQ_GUID は n12 ヘッダから消えているため nvenc は明示的に無効。
+    AMTK_NV_FLAGS="--enable-ffnvcodec --enable-cuvid --enable-nvdec --disable-nvenc"
+else
+    AMTK_NV_FLAGS="--disable-ffnvcodec --disable-cuvid --disable-nvdec --disable-nvenc --disable-cuda"
+fi
+PKG_CONFIG_PATH=${PKG_CONFIG_PATH_FFMPEG} \
+./configure \
+--prefix=${FFMPEG_INSTALL_DIR} \
+--arch="${FFMPEG_ARCH}" \
+--target-os="${FFMPEG_TARGET_OS}" \
+--enable-gpl \
+--enable-version3 \
+--disable-postproc \
+--enable-zlib \
+--enable-bzlib \
+--enable-lzma \
+--enable-iconv \
+--enable-libmfx \
+--enable-dxva2 \
+--enable-gray \
+--disable-xlib \
+--disable-vaapi \
+--disable-vdpau \
+--disable-videotoolbox \
+--disable-audiotoolbox \
+--disable-appkit \
+--disable-avfoundation \
+--disable-coreimage \
+--disable-amf \
+--disable-crystalhd \
+--disable-d3d11va \
+--disable-v4l2-m2m \
+--disable-sdl2 \
+--disable-schannel \
+--disable-securetransport \
+--disable-alsa \
+--disable-sndio \
+--disable-libxcb \
+--disable-libxcb-shm \
+--disable-libxcb-xfixes \
+--disable-libxcb-shape \
+--disable-xvmc \
+$AMTK_NV_FLAGS \
+--disable-doc \
+--disable-network \
+--disable-devices \
+--disable-debug \
+$FFMPEG_LIBRARY_TYPE_FLAGS \
+$FFMPEG_X86_DISABLE_FLAGS \
+$FFMPEG_THREAD_FLAGS \
+--pkg-config-flags=--static \
+--extra-cflags="${BUILD_CCFLAGS} -std=gnu11 ${FFMPEG_ARCH_CFLAGS}" \
+--extra-ldflags="${FFMPEG_EXTRA_LDFLAGS}"
+elif [ $FOR_AUDENC = "TRUE" ]; then
 start_build "FFmpeg for Audenc"
 pwd
 PKG_CONFIG_PATH=${PKG_CONFIG_PATH_FFMPEG} \
@@ -3090,6 +3281,10 @@ $FFMPEG_EXTRA_LIBS
 fi
 if [ "$MINGWDIR" != "" ]; then
     force_mingw_static_iconv_pthread_in_ffmpeg_config "$FFMPEG_WORK_DIR"
+    if [ "$FOR_AMTK" = "TRUE" ]; then
+        force_mingw_static_z_bz2_lzma_in_ffmpeg_config "$FFMPEG_WORK_DIR"
+        relax_ffmpeg40_gcc_errors "$FFMPEG_WORK_DIR"
+    fi
 fi
 make clean && make -j$NJOBS && make install
 
